@@ -1,0 +1,631 @@
+/* editorial.module.css — 剧本模块卡片 Editorial × 古籍数字化美学
+   设计原则:克制+精准。无圆角或 2px。左侧封印色条。serif 大数字。字符进度条。朱印徽章。
+*/
+
+/* ─────────────────────────────────────────────────────────
+   MODULE MATRIX OVERVIEW
+───────────────────────────────────────────────────────── */
+
+.matrixRoot {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.matrixHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.matrixTitle {
+  font-family: var(--font-serif);
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--text);
+  margin: 0;
+}
+
+.matrixDesc {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.matrixGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  /* No gap between cells — hairline borders create separation */
+  gap: 0;
+  border-top: 1px solid var(--line-soft);
+  border-left: 1px solid var(--line-soft);
+}
+
+@media (max-width: 780px) {
+  .matrixGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.matrixLoading {
+  font-size: 12px;
+  color: var(--muted);
+  padding: 16px 0;
+}
+
+/* ─────────────────────────────────────────────────────────
+   MODULE STATUS CARD
+───────────────────────────────────────────────────────── */
+
+.card {
+  position: relative;
+  background: var(--bg-deep);
+  border-right: 1px solid var(--line-soft);
+  border-bottom: 1px solid var(--line-soft);
+  padding: 16px 18px 14px 22px;
+  /* The left accent bar is a pseudo-element for smooth transition */
+  transition: background 0.15s ease;
+  cursor: default;
+}
+
+.card::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--line);
+  transition: width 0.15s ease, background 0.15s ease;
+}
+
+.card:hover {
+  background: var(--panel);
+}
+
+.card:hover::before {
+  width: 4px;
+  background: var(--accent);
+}
+
+/* Running state — accent bar always on */
+.cardRunning::before {
+  width: 4px;
+  background: var(--accent);
+  animation: barPulse 1.6s ease-in-out infinite;
+}
+
+@keyframes barPulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.45; }
+}
+
+/* Missing state — danger bar */
+.cardMissing::before {
+  background: var(--danger);
+  width: 2px;
+}
+
+/* ── Card header row ── */
+.cardHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.cardTitleGroup {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.cardTitle {
+  font-family: var(--font-serif);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Source tag — small-caps dotted label */
+.sourceTag {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-variant: small-caps;
+  letter-spacing: 0.06em;
+  color: var(--muted-2);
+  white-space: nowrap;
+  flex-shrink: 0;
+  padding: 1px 4px;
+  border: 1px dotted var(--line-soft);
+  border-radius: 1px;
+  line-height: 1.4;
+}
+
+.sourceTagLlm {
+  color: var(--warn);
+  border-color: rgba(212, 179, 102, 0.28);
+}
+
+.sourceTagZero {
+  color: var(--ok);
+  border-color: rgba(126, 184, 142, 0.28);
+}
+
+.sourceTagMixed {
+  color: var(--info);
+  border-color: rgba(122, 166, 194, 0.28);
+}
+
+/* ── Card actions area ── */
+.cardActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+/* Inline-link style rebuild button */
+.rebuildBtn {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 2px;
+  transition: color 0.12s ease, text-decoration-color 0.12s ease;
+}
+
+.rebuildBtn:hover:not(:disabled) {
+  color: var(--accent);
+  text-decoration-color: var(--accent-edge);
+}
+
+.rebuildBtn:disabled {
+  opacity: 0.38;
+  cursor: default;
+}
+
+.rebuildArrow {
+  font-size: 13px;
+  line-height: 1;
+  display: inline-block;
+  transition: transform 0.18s ease;
+}
+
+.rebuildBtn:hover:not(:disabled) .rebuildArrow {
+  transform: rotate(45deg);
+}
+
+/* Detail link */
+.detailLink {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  color: var(--muted-2);
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 2px;
+  transition: color 0.12s ease, text-decoration-color 0.12s ease;
+}
+
+.detailLink:hover {
+  color: var(--text-quiet);
+  text-decoration-color: var(--line-strong);
+}
+
+/* ── Card body ── */
+.cardBody {
+  display: flex;
+  align-items: baseline;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+/* Big serif count display */
+.countBlock {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  min-width: 60px;
+}
+
+.countNum {
+  font-family: var(--font-serif);
+  font-size: 32px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  color: var(--text);
+  letter-spacing: -0.02em;
+}
+
+.countDash {
+  font-family: var(--font-serif);
+  font-size: 24px;
+  font-weight: 400;
+  color: var(--muted-2);
+  line-height: 1;
+}
+
+.countSep {
+  font-family: var(--font-serif);
+  font-size: 20px;
+  color: var(--muted-2);
+  line-height: 1;
+  font-weight: 300;
+}
+
+.countTotal {
+  font-family: var(--font-serif);
+  font-size: 18px;
+  font-weight: 400;
+  color: var(--muted);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.countUnit {
+  font-size: 11px;
+  color: var(--muted-2);
+  font-family: var(--font-sans);
+  line-height: 1;
+  margin-left: -2px;
+}
+
+/* ── Status badge ── */
+.statusArea {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.statusLabel {
+  font-size: 11px;
+  color: var(--muted-2);
+  font-family: var(--font-sans);
+  line-height: 1;
+}
+
+.statusBadge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.3;
+  font-weight: 500;
+}
+
+.statusBadge.ok     { color: var(--ok); }
+.statusBadge.warn   { color: var(--warn); }
+.statusBadge.danger { color: var(--danger); }
+.statusBadge.run    { color: var(--accent); }
+.statusBadge.dim    { color: var(--muted); }
+
+/* ── Progress bar (character-based) ── */
+.progressArea {
+  width: 100%;
+  margin-top: 8px;
+}
+
+.progressBar {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  letter-spacing: 0.05em;
+  line-height: 1;
+  color: var(--accent);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.progressBarEmpty {
+  color: var(--muted-3);
+}
+
+.progressPct {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--muted-2);
+  margin-left: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Time since label ── */
+.timeLabel {
+  font-size: 11px;
+  color: var(--muted-2);
+  font-family: var(--font-sans);
+}
+
+/* ── Extra actions slot (world tab double-button) ── */
+.extraActionsRow {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dotted var(--line-soft);
+  flex-wrap: wrap;
+}
+
+/* ── 朱印 protagonist badge ── */
+.zhuyinBadge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #b32118;
+  box-shadow: 0 0 0 1.5px rgba(179, 33, 24, 0.55), 0 1px 4px rgba(0,0,0,0.45);
+  transform: rotate(-8deg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  /* Subtle grain texture via radial gradient */
+  background-image: radial-gradient(circle at 38% 35%, rgba(255,255,255,0.12) 0%, transparent 65%),
+                    radial-gradient(circle at 65% 68%, rgba(0,0,0,0.18) 0%, transparent 50%);
+  background-color: #b32118;
+}
+
+.zhuyinChar {
+  font-family: var(--font-serif);
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff8f3;
+  line-height: 1;
+  letter-spacing: 0;
+  /* Simulate a carved impression by slightly offsetting the drop shadow */
+  text-shadow: 0 1px 0 rgba(0,0,0,0.5), 0 -1px 0 rgba(255,255,255,0.08);
+  transform: rotate(0deg);
+}
+
+/* Card description */
+.cardDesc {
+  font-size: 11px;
+  color: var(--muted-2);
+  font-family: var(--font-sans);
+  line-height: 1.45;
+  margin-bottom: 8px;
+}
+
+/* ─────────────────────────────────────────────────────────
+   REBUILD JOB BANNER
+───────────────────────────────────────────────────────── */
+
+.banner {
+  position: relative;
+  background: var(--panel);
+  border: 1px solid var(--line-soft);
+  border-left: 3px solid var(--accent);
+  border-radius: 0;
+  padding: 10px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.bannerHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.bannerTitle {
+  font-family: var(--font-serif);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  letter-spacing: 0.02em;
+}
+
+.bannerModule {
+  color: var(--accent);
+}
+
+.bannerArrow {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--muted);
+  background: var(--bg-deep);
+  padding: 1px 6px;
+  border: 1px solid var(--line-soft);
+  border-radius: 1px;
+}
+
+.bannerCancel {
+  background: none;
+  border: 1px solid var(--line-soft);
+  border-radius: 1px;
+  padding: 3px 10px;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  color: var(--muted);
+  transition: color 0.1s, border-color 0.1s;
+}
+
+.bannerCancel:hover {
+  color: var(--text);
+  border-color: var(--line-strong);
+}
+
+.bannerProgressRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.bannerCharBar {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.bannerPct {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.bannerStage {
+  font-size: 11px;
+  color: var(--muted-2);
+  font-family: var(--font-sans);
+}
+
+.bannerError {
+  border-left-color: var(--danger);
+}
+
+.bannerErrorTitle {
+  color: var(--danger);
+}
+
+.bannerErrorMsg {
+  font-size: 11px;
+  color: var(--muted);
+  font-family: var(--font-sans);
+  margin-top: 2px;
+}
+
+/* ─────────────────────────────────────────────────────────
+   ESTIMATE MODAL overrides (Cloudscape CSModal still used)
+   Only override the inner content styling — not the modal shell.
+───────────────────────────────────────────────────────── */
+
+.estimateBody {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  font-family: var(--font-sans);
+}
+
+.estimateKVRow {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.estimateKVItem {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.estimateKVLabel {
+  font-size: 11px;
+  color: var(--muted-2);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-variant: small-caps;
+}
+
+.estimateKVValue {
+  font-family: var(--font-serif);
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+.estimateKVValueFree {
+  color: var(--ok);
+}
+
+.estimateSectionLabel {
+  font-size: 11px;
+  color: var(--muted-2);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 4px;
+}
+
+.estimateTagRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.estimateTag {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+  border: 1px dotted var(--line-soft);
+  padding: 1px 6px;
+  border-radius: 1px;
+}
+
+.estimatePrereqRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-quiet);
+}
+
+.prereqOk    { color: var(--ok); }
+.prereqWarn  { color: var(--warn); }
+
+.estimateBlockAlert {
+  background: var(--warn-soft);
+  border: 1px solid rgba(212, 179, 102, 0.28);
+  border-left: 3px solid var(--warn);
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--warn);
+}
+
+.estimateNote {
+  font-size: 11px;
+  color: var(--muted-2);
+  font-style: italic;
+}
+
+.estimateLoading {
+  font-size: 12px;
+  color: var(--muted);
+  padding: 12px 0;
+}
+
+.estimateErrorBanner {
+  background: var(--danger-soft);
+  border: 1px solid rgba(200, 103, 93, 0.28);
+  border-left: 3px solid var(--danger);
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--danger);
+}

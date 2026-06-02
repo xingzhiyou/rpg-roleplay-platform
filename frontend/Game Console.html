@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="api-base" content="" />
+  <meta name="api-prefix" content="/api/v1" />
+  <title>RPG Roleplay · 游戏控制台</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&family=Noto+Serif+SC:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="src/tokens.css" />
+  <link rel="stylesheet" href="src/platform.css?v=20260527-assistant" />
+  <link rel="stylesheet" href="src/game-console.css?v=20260527-noflk1" />
+  <link rel="stylesheet" href="src/motion.css" />
+
+  <!-- Vite: CDN UMD 脚本（React/ReactDOM/@babel/standalone）已移除
+       改由 @vitejs/plugin-react + src/entries/game-console.jsx 处理 -->
+</head>
+<body data-screen-label="Game Console">
+  <!-- 首屏 splash:不依赖 JS,bundle 下载/RPG_DATA_READY 解析期间也有视觉反馈,
+       消除『打开新 tab → 黑屏 N 秒』。React mount 时会接管 #root,替换这段。 -->
+  <style>
+    #rpg-game-splash {
+      position: fixed; inset: 0; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      background: var(--bg, #121110); color: var(--text, #c8c2b7);
+      font-family: 'Noto Sans SC', system-ui, sans-serif;
+      z-index: 1; transition: opacity .25s ease-out;
+    }
+    #rpg-game-splash .spinner {
+      width: 38px; height: 38px;
+      border: 3px solid rgba(201, 100, 66, .25);
+      border-top-color: var(--accent, #c96442);
+      border-radius: 50%;
+      animation: rpg-spin .85s linear infinite;
+      margin-bottom: 18px;
+    }
+    #rpg-game-splash .label { font-size: 14px; opacity: .72; letter-spacing: .04em; }
+    #rpg-game-splash .hint  { font-size: 12px; opacity: .42; margin-top: 8px; max-width: 320px; text-align: center; line-height: 1.6; }
+    @keyframes rpg-spin { to { transform: rotate(360deg); } }
+    /* React 接管时给 splash 一个 0.25s fade-out;然后 cleanup script 删除节点 */
+    body.rpg-mounted #rpg-game-splash { opacity: 0; pointer-events: none; }
+  </style>
+  <div id="rpg-game-splash">
+    <div class="spinner" aria-hidden="true"></div>
+    <div class="label">正在加载游戏控制台…</div>
+    <div class="hint">首次进入新存档时,GM 正在准备开场,可能需要 5-30 秒。请稍候。</div>
+  </div>
+
+  <div id="root"></div>
+
+  <!-- Vite ESM 入口：density/font init + 所有 JSX 依赖 + 挂载 App 均在入口文件内完成
+       原 text/babel 内联 App 脚本已移至 src/entries/game-console.jsx -->
+  <script type="module" src="src/entries/game-console.jsx"></script>
+</body>
+</html>

@@ -35,7 +35,9 @@ origin 白名单:
 from __future__ import annotations
 
 import asyncio
+import queue as _queue
 import secrets
+import threading
 import time
 from collections import OrderedDict
 from collections.abc import Callable
@@ -497,11 +499,10 @@ def _persist_invocation_async(env: ToolCallEnvelope, *, ok: bool,
                               error: str | None, error_kind: str | None) -> None:
     """fire-and-forget 写 tool_invocations 表。
 
-    线程池里跑 INSERT,主路径不阻塞。失败 silent — 仅 log.debug,不阻断 chat。
+    有界队列 + 固定 drain worker 跑 INSERT,主路径不阻塞。失败 silent — 仅 log.debug。
     """
     import json as _json
     import logging
-    import threading
 
     log = logging.getLogger(__name__)
 
@@ -541,7 +542,49 @@ def _persist_invocation_async(env: ToolCallEnvelope, *, ok: bool,
         except Exception as exc:  # noqa: BLE001
             log.debug("[telemetry] persist tool_invocations failed: %s", exc)
 
-    threading.Thread(target=_do_insert, daemon=True).start()
+    _submit_telemetry(_do_insert)
+
+
+# ── 遥测写入:有界队列 + 固定 drain worker ─────────────────────────────────────
+# 原实现每次工具调用 threading.Thread().start():高负载下(多用户 × 每回合多工具调用)
+# 线程爆炸,且这些线程与主请求争抢同一 DB 连接池(25/worker)→ 可耗尽连接池阻塞游戏请求。
+# 改为固定 2 个 drain worker 从有界队列消费:并发遥测连接 ≤2,队列满则丢弃(遥测是
+# best-effort),永不阻塞 chat 主路径,也不让积压无界增长(DB 慢/down 时)。
+_TELEMETRY_QUEUE: "_queue.Queue | None" = None
+_TELEMETRY_LOCK = threading.Lock()
+_TELEMETRY_WORKERS = 2
+_TELEMETRY_QUEUE_MAX = 2000
+
+
+def _telemetry_drain(q: "_queue.Queue") -> None:
+    while True:
+        fn = q.get()
+        try:
+            fn()
+        except Exception:
+            pass
+        finally:
+            q.task_done()
+
+
+def _submit_telemetry(fn: Callable[[], None]) -> None:
+    global _TELEMETRY_QUEUE
+    q = _TELEMETRY_QUEUE
+    if q is None:
+        with _TELEMETRY_LOCK:
+            if _TELEMETRY_QUEUE is None:
+                _TELEMETRY_QUEUE = _queue.Queue(maxsize=_TELEMETRY_QUEUE_MAX)
+                for i in range(_TELEMETRY_WORKERS):
+                    threading.Thread(
+                        target=_telemetry_drain, args=(_TELEMETRY_QUEUE,),
+                        daemon=True, name=f"tool-telemetry-{i}",
+                    ).start()
+            q = _TELEMETRY_QUEUE
+    try:
+        q.put_nowait(fn)
+    except _queue.Full:
+        # 积压(DB 持续慢/down)→ 丢弃该遥测,绝不阻塞或拖垮主路径
+        pass
 
 
 def _stable_json(obj: Any) -> str:

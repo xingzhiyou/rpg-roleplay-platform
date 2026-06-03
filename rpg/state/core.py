@@ -654,7 +654,10 @@ class GameState(ApplyOpsMixin, RulesGameplayMixin, PendingMixin):
             rel_lines.append(f"  · {char}：{status}")
         rel_text = "\n".join(rel_lines) if rel_lines else "  （尚未与任何人建立明确关系）"
 
-        known = "\n".join(f"  · {e}" for e in w["known_events"])
+        # 只注入最近 N 条已知事件:与下方 memory 各 bucket(abilities[:6]/facts[:10]/notes[:8])
+        # 的注入截断一致。原来全量注入,而 known_events 写入无上限 + GM prompt 鼓励记流水账,
+        # 长局后这块线性增长吃光 token。取最近 15 条(时间上最相关)。
+        known = "\n".join(f"  · {e}" for e in w["known_events"][-15:])
         memory_lines = []
         if m["main_quest"]:
             memory_lines.append(f"主线：{m['main_quest']}")

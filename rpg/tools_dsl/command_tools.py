@@ -448,6 +448,10 @@ def execute_tool(state: Any, name: str, args: dict) -> str:
             events = state.data.setdefault("world", {}).setdefault("known_events", [])
             if event not in events:
                 events.append(event)
+                # 硬上限:known_events 原本无 cap,GM 每轮记流水账长局后会无界堆积撑大
+                # state_snapshot(持久化进 DB)。注入只看最近 15 条,故保留最近 100 条足矣。
+                if len(events) > 100:
+                    del events[:-100]
                 return f"已知事件 += {event}"
             return f"已知事件已存在: {event}"
         if name == "set_world_attribute":

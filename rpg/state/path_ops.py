@@ -58,21 +58,41 @@ _MODULE_MANAGED_PATHS = {
 }
 
 
+def _protects_descendant(path: str, protected_paths, protected_prefixes) -> bool:
+    """path 是否为某个受保护路径的**祖先**(即受保护路径以 path+"." 开头)。
+    用于堵「裸父对象整体覆盖」绕过:写 `permissions`/`player_character`/`encounter` 这类含
+    受保护子树的父节点会一次性覆盖掉 permissions.mode / player_character.hp / encounter.combatants,
+    绕过叶子级保护。原实现只做精确 path + 子前缀匹配,漏了这一类(full_access 默认档下 GM
+    可凭空改 HP/清战斗/清审计/自我提权)。"""
+    p = path + "."
+    if any(pp.startswith(p) for pp in protected_paths):
+        return True
+    if any(pref.startswith(p) for pref in protected_prefixes):
+        return True
+    return False
+
+
 def _write_path_hard_forbidden(path: str) -> bool:
     """绝对不能写的路径，无论权限模式或 force 标志。
 
     permissions.* — 用户/GM 自己改权限模式 = 整套审批失效（自我提权）
     history.*     — 改对话历史 = 篡改可见证据
     schema_version / created_at / is_new — 元数据，破坏会让 state 反序列化崩
+    祖先保护 — 裸 `permissions`/`history` 父覆盖会整体替换受保护子树,等效自我提权/篡改审计。
     """
-    return path in _HARD_FORBIDDEN_PATHS or path.startswith(_HARD_FORBIDDEN_PREFIXES)
+    if path in _HARD_FORBIDDEN_PATHS or path.startswith(_HARD_FORBIDDEN_PREFIXES):
+        return True
+    return _protects_descendant(path, _HARD_FORBIDDEN_PATHS, _HARD_FORBIDDEN_PREFIXES)
 
 
 def _write_path_rules_managed(path: str) -> bool:
     """5E 规则受控路径。任何非 rules_engine 来源写入都会被 State Gate 拒绝。"""
     if path in _RULES_MANAGED_PATHS:
         return True
-    return any(path == prefix.rstrip(".") or path.startswith(prefix) for prefix in _RULES_MANAGED_PREFIXES)
+    if any(path == prefix.rstrip(".") or path.startswith(prefix) for prefix in _RULES_MANAGED_PREFIXES):
+        return True
+    # 祖先保护:裸 `player_character`/`encounter` 父覆盖会把 hp/combatants 一并改掉 → 绕过保护。
+    return _protects_descendant(path, _RULES_MANAGED_PATHS, _RULES_MANAGED_PREFIXES)
 
 
 def _write_path_module_managed(path: str) -> bool:

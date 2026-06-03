@@ -208,6 +208,10 @@ async def admin_deactivate_user(
     admin=Depends(_require_admin),
 ):
     ip = _client_ip(request)
+    # 禁止管理员停用自己:deactivated_at 让自己的 token 立即失效 + 删自己的 session →
+    # 自锁在门外且无法撤销(已停用进不了 admin)。与 update_role 的自降级保护一致。
+    if admin.get("id") == user_id:
+        raise HTTPException(status_code=400, detail="不允许停用自己的账户")
     with connect() as db:
         db.execute(
             "update users set deactivated_at = now() where id = %s",

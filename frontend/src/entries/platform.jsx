@@ -7,6 +7,7 @@ import * as ReactDOM from 'react-dom/client';
 // 基础设施 side-effect 模块(设置 window.api / window.MOCK_* / SSE bridge 等)
 import '../mock-data.js';
 import '../api-client.js';
+import '../a11y-tooltip-labels.js';   // data-tip → aria-label 镜像(屏幕阅读器)
 // 运行环境采集 — 反馈抽屉提交时附带最近 20 个错误 + 10 个失败 API 给管理员排查
 import '../runtime-telemetry.js';
 import '../data-loader.js';

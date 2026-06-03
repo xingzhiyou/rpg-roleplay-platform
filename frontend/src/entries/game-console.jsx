@@ -13,6 +13,7 @@ import '../data-loader.js';
 import '../state-event-bridge.js';
 import '../worldbook-status-toast.js';
 import '../ui-atlas.js';
+import '../a11y-tooltip-labels.js';   // data-tip → aria-label 镜像(屏幕阅读器)
 import '../console-assistant-navigation.jsx';
 import '../i18n/index.js';   // 初始化 i18next + 接 interfaceLang
 
@@ -573,6 +574,14 @@ function App() {
                         try {
                           const d2 = await window.api.game.state();
                           if (d2 && d2.player) {
+                            if (Array.isArray(d2.history)) {
+                              setHistory(d2.history);
+                            }
+                            if (d2.permissions) {
+                              setPermission(d2.permissions.mode || 'full_access');
+                              setPendingWrites(d2.permissions.pending_writes || []);
+                              setPendingQuestions(d2.permissions.pending_questions || []);
+                            }
                             setGame((g) => {
                               const next = { ...g };
                               for (const k of PICK_STATE_KEYS) {
@@ -815,6 +824,11 @@ function App() {
             n._raw = { save_id: data.save_id ?? n._raw?.save_id, save_title: data.save_title ?? n._raw?.save_title, turn: data.turn ?? n._raw?.turn };
             return n;
           });
+          if (data && data.permissions) {
+            setPermission(data.permissions.mode || 'full_access');
+            setPendingWrites(data.permissions.pending_writes || []);
+            setPendingQuestions(data.permissions.pending_questions || []);
+          }
           if (data && data.save_id != null && (!activeSave || activeSave.id !== data.save_id)) {
             setActiveSave({ id: data.save_id, title: data.save_title || `存档 #${data.save_id}`, updated_at: data.save_updated_at || '' });
           }

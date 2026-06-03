@@ -4,6 +4,7 @@ import * as React from 'react';
 import * as ReactDOM from 'react-dom/client';
 
 import '../api-client.js';
+import '../a11y-tooltip-labels.js';   // data-tip → aria-label 镜像(屏幕阅读器)
 import '../i18n/index.js';
 import { LoginApp } from '../login-app.jsx';
 

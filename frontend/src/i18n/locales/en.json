@@ -1243,7 +1243,14 @@
       "merge_msg": "Merge chapter {{a}} and chapter {{b}}?",
       "merge_btn": "Merge",
       "split_title": "Split Chapter",
-      "split_label": "Split at which character position?"
+      "split_label": "Split at which character position?",
+      "embed_breakdown_title": "Vector index (by type)",
+      "embed_breakdown_desc": "Vector index split by content type; can be selectively re-embedded.",
+      "embed_kind_chunks": "Chapter chunks",
+      "embed_kind_cards": "NPC cards",
+      "embed_kind_worldbook": "Worldbook entries",
+      "embed_kind_canon": "Knowledge base entities",
+      "embed_kind_desc": "pgvector embedding_vec column"
     },
     "review": {
       "eyebrow": "KB Review · Extraction Results",
@@ -1532,7 +1539,8 @@
         "toast_batch_enabled": "Entries enabled",
         "toast_batch_disabled": "Entries disabled",
         "toast_forked": "Forked — copy created",
-        "toast_fork_fail": "Fork failed"
+        "toast_fork_fail": "Fork failed",
+        "col_detail": "Detail"
       }
     }
   },
@@ -2490,6 +2498,92 @@
       "no_npc_cards": "No NPC cards in your scripts yet.",
       "no_npc_hint": "Click \"New NPC\" to create one, or go to Scripts / Import to upload a script with character profiles.",
       "no_settings": "No profile yet — switch to Character Settings to fill it in."
+    }
+  },
+  "modules": {
+    "matrix": {
+      "title": "Module Matrix",
+      "desc": "Current state of all derived data for this script. Each module can be rebuilt independently."
+    },
+    "status": {
+      "ready": "Ready",
+      "partial": "Partial",
+      "missing": "Not built",
+      "running": "Running…",
+      "stale": "Needs rebuild",
+      "unknown": "Unknown"
+    },
+    "tag": {
+      "llm": "LLM",
+      "zero_llm": "Zero LLM",
+      "mixed": "Optional LLM"
+    },
+    "action": {
+      "build": "Build",
+      "rebuild": "Rebuild",
+      "view_detail": "View details"
+    },
+    "field": {
+      "count": "Count",
+      "status": "Status",
+      "last_rebuilt": "Last rebuilt",
+      "last_job": "Last job"
+    },
+    "banner": {
+      "failed": "Rebuild failed",
+      "failed_detail": "Job ID available in backend logs",
+      "running": "Rebuilding"
+    },
+    "estimate": {
+      "title": "Rebuild estimate",
+      "loading": "Estimating…",
+      "fail": "Unable to estimate",
+      "tokens": "Tokens",
+      "cost": "Estimated cost",
+      "model": "Model",
+      "affects": "Affected tables",
+      "prereqs": "Prerequisites",
+      "prereq_block_header": "Prerequisites not met",
+      "prereq_block_body": "Please rebuild the missing modules above first.",
+      "confirm_zero": "Confirm rebuild (free)",
+      "confirm_llm": "Confirm rebuild (uses LLM)"
+    },
+    "toast": {
+      "dispatched": "Rebuild job dispatched",
+      "dispatch_fail": "Dispatch failed",
+      "rebuild_done": "Rebuild complete"
+    },
+    "chunks": {
+      "title": "Chapter chunks",
+      "desc": "Whole book split into passages and indexed — the smallest unit for RAG retrieval"
+    },
+    "chapter-facts": {
+      "title": "Chapter summaries",
+      "desc": "Per-chapter LLM summary + story-time labels"
+    },
+    "chapter_facts": {
+      "title": "Chapter summaries",
+      "desc": "Per-chapter LLM summary + story-time labels"
+    },
+    "canon": {
+      "title": "Knowledge base entities",
+      "desc": "Character / faction / location / item / concept entities extracted by the LLM"
+    },
+    "cards": {
+      "title": "NPC cards",
+      "desc": "Editable NPC profile cards (used by the GM)"
+    },
+    "worldbook": {
+      "title": "Worldbook",
+      "desc": "Collection of worldbuilding entries, persistent reference in GM context"
+    },
+    "anchors": {
+      "title": "Timeline anchors",
+      "desc": "Script timeline aggregated by story_time_label"
+    },
+    "embeddings": {
+      "title": "Vector index",
+      "desc": "pgvector embeddings, used for RAG semantic recall"
     }
   }
 }

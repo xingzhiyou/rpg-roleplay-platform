@@ -15,7 +15,8 @@
     "refresh": "Refresh",
     "unknown": "Unknown",
     "open": "Open",
-    "error": "Error"
+    "error": "Error",
+    "load_more": "Load more"
   },
   "settings": {
     "title": "Settings",
@@ -455,7 +456,12 @@
       "save_ok": "Saved",
       "save_fail": "Save failed",
       "keep_key": "Leave blank to keep current key",
-      "base_url_relay": "Base URL (relay/proxy override)"
+      "base_url_relay": "Base URL (relay/proxy override)",
+      "base_url": "Base URL",
+      "sa": {
+        "unavailable_title": "Platform-hosted model unavailable",
+        "unavailable_desc": "Platform-hosted agent / embedding models are only available to select accounts. Please use your own API key."
+      }
     },
     "account": {
       "title": "Account",
@@ -1182,7 +1188,11 @@
       "pipeline_resumed": "Knowledge pipeline resumed",
       "pipeline_resume_fail": "Resume failed",
       "import_ok_needs_api": "Script #{{id}} · {{title}} created. Configure an API key to continue character cards/worldbook/timeline.",
-      "api_fail": "Import API returned failure"
+      "api_fail": "Import API returned failure",
+      "embedder_error_title": "Embedding configuration may have an issue",
+      "embedder_not_configured_body": "After import, without a configured embedding (RAG) model the vector index cannot be built — RAG semantic recall degrades to keyword matching, hurting in-game character/worldbook accuracy.\nWe recommend configuring an API key that supports the /embeddings endpoint (e.g. OpenAI, Deepseek Embedding, Cohere) under Settings → RAG / Embedding model before importing.",
+      "embedder_not_configured_title": "No RAG / embedding model configured (optional, but recommended)",
+      "go_rag_settings": "Configure RAG model"
     },
     "editor": {
       "tab_overview": "Overview",
@@ -1250,7 +1260,16 @@
       "embed_kind_cards": "NPC cards",
       "embed_kind_worldbook": "Worldbook entries",
       "embed_kind_canon": "Knowledge base entities",
-      "embed_kind_desc": "pgvector embedding_vec column"
+      "embed_kind_desc": "pgvector embedding_vec column",
+      "anchors_desc": "script_timeline_anchors, built from chapter_facts story-time labels, zero LLM",
+      "canon_desc": "kb_canon_entities — normalized character/org/location entities extracted by the LLM; distinct from NPC cards.",
+      "canon_editor_todo": "kb_canon_entities table editor: see /api/scripts/{id}/canon — table view lands in a later phase. Currently usable",
+      "cards_desc": "Playable NPC cards, distinct from knowledge-base entities",
+      "embed_warn_chunks_missing": "Chapter embeddings not built; RAG falls back to keyword",
+      "tab_canon": "KB entities",
+      "tab_modules": "Modules",
+      "wb_from_canon": "Derive from KB entities (free)",
+      "wb_llm_rich": "LLM re-extract & enrich"
     },
     "review": {
       "eyebrow": "KB Review · Extraction Results",
@@ -2095,7 +2114,8 @@
       "pending_stat": "Pending ",
       "occurred_stat": " · Occurred ",
       "variant_stat": " · Variant ",
-      "superseded_stat": " · Bypassed "
+      "superseded_stat": " · Bypassed ",
+      "convergence_label": "Converged {{done}}/{{total}}"
     },
     "context": {
       "title": "Context This Round",

@@ -323,8 +323,15 @@ def _call_anthropic_tool_use(
 def _call_openai_compat_json_mode(
     api_id: str, model: str, system_prompt: str, user_prompt: str,
     user_id: int | None, timeout_sec: int,
+    json_hint: str = '{"ops":[...]}',
 ) -> str:
-    """OpenAI 兼容 chat completions，强制 response_format = json_object。"""
+    """OpenAI 兼容 chat completions，强制 response_format = json_object。
+
+    json_hint:追加到 system prompt 的输出格式提示。extractor 默认 {"ops":[...]};
+    acceptance_verifier 复用本 helper 时必须传 {"unmet":[...]}—— 否则硬编码的 ops 提示
+    会与 verifier 自己的 unmet schema 矛盾,模型产出 {"ops":...} → 解析取不到 unmet →
+    verifier 静默失效降级 rule。
+    """
     from platform_app.user_credentials import resolve_api_key
     cred = resolve_api_key(user_id, api_id)
     if not cred.get("key"):
@@ -336,7 +343,7 @@ def _call_openai_compat_json_mode(
     body_dict = {
         "model": model,
         "messages": [
-            {"role": "system", "content": system_prompt + "\n\n输出必须是 JSON 对象 {\"ops\":[...]}，不要任何文字。"},
+            {"role": "system", "content": system_prompt + f"\n\n输出必须是 JSON 对象 {json_hint}，不要任何文字。"},
             {"role": "user", "content": user_prompt},
         ],
         "temperature": 0,

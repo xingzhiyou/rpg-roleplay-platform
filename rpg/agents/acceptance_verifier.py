@@ -260,7 +260,12 @@ def _call_verifier_backend(
     import agents.extractor as _extractor
     if api_id == "vertex_ai":
         from agents.gm import _VertexBackend
-        backend = _VertexBackend(model=model)
+        # 必须透传 user_id:生产鉴权模式下 load_sa_credentials(None) 对 user_id=None 直接返
+        # (None,None)(LLM 路径 allow_platform_fallback=False)→ client=None → call_structured 抛
+        # → verify_acceptance_llm 捕获返 None → 静默降级回 rule。结果所有把 verifier 设成
+        # vertex 的用户"llm/hybrid 验收"从不生效、始终跑廉价 rule(即使已上传 BYOK SA)。
+        # GM 路径 master.py 构造 vertex backend 时本就传了 user_id,这里是疏忽漏传。
+        backend = _VertexBackend(model=model, user_id=user_id)
         text = backend.call_structured(
             system=system_prompt,
             messages=[{"role": "user", "content": user_prompt}],
@@ -274,6 +279,9 @@ def _call_verifier_backend(
         user_prompt=user_prompt,
         user_id=user_id,
         timeout_sec=timeout_sec,
+        # 必须传 verifier 自己的 schema 提示,否则 helper 默认追加的 {"ops":[...]} 会与
+        # verifier 的 {"unmet":[...]} 矛盾 → 模型产出 ops → 解析取不到 unmet → 降级 rule。
+        json_hint='{"unmet":[...]}',
     )
     return text, None
 

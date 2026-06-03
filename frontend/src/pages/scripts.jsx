@@ -1159,13 +1159,27 @@ function ScriptsListView() {
   };
   const onToggleVisibility = async (s) => {
     const next = !s.is_public;
-    if (next && !await window.__confirm({ title: t('scripts.confirm.publish_title'), message: t('scripts.confirm.publish_msg', { title: s.title }), confirmText: t('scripts.confirm.publish_btn') })) return;
+    if (next) {
+      // 发布到公开库前的 KB 复核闸:未复核直接引导去「KB 核查」,不发请求。
+      if ((s.review_status || 'unreviewed') !== 'reviewed') {
+        window.__apiToast?.('分享前需先通过 KB 复核', { kind: 'warn', detail: '已为你打开「KB 核查」,确认实体/世界线/时间锚无误后点「标记已复核」,再回来分享。', duration: 5500 });
+        setReviewScript(s);
+        return;
+      }
+      if (!await window.__confirm({ title: t('scripts.confirm.publish_title'), message: t('scripts.confirm.publish_msg', { title: s.title }), confirmText: t('scripts.confirm.publish_btn') })) return;
+    }
     try {
       const r = await window.api.scripts.setVisibility(s.id, next);
-      if (r && r.ok === false) throw new Error(r.error || t('scripts.toast.op_fail'));
+      if (r && r.ok === false) throw new Error(r.message || r.error || t('scripts.toast.op_fail'));
       window.__apiToast?.(next ? t('scripts.toast.published') : t('scripts.toast.unpublished'), { kind: 'ok', duration: 2000 });
       setScripts((arr) => arr.map((x) => x.id === s.id ? { ...x, is_public: next } : x));
     } catch (e) {
+      // 后端复核闸兜底(前端 review_status 陈旧时返回 409 REVIEW_REQUIRED)
+      if (e?.payload?.error === 'REVIEW_REQUIRED') {
+        window.__apiToast?.('分享前需先通过 KB 复核', { kind: 'warn', detail: e?.payload?.message || '请先在「KB 核查」标记已复核。', duration: 5500 });
+        setReviewScript(s);
+        return;
+      }
       window.__apiToast?.(t('scripts.toast.op_fail'), { kind: 'danger', detail: e?.message });
     }
   };
@@ -1372,7 +1386,15 @@ function ScriptsListView() {
               </div>
               <button className="iconbtn" onClick={() => setReviewScript(null)} data-tip={t('common.close')}><Icon name="close" size={14} /></button>
             </header>
-            <ScriptReview scriptId={reviewScript.id} />
+            <ScriptReview
+              scriptId={reviewScript.id}
+              initialStatus={reviewScript.review_status}
+              onReviewedChange={(sid, rs) => {
+                // 复核状态变更 → 同步剧本列表 + 当前 reviewScript,卡片/发布闸读到的是最新值
+                setScripts((arr) => arr.map((x) => x.id === sid ? { ...x, review_status: rs } : x));
+                setReviewScript((cur) => cur && cur.id === sid ? { ...cur, review_status: rs } : cur);
+              }}
+            />
           </div>
         </div>
       )}

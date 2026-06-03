@@ -57,6 +57,7 @@ function ReviewFlags({ flags }) {
 }
 
 function ReviewStatusBanner({ scriptId, status, busy, onChange }) {
+  const [acting, setActing] = useState(false);
   const isReviewed = status?.review_status === 'reviewed';
   const reviewedAt = status?.reviewed_at;
   const reviewedAtLabel = reviewedAt
@@ -83,16 +84,19 @@ function ReviewStatusBanner({ scriptId, status, busy, onChange }) {
         </div>
       </div>
       <button
-        disabled={busy}
+        disabled={busy || acting}
         onClick={async () => {
-          const r = isReviewed ? await unmarkReviewed(scriptId) : await markReviewed(scriptId);
-          onChange?.(r);
+          setActing(true);
+          try {
+            const r = isReviewed ? await unmarkReviewed(scriptId) : await markReviewed(scriptId);
+            onChange?.(r);
+          } finally { setActing(false); }
         }}
         style={{
           flexShrink: 0,
           padding: '8px 16px',
           fontSize: 13, fontWeight: 600,
-          border: 'none', borderRadius: 6, cursor: busy ? 'wait' : 'pointer',
+          border: 'none', borderRadius: 6, cursor: (busy || acting) ? 'wait' : 'pointer',
           background: isReviewed ? 'rgba(150,143,133,0.25)' : 'var(--accent, #c96442)',
           color: isReviewed ? 'var(--text, #ebe7df)' : '#fff',
         }}
@@ -103,9 +107,10 @@ function ReviewStatusBanner({ scriptId, status, busy, onChange }) {
   );
 }
 
-export function ScriptReview({ scriptId }) {
+export function ScriptReview({ scriptId, initialStatus, onReviewedChange }) {
   const [data, setData] = useState(null);
-  const [status, setStatus] = useState(null);
+  // 用父级已知的 review_status 初始化,banner 立刻显示正确态(不必等 /my 回来)。
+  const [status, setStatus] = useState(initialStatus ? { review_status: initialStatus } : null);
   const [busy, setBusy] = useState(true);
   const [err, setErr] = useState('');
   const [editing, setEditing] = useState(null); // logical_key being edited
@@ -147,7 +152,14 @@ export function ScriptReview({ scriptId }) {
         scriptId={scriptId}
         status={status}
         busy={busy}
-        onChange={() => reload()}
+        onChange={(r) => {
+          // 用 mark/unmark 的权威 POST 响应更新 banner(不再依赖 /scripts/my 的 find,
+          // 那是 UI 卡在「需复核」的根因)+ 回调父列表同步 review_status。
+          if (r && r.review_status) {
+            setStatus({ review_status: r.review_status, reviewed_at: r.review_status === 'reviewed' ? new Date().toISOString() : null });
+            onReviewedChange?.(scriptId, r.review_status);
+          } else { reload(); }
+        }}
       />
       <ReviewFlags flags={data.review_flags} />
 

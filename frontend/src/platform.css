@@ -1,5 +1,53 @@
 /* === Platform-specific styles, on top of tokens.css === */
 
+/* ── KB 核查弹窗(script-review)—— 原本 sr-* class 无任何 CSS,内容裸奔。
+   暖色主题、表格清晰、flags 徽章化。 */
+.script-review { padding: 4px 4px 8px; color: var(--text); }
+.script-review > h2 { font-size: 17px; font-weight: 600; margin: 4px 0 12px; letter-spacing: .02em; }
+.script-review > h3 {
+  font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase;
+  letter-spacing: .14em; margin: 22px 0 10px; padding-bottom: 7px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.sr-loading, .sr-error { padding: 40px 16px; text-align: center; color: var(--muted); font-size: 13.5px; }
+.sr-error { color: var(--danger); }
+/* 摄入体检 flags → 徽章 */
+.sr-flags { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0 4px; }
+.sr-flag {
+  display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 11px;
+  border-radius: 999px; font-size: 11.5px; white-space: nowrap;
+  background: var(--panel-2); border: 1px solid var(--line); color: var(--text-quiet);
+}
+.sr-flag.ok   { color: var(--ok);   border-color: rgba(126,184,142,.34); background: var(--ok-soft); }
+.sr-flag.warn { color: var(--warn); border-color: rgba(212,179,102,.34); background: var(--warn-soft); }
+/* 规范实体表 */
+.sr-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.sr-table thead th {
+  position: sticky; top: 0; z-index: 1;
+  text-align: left; font-weight: 600; font-size: 11px; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--muted-2);
+  padding: 8px 10px; background: var(--panel); border-bottom: 1px solid var(--line);
+}
+.sr-table tbody td { padding: 9px 10px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+.sr-table tbody tr:hover { background: var(--panel-2); }
+.sr-table tbody td input {
+  width: 90%; background: var(--bg-deep); border: 1px solid var(--line);
+  border-radius: var(--r-2); padding: 5px 8px; color: var(--text); font-size: 13px;
+}
+.sr-table tbody td button {
+  height: 26px; padding: 0 9px; margin-right: 5px; border-radius: var(--r-2);
+  border: 1px solid var(--line); background: var(--panel-2); color: var(--text-quiet);
+  font-size: 12px; cursor: pointer; transition: background .12s, border-color .12s, color .12s;
+}
+.sr-table tbody td button:hover { color: var(--text); border-color: var(--line-strong); background: var(--panel-3); }
+/* 世界线列表 */
+.script-review ul { list-style: none; margin: 4px 0; padding: 0; }
+.script-review ul > li {
+  padding: 9px 12px; margin-bottom: 6px; border-radius: var(--r-2);
+  background: var(--panel); border: 1px solid var(--line-soft); font-size: 13px; line-height: 1.6;
+}
+.sr-node { color: var(--muted); font-size: 12px; }
+
 /* ── InfoHint(ⓘ 信息按钮)── 把过长说明从常驻副标题收进按需 popover,
    表单行高统一 → 输入框对齐;全站 label 旁通用。 */
 .label-with-hint { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }

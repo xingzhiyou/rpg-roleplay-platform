@@ -870,14 +870,14 @@ async def api_script_visibility(request: Request, script_id: int, user=Depends(r
     is_public = bool(body.get("is_public"))
     with connect() as db:
         owned = db.execute(
-            "SELECT chapter_count FROM scripts WHERE id = %s AND owner_id = %s",
+            "SELECT chapter_count, review_status FROM scripts WHERE id = %s AND owner_id = %s",
             (script_id, user["id"]),
         ).fetchone()
         if not owned:
             return json_response({"ok": False, "error": "无权操作该剧本"}, status_code=403)
-        # 护栏:0 章空剧本(注册默认档 / 未导入正文)不允许公开,避免污染公开库。
-        # 以 script_chapters 实际行数为准(chapter_count 列可能陈旧)。
         if is_public:
+            # 护栏:0 章空剧本(注册默认档 / 未导入正文)不允许公开,避免污染公开库。
+            # 以 script_chapters 实际行数为准(chapter_count 列可能陈旧)。
             real_ch = db.execute(
                 "SELECT count(*) AS n FROM script_chapters WHERE script_id = %s",
                 (script_id,),
@@ -886,6 +886,15 @@ async def api_script_visibility(request: Request, script_id: int, user=Depends(r
                 return json_response(
                     {"ok": False, "error": "空剧本(0 章)不能公开分享,请先导入正文。"},
                     status_code=400,
+                )
+            # KB 复核闸:未通过复核的剧本不允许分享到公开库(与新建存档闸一致),
+            # 防止未审实体/未消歧别名/错章节污染公开剧本库。前端也会预拦并引导,
+            # 此处是确定性后端兜底(不依赖前端)。重切(resplit)后会自动回 unreviewed。
+            if (dict(owned) or {}).get("review_status", "unreviewed") != "reviewed":
+                return json_response(
+                    {"ok": False, "error": "REVIEW_REQUIRED",
+                     "message": "分享到公开库前需先通过 KB 复核:请在剧本「KB 核查」中检查实体/世界线/时间锚无误后点击「标记已复核」。"},
+                    status_code=409,
                 )
         db.execute(
             "UPDATE scripts SET is_public = %s, "

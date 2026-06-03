@@ -542,13 +542,18 @@ def confirm_email_verification(email: str, code: str) -> tuple[dict[str, Any], s
 
         user = dict(row)
 
-        # 标记 invite_code 已用
+        # 标记 invite_code 已用。原子预占:用 rowcount 判定是否抢到。
+        # 原写法不查 rowcount,两个请求拿同一单次邀请码并发 confirm 时,user 行已先 INSERT,
+        # 第二个的 UPDATE 命中 0 行被忽略却照样建号 → 单次邀请码双花、邀请 gate 被绕过。
+        # 命中 0 行即抛错回滚整个事务(同一 with connect(),user INSERT 一并回滚)。
         invite_code = pending.get("invite_code")
         if invite_code:
-            db.execute(
+            _res = db.execute(
                 "update invite_codes set used_by = %s, used_at = now() where code = %s and used_by is null",
                 (user["id"], invite_code),
             )
+            if _res.rowcount == 0:
+                raise ValueError("邀请码已被使用，请联系邀请人获取新的邀请码")
 
         # 标记验证码已使用。放在用户创建之后，避免 pending 恢复失败时吞掉有效验证码。
         db.execute(

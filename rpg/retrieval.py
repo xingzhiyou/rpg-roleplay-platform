@@ -33,10 +33,16 @@ def _load_aliases():
         return
     with open(CHAR_IDX, encoding="utf-8") as f:
         chars = json.load(f)["characters"]
+    # 先建局部 dict 再原子整体赋值给全局。retrieve_context 跑在 to_thread worker 线程,
+    # 两个用户冷启首回合并发时,若直接往全局 dict 边插边被 detect_mentioned_characters
+    # 迭代 → RuntimeError: dictionary changed size during iteration。整体 rebind 后,读方
+    # 看到的要么是空(走 if 提前返回前)要么是完整 dict,绝不会是半建状态。
+    local: dict[str, str] = {}
     for name, info in chars.items():
-        _CHAR_ALIASES[name] = name
+        local[name] = name
         for alias in info.get("aliases", []):
-            _CHAR_ALIASES[alias] = name
+            local[alias] = name
+    _CHAR_ALIASES = local
 
 
 def detect_mentioned_characters(text: str) -> list[str]:

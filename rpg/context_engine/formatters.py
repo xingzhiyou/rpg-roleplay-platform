@@ -90,7 +90,15 @@ def _active_worldbook(
     for entry in entries:
         matched = [key for key in entry["keys"] if key and key in scan_text]
         if entry.get("regex"):
-            matched.extend(pattern for pattern in entry["regex"] if re.search(pattern, scan_text))
+            # regex_keys 是 LLM 抽取 / 用户编写,写入时未做 re.compile 校验。畸形正则
+            # 会让 re.search 抛 re.error;若不隔离,会冒泡炸掉整个世界书激活 → 上下文组装
+            # → 整轮 GM。逐条 try,坏正则只跳过该 pattern,不影响其余条目与关键词激活。
+            for pattern in entry["regex"]:
+                try:
+                    if pattern and re.search(pattern, scan_text):
+                        matched.append(pattern)
+                except re.error:
+                    continue
         if not matched:
             continue
         entry = dict(entry)

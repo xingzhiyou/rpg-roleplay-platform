@@ -27,6 +27,7 @@ from state import DEFAULT_STATE, GameState  # noqa: E402
 from tools_dsl.command_dispatcher import (  # noqa: E402
     MAX_CALLS_PER_USER_PER_SECOND,
     MAX_TRACE_DEPTH,
+    MAX_TRACE_SEEN,
     ToolCallEnvelope,
     ToolDispatcher,
     ToolRegistry,
@@ -333,13 +334,14 @@ class Phase2ToolExecution(unittest.TestCase):
             os.environ["RPG_REQUIRE_AUTH"] = "0"
 
     def test_add_world_event(self):
-        r = self._call("add_world_event", {"text": "图卢兹陷落第七天"})
+        # task #14: add_world_event 别名已删,改用 set_world_known_event(arg: event)
+        r = self._call("set_world_known_event", {"event": "图卢兹陷落第七天"})
         self.assertTrue(r.ok, r.error)
         self.assertIn("图卢兹陷落第七天", self.state.data["world"]["known_events"])
 
     def test_add_world_event_dedup(self):
         self.state.data.setdefault("world", {})["known_events"] = ["X"]
-        r = self._call("add_world_event", {"text": "X"}, trace_id="tdup-1")
+        r = self._call("set_world_known_event", {"event": "X"}, trace_id="tdup-1")
         self.assertIn("已存在", r.result)
 
     def test_stop_current_chat(self):
@@ -376,8 +378,8 @@ class AuditTrail(unittest.TestCase):
 
     def test_successful_call_audited_to_state(self):
         env = ToolCallEnvelope(
-            user_id=1, save_id=100, tool="add_world_event",
-            args={"text": "事件A"}, origin="ui_button", trace_id="ta-1",
+            user_id=1, save_id=100, tool="set_world_known_event",
+            args={"event": "事件A"}, origin="ui_button", trace_id="ta-1",
         )
         r = self.dispatcher.dispatch_sync(env)
         self.assertTrue(r.ok, r.error)
@@ -385,7 +387,7 @@ class AuditTrail(unittest.TestCase):
         tool_audits = [a for a in audit if a.get("kind") == "tool_call"]
         self.assertGreaterEqual(len(tool_audits), 1)
         last = tool_audits[-1]
-        self.assertEqual(last["tool"], "add_world_event")
+        self.assertEqual(last["tool"], "set_world_known_event")
         self.assertEqual(last["origin"], "ui_button")
         self.assertTrue(last["ok"])
 
@@ -449,6 +451,56 @@ class LegacyCommandToolsViaDispatcher(unittest.TestCase):
         r = self.dispatcher.dispatch_sync(env)
         self.assertTrue(r.ok, r.error)
         self.assertEqual(self.state.data["relationships"]["斯雷因"], "警惕中立")
+
+
+class TraceSeenLRUBound(unittest.TestCase):
+    """_trace_seen 去重表必须有界:dispatcher 是进程级单例,trace_id 按回合唯一,
+    plain dict 会随累计回合数无限增长(内存泄漏)。验证 LRU 上限 + 去重仍正确。"""
+
+    def setUp(self):
+        self.reg = ToolRegistry()
+        self.reg.register(ToolSpec(
+            name="list_models", description="",
+            input_schema={"type": "object", "properties": {}},
+            executor=lambda args: "ok",
+            scope="global",
+            origins=frozenset({"llm_chat", "ui_button"}),
+        ))
+        self.dispatcher = ToolDispatcher(registry=self.reg, state_provider=lambda env: None)
+
+    def test_trace_seen_bounded(self):
+        # 派发远超上限个不同 trace_id,断言去重表不超过 MAX_TRACE_SEEN
+        for i in range(MAX_TRACE_SEEN + 200):
+            self.dispatcher.dispatch_sync(ToolCallEnvelope(
+                user_id=1, tool="list_models", args={}, origin="llm_chat",
+                trace_id=f"trace-{i}",
+            ))
+        self.assertLessEqual(len(self.dispatcher._trace_seen), MAX_TRACE_SEEN,
+                             "_trace_seen 超过 LRU 上限,未防住内存泄漏")
+
+    def test_dedup_still_works_for_active_trace(self):
+        # 同 trace 同 (tool,args) 第二次必须被拒(去重逻辑未被 LRU 改坏)
+        env = ToolCallEnvelope(user_id=1, tool="list_models", args={}, origin="llm_chat", trace_id="dup-trace")
+        r1 = self.dispatcher.dispatch_sync(env)
+        self.assertTrue(r1.ok)
+        r2 = self.dispatcher.dispatch_sync(ToolCallEnvelope(
+            user_id=1, tool="list_models", args={}, origin="llm_chat", trace_id="dup-trace"))
+        self.assertFalse(r2.ok)
+        self.assertIn("trace_duplicate", (r2.error or ""))
+
+    def test_active_trace_not_evicted_under_churn(self):
+        # 活跃 trace 反复使用时,即使有大量新 trace 涌入也不应被淘汰(LRU move_to_end)
+        live = "live-trace"
+        self.dispatcher.dispatch_sync(ToolCallEnvelope(
+            user_id=1, tool="list_models", args={"k": "a"}, origin="llm_chat", trace_id=live))
+        for i in range(MAX_TRACE_SEEN + 50):
+            self.dispatcher.dispatch_sync(ToolCallEnvelope(
+                user_id=1, tool="list_models", args={}, origin="llm_chat", trace_id=f"noise-{i}"))
+            # 每轮也碰一下 live trace,使其保持在末尾不被淘汰
+            self.dispatcher.dispatch_sync(ToolCallEnvelope(
+                user_id=1, tool="list_models", args={"k": str(i)}, origin="llm_chat", trace_id=live))
+        # live trace 仍在表中且其去重集保留了历史签名
+        self.assertIn(live, self.dispatcher._trace_seen)
 
 
 if __name__ == "__main__":

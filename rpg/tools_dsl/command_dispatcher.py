@@ -37,6 +37,7 @@ from __future__ import annotations
 import asyncio
 import secrets
 import time
+from collections import OrderedDict
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -192,6 +193,8 @@ class DispatchError(Exception):
 
 MAX_TRACE_DEPTH = 3
 MAX_CALLS_PER_USER_PER_SECOND = 20
+# _trace_seen 去重表 LRU 上限:只需覆盖在途 trace(单回合内完成),1024 远超任何并发量
+MAX_TRACE_SEEN = 1024
 AUDIT_LOG_LIMIT = 200
 RECENT_AUDIT_LIMIT = 1000
 
@@ -222,7 +225,10 @@ class ToolDispatcher:
         # 限流: per user_id 最近 1 秒内调用数
         self._rate_buckets: dict[int, list[float]] = {}
         # trace 内去重: trace_id → set of (tool, args_json)
-        self._trace_seen: dict[str, set[tuple[str, str]]] = {}
+        # LRU 有界:trace_id 按回合唯一且永不主动清理,plain dict 会随累计回合数无限增长
+        # (dispatcher 是进程级单例 → 真实内存泄漏)。用 OrderedDict + MAX_TRACE_SEEN 上限,
+        # 只保留最近 N 个 trace 的去重集(远超任何在途 trace —— 一个 trace 在单回合内完成)。
+        self._trace_seen: OrderedDict[str, set[tuple[str, str]]] = OrderedDict()
         # 滚动审计缓冲: 按 user_id 分桶, 防止单例化后跨用户信息泄漏
         self._recent_audit: dict[int, list[dict[str, Any]]] = {}
 
@@ -328,7 +334,13 @@ class ToolDispatcher:
         # 9) trace 内去重 (同 trace 同 tool+args 只执行一次)
         if env.trace_id:
             sig = (env.tool, _stable_json(env.args))
-            seen = self._trace_seen.setdefault(env.trace_id, set())
+            seen = self._trace_seen.get(env.trace_id)
+            if seen is None:
+                seen = set()
+                self._trace_seen[env.trace_id] = seen
+            self._trace_seen.move_to_end(env.trace_id)  # LRU:活跃 trace 推到末尾,不会被淘汰
+            while len(self._trace_seen) > MAX_TRACE_SEEN:
+                self._trace_seen.popitem(last=False)  # 淘汰最久未用的 trace 去重集,防无界增长
             if sig in seen:
                 raise DispatchError(
                     "trace_duplicate",

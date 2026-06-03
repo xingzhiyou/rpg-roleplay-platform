@@ -155,7 +155,16 @@ def enter_room(state, location_id: str) -> dict:
     # 校验当前房间出口是否允许去 location_id
     cur_id = scene.get("location_id")
     cur_room = next((r for r in rooms if r.get("id") == cur_id), None)
-    if cur_room:
+    if cur_room is None:
+        # fail-closed:当前 location_id 不是本模组的合法房间(损坏/迁移存档,或模组 rooms.json
+        # 被编辑/重排后旧存档指向已删房间)。原来这里 `if cur_room:` 直接跳过全部校验、无条件
+        # 接受 → 可从失效位置瞬移到任意房间(含上锁的祭坛/终局房)= 穿锁+瞬移。改为只允许回锚到
+        # 模组起点重新进入,拒绝其它任意目标。
+        manifest = bundle.get("manifest") or {}
+        start_id = manifest.get("starting_location") or (rooms[0].get("id") if rooms else None)
+        if location_id != start_id:
+            return {"ok": False, "error": f"当前位置 {cur_id!r} 不在模组房间图中,只能回到起点 {start_id} 重新进入"}
+    else:
         exits = cur_room.get("exits") or []
         valid_targets = {e.get("to") for e in exits}
         if location_id not in valid_targets:
@@ -168,6 +177,10 @@ def enter_room(state, location_id: str) -> dict:
                 flag = req.split(":", 1)[1]
                 if not scene.get("flags", {}).get(flag):
                     return {"ok": False, "error": f"前往 {location_id} 需要先满足条件：{flag}"}
+            else:
+                # 未识别的 requires 前缀(item:/key:/quest: 等):锁应 fail-closed,不静默放行
+                # (原来非 flag: 前缀的上锁出口会被直接放行 = 锁失效穿门)。
+                return {"ok": False, "error": f"前往 {location_id} 的通行条件 {req!r} 暂不支持,通行被拒"}
     scene["location_id"] = location_id
     scene["exits"] = list(room.get("exits") or [])
     scene["visible_clues"] = list(room.get("visible_clues") or [])

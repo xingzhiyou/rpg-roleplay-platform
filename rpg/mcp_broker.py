@@ -49,6 +49,9 @@ class MCPServerConn:
         self._id_lock = threading.Lock()
         self._writer_lock = threading.Lock()
         self._pending: dict[int, dict[str, Any]] = {}
+        # 仍在等待响应的 req_id 集合。reader 只为仍被等待的 req_id 存响应;超时/出错退出的
+        # 请求会从此集合移除,其迟到响应被 reader 丢弃 → 防孤儿响应滞留 _pending 撑爆 _MAX_PENDING。
+        self._waiting: set[int] = set()
         self._pending_lock = threading.Condition()
         self._reader_thread: threading.Thread | None = None
         self._stderr_thread: threading.Thread | None = None
@@ -154,22 +157,32 @@ class MCPServerConn:
         with self._id_lock:
             req_id = self._next_id
             self._next_id += 1
-        # P2: _pending 上限，超过则拒绝新请求，防止无限堆积
+        # P2: 在飞请求上限，超过则拒绝新请求，防止无限堆积(以 _waiting 为准 —— 真正
+        # 在等的请求数;_pending 仅瞬时存放已到达待 pop 的响应)
         with self._pending_lock:
-            if len(self._pending) >= _MAX_PENDING:
+            if len(self._waiting) >= _MAX_PENDING:
                 raise RuntimeError(f"MCP server {self.server_id} 待处理请求已达上限 {_MAX_PENDING}，拒绝新请求")
         payload = {"jsonrpc": "2.0", "id": req_id, "method": method, "params": params}
+        # 登记为"仍在等待":reader 只为在此集合中的 req_id 存响应
+        with self._pending_lock:
+            self._waiting.add(req_id)
         self._write(payload)
         deadline = time.monotonic() + timeout
-        with self._pending_lock:
-            while req_id not in self._pending:
-                remaining = deadline - time.monotonic()
-                if remaining <= 0:
-                    raise TimeoutError(f"等待 {method} 响应超时")
-                if self._closed or not self.is_alive():
-                    raise RuntimeError("MCP server 进程退出")
-                self._pending_lock.wait(timeout=min(remaining, 1.0))
-            resp = self._pending.pop(req_id)
+        try:
+            with self._pending_lock:
+                while req_id not in self._pending:
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        raise TimeoutError(f"等待 {method} 响应超时")
+                    if self._closed or not self.is_alive():
+                        raise RuntimeError("MCP server 进程退出")
+                    self._pending_lock.wait(timeout=min(remaining, 1.0))
+                resp = self._pending.pop(req_id)
+        finally:
+            # 无论成功/超时/进程退出,都清掉登记 + 丢弃可能迟到入队的孤儿响应,防 _pending 泄漏
+            with self._pending_lock:
+                self._waiting.discard(req_id)
+                self._pending.pop(req_id, None)
         if "error" in resp:
             err = resp["error"]
             raise RuntimeError(f"MCP error {err.get('code')}: {err.get('message')}")
@@ -213,8 +226,11 @@ class MCPServerConn:
             req_id = msg.get("id")
             if req_id is not None:
                 with self._pending_lock:
-                    self._pending[int(req_id)] = msg
-                    self._pending_lock.notify_all()
+                    # 只为仍在等待的 req_id 存响应;超时/出错已退出的请求的迟到响应直接丢弃,
+                    # 否则会孤儿滞留 _pending 永不被 pop,累积撑爆 _MAX_PENDING 致 server 砖化。
+                    if int(req_id) in self._waiting:
+                        self._pending[int(req_id)] = msg
+                        self._pending_lock.notify_all()
             # else: 是 notification，目前不处理
         with self._pending_lock:
             self._pending_lock.notify_all()

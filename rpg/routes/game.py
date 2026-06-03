@@ -13,6 +13,22 @@ from schemas._common import COMMON_ERROR_RESPONSES, GenericOkResponse, OkRespons
 from schemas.game import ChatEstimateRequest, ChatRequest, NewGameRequest
 from state.parsers import _extract_trailing_markdown_options
 
+import logging as _logging
+import secrets as _secrets
+
+_log = _logging.getLogger(__name__)
+
+
+def _client_safe_error(exc: Exception) -> str:
+    """把未预期异常转成对客户端安全的泛化文案 + error_id。
+
+    str(exc) 可能含 DB 表名/连接串、文件路径、第三方 SDK 内部细节(乃至凭据上下文),
+    绝不能直透进 SSE 给玩家。原始异常带 error_id 写服务端日志,客户端只拿 id 便于排障对账。
+    """
+    error_id = _secrets.token_hex(4)
+    _log.exception("[chat] unhandled stream error (error_id=%s)", error_id)
+    return f"本轮处理出错,请重试(错误码 {error_id})"
+
 
 async def _bridge_sync_generator_to_async(gen_factory, stop_event: threading.Event | None = None):
     """跑同步 generator,SSE 取消时设置 stop_event 让 generator 早退。
@@ -263,7 +279,7 @@ async def api_opening(
                 _persist_runtime_checkpoint(state, api_user)
             yield _sse("done", {"status": _payload(api_user)})
         except Exception as exc:
-            yield _sse("error", {"message": str(exc), "partial": text})
+            yield _sse("error", {"message": _client_safe_error(exc), "partial": text})
             yield _sse("done", {"interrupted": True, "status": _payload(api_user)})
 
     return StreamingResponse(stream(), media_type="text/event-stream")
@@ -699,7 +715,7 @@ async def api_chat(
                 error=str(exc),
                 duration_ms=int((time.time() - _chat_start_time) * 1000),
             )
-            yield _sse("error", {"message": str(exc), "partial": pipeline_ctx.response or response})
+            yield _sse("error", {"message": _client_safe_error(exc), "partial": pipeline_ctx.response or response})
             yield _sse("done", {"interrupted": True, "status": _payload(api_user)})
 
     return StreamingResponse(stream(), media_type="text/event-stream")

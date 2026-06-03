@@ -22,6 +22,8 @@ import CSCheckbox     from '@cloudscape-design/components/checkbox';
 import CSFormField    from '@cloudscape-design/components/form-field';
 import CSContainer    from '@cloudscape-design/components/container';
 import CSHeader       from '@cloudscape-design/components/header';
+import CSExpandableSection from '@cloudscape-design/components/expandable-section';
+import { sha256hex } from '../lib/crypto-safe.js';
 
 // ── 常量 ─────────────────────────────────────────────────────────────────────
 
@@ -32,16 +34,15 @@ const AUP_LINK = 'https://play.stellatrix.icu/legal/aup#2J';
 
 const MAX_FREE_TEXT = 10000;
 
-// ── SHA256 工具 ───────────────────────────────────────────────────────────────
+// 玩家交流 QQ 群
+const QQ_GROUP_NUMBER = '584876566';
+const QQ_JOIN_URL     = 'https://qm.qq.com/q/49Dqcr0aw0';
+const QQ_QR_SRC       = '/qq-group.jpg';
 
-async function sha256hex(text) {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(text);
-  const buf = await crypto.subtle.digest('SHA-256', data);
-  return Array.from(new Uint8Array(buf))
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
-}
+// ── SHA256 工具 ───────────────────────────────────────────────────────────────
+// crypto.subtle 仅在安全上下文(HTTPS/localhost)可用;明文 HTTP LAN 访问下为
+// undefined,旧实现会抛错使反馈提交失败。改用 crypto-safe 的降级封装(安全上下文
+// 走真 SHA-256,否则确定性 64-hex 兜底,满足后端 consent_token 契约)。
 
 // ── FeedbackDrawer ────────────────────────────────────────────────────────────
 
@@ -377,15 +378,37 @@ export function FeedbackDrawer({ open, onClose }) {
           </>
         )}
 
-        <CSContainer
-          header={
-            <CSHeader
-              variant="h3"
-              actions={<CSButton iconName="refresh" onClick={loadFeedbackHistory} loading={historyLoading}>刷新</CSButton>}
-            >
-              历史反馈
-            </CSHeader>
-          }
+        {/* ── 玩家交流 QQ 群 ── */}
+        <CSContainer header={<CSHeader variant="h3">玩家交流群</CSHeader>}>
+          <CSSpaceBetween size="s">
+            <CSBox fontSize="body-s" color="text-body-secondary">
+              遇到问题、想交流玩法，欢迎加入玩家 QQ 群（群号 {QQ_GROUP_NUMBER}）。
+            </CSBox>
+            <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+              <img
+                src={QQ_QR_SRC}
+                alt={`QQ 群二维码 ${QQ_GROUP_NUMBER}`}
+                loading="lazy"
+                style={{ width: 150, height: 'auto', borderRadius: 10, border: '1px solid var(--color-border-divider-default, #2a2e33)' }}
+              />
+              <CSSpaceBetween size="xs">
+                <CSButton variant="primary" href={QQ_JOIN_URL} target="_blank" iconName="external">
+                  用 QQ 加入群聊
+                </CSButton>
+                <CSBox fontSize="body-s" color="text-body-secondary">
+                  或在 QQ 中搜索群号 {QQ_GROUP_NUMBER}
+                </CSBox>
+              </CSSpaceBetween>
+            </div>
+          </CSSpaceBetween>
+        </CSContainer>
+
+        <CSExpandableSection
+          variant="container"
+          defaultExpanded={false}
+          headerText="历史反馈"
+          headerCounter={feedbackHistory.length ? `(${feedbackHistory.length})` : undefined}
+          headerActions={<CSButton iconName="refresh" onClick={loadFeedbackHistory} loading={historyLoading}>刷新</CSButton>}
         >
           {historyError ? (
             <CSAlert type="error" header="历史反馈读取失败">{historyError}</CSAlert>
@@ -420,7 +443,7 @@ export function FeedbackDrawer({ open, onClose }) {
               ))}
             </CSSpaceBetween>
           )}
-        </CSContainer>
+        </CSExpandableSection>
       </CSSpaceBetween>
     </CSModal>
   );

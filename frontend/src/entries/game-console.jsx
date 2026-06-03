@@ -24,6 +24,7 @@ installWarmTheme();
 
 // 组件模块 — named import
 import { useResizable } from '../responsive.jsx';
+import { safeUUID } from '../lib/crypto-safe.js';
 import { LeftRail, TopBar, ChatArea, HistoryDrawer, SearchDrawer, GameToastStack, RunSteps, GameSettingsModal } from '../game-app.jsx';
 import { Composer, ConfirmStrip } from '../game-composer.jsx';
 import { RightPanel, PANEL_TABS } from '../game-panels.jsx';
@@ -293,7 +294,7 @@ function App() {
 
   useEffect(() => {
     if (typeof BroadcastChannel === 'undefined') return; // 不支持的环境静默跳过
-    const tabId = crypto.randomUUID();
+    const tabId = safeUUID();
     _tabIdRef.current = tabId;
     const ch = new BroadcastChannel('rpg-game-tabs');
     _tabChRef.current = ch;

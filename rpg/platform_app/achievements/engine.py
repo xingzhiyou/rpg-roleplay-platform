@@ -49,33 +49,28 @@ def build_stats_snapshot(db, user) -> dict[str, Any]:
         "from scripts where owner_id = %s",
         (uid,),
     ).fetchone()
+    # 回合数取 game_saves.state_snapshot->>'turn'(权威的每存档当前回合,与 saves API
+    # 列表展示的 turn 完全同源,见 workspace._SAVE_LIST_COLUMNS)。
+    # 注意:历史上这里读 branch_nodes.turn_index,但 branch_nodes 是旧/平行结构、turn_index
+    # 未填 → total_rounds 恒为 0(生产实测发现:存档有真实 turn 但统计全 0)。
     sv_row = db.execute(
-        "select count(*) as n from game_saves where user_id = %s", (uid,)
-    ).fetchone()
-    rounds_row = db.execute(
-        """
-        select coalesce(sum(per_save_max), 0) as n from (
-          select max(b.turn_index) as per_save_max
-          from branch_nodes b join game_saves s on s.id = b.save_id
-          where s.user_id = %s
-          group by b.save_id
-        ) t
-        """,
+        "select count(*) as n, "
+        "coalesce(sum((state_snapshot->>'turn')::int), 0) as rounds, "
+        "coalesce(max((state_snapshot->>'turn')::int), 0) as max_single "
+        "from game_saves where user_id = %s",
         (uid,),
     ).fetchone()
+    # 分支树统计走 branch_commits(真实提交树:save_id/parent_id/turn_index/created_at)。
     nodes_row = db.execute(
-        """
-        select count(*) as n
-        from branch_nodes b join game_saves s on s.id = b.save_id
-        where s.user_id = %s
-        """,
+        "select count(*) as n from branch_commits b join game_saves s on s.id = b.save_id "
+        "where s.user_id = %s",
         (uid,),
     ).fetchone()
     branches_row = db.execute(
         """
         select coalesce(sum(extra), 0) as n from (
           select count(*) - 1 as extra
-          from branch_nodes b join game_saves s on s.id = b.save_id
+          from branch_commits b join game_saves s on s.id = b.save_id
           where s.user_id = %s and b.parent_id is not null
           group by b.parent_id
           having count(*) > 1
@@ -85,37 +80,27 @@ def build_stats_snapshot(db, user) -> dict[str, Any]:
     ).fetchone()
     depth_row = db.execute(
         """
-        with recursive bn as (
-          select b.id, b.save_id, b.parent_id, 1 as depth
-          from branch_nodes b join game_saves s on s.id = b.save_id
+        with recursive bc as (
+          select b.id, b.parent_id, 1 as depth
+          from branch_commits b join game_saves s on s.id = b.save_id
           where s.user_id = %s and b.parent_id is null
           union all
-          select c.id, c.save_id, c.parent_id, bn.depth + 1
-          from branch_nodes c join bn on c.parent_id = bn.id
+          select c.id, c.parent_id, bc.depth + 1
+          from branch_commits c join bc on c.parent_id = bc.id
         )
-        select coalesce(max(depth), 0) as n from bn
+        select coalesce(max(depth), 0) as n from bc
         """,
         (uid,),
     ).fetchone()
-    # Phase 2:单存档最深回合(与 total_rounds 同源 branch_nodes,保持一致)
-    max_single_row = db.execute(
-        """
-        select coalesce(max(per_save_max), 0) as n from (
-          select max(b.turn_index) as per_save_max
-          from branch_nodes b join game_saves s on s.id = b.save_id
-          where s.user_id = %s
-          group by b.save_id
-        ) t
-        """,
-        (uid,),
-    ).fetchone()
-    # 深夜回合:按 Asia/Shanghai 计 0-5 点推进的节点数(平台以中文用户为主)
+    # 深夜回合:Asia/Shanghai 0-6 点推进的「不同回合」数(distinct save+turn_index)。
     night_row = db.execute(
         """
-        select count(*) as n
-        from branch_nodes b join game_saves s on s.id = b.save_id
-        where s.user_id = %s
-          and extract(hour from b.created_at at time zone 'Asia/Shanghai') < 6
+        select count(*) as n from (
+          select distinct b.save_id, b.turn_index
+          from branch_commits b join game_saves s on s.id = b.save_id
+          where s.user_id = %s
+            and extract(hour from b.created_at at time zone 'Asia/Shanghai') < 6
+        ) t
         """,
         (uid,),
     ).fetchone()
@@ -174,7 +159,7 @@ def build_stats_snapshot(db, user) -> dict[str, Any]:
 
     return {
         "saves_count": int(sv_row["n"] or 0),
-        "total_rounds": int(rounds_row["n"] or 0),
+        "total_rounds": int(sv_row["rounds"] or 0),
         "branches": int(branches_row["n"] or 0),
         "branch_nodes": int(nodes_row["n"] or 0),
         "max_branch_depth": int(depth_row["n"] or 0),
@@ -183,7 +168,7 @@ def build_stats_snapshot(db, user) -> dict[str, Any]:
         "chapters": int(sc_row["chapters"] or 0),
         "login_streak": int(streak),
         "longest_login_streak": int(longest),
-        "max_single_save_rounds": int(max_single_row["n"] or 0),
+        "max_single_save_rounds": int(sv_row["max_single"] or 0),
         "night_turns": int(night_row["n"] or 0),
         "anchors_completed": int(anchors_row["n"] or 0),
         "last_login_at": (

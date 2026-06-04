@@ -392,12 +392,22 @@ async def api_pin_script(request: Request, script_id: int, user=Depends(require_
     with connect() as db:
         _require_owner(db, script_id, user["id"])
 
-        # 校验 target 存在
+        # 用户隔离:target 必须【对当前用户可访问】(自己拥有 / 公开 / 已订阅),否则
+        # 用户可把自己的剧本 pin 到别人的【私有剧本】,而 KB 读取的 pin 重定向会泄露
+        # 该私有剧本的世界书/人物/时间线。与订阅的访问模型一致。
         target = db.execute(
-            "SELECT 1 FROM scripts WHERE id = %s", (target_script_id,)
+            """
+            SELECT 1 FROM scripts
+            WHERE id = %s AND (
+                owner_id = %s
+                OR is_public
+                OR id IN (SELECT script_id FROM user_script_subscriptions WHERE user_id = %s)
+            )
+            """,
+            (target_script_id, user["id"], user["id"]),
         ).fetchone()
         if not target:
-            return json_response({"ok": False, "error": "目标剧本不存在"}, status_code=404)
+            return json_response({"ok": False, "error": "目标剧本不存在或无权引用"}, status_code=403)
 
         # 若 pinned-snapshot，校验 commit 归属于 target_script_id
         if commit_id:

@@ -6,6 +6,27 @@ from platform_app.knowledge._search import _search_chunks, _search_entities
 from platform_app.knowledge._utils import _query_tokens
 
 
+def _resolve_effective_script_id(db, script_id: int) -> int:
+    """pin 重定向:若剧本是 pinned-snapshot / floating-latest 引用,检索读 pin 的目标剧本。
+
+    其余(private/public,无 pin)原样返回 → 对绝大多数剧本零影响。
+    注:commit_id 版本锁未做历史回放,统一读目标【当前】数据 —— floating-latest 语义正确;
+    pinned-snapshot 为近似(不再读空,但不锁版本)。历史精确回放是后续单独的大功能。
+    """
+    try:
+        row = db.execute(
+            "select sharing_mode, current_pin_script_id from scripts where id = %s",
+            (int(script_id),),
+        ).fetchone()
+        if not row:
+            return int(script_id)
+        if row["sharing_mode"] in ("pinned-snapshot", "floating-latest") and row["current_pin_script_id"]:
+            return int(row["current_pin_script_id"])
+    except Exception:
+        pass
+    return int(script_id)
+
+
 def retrieve_runtime_context(
     query: str,
     *,
@@ -69,6 +90,8 @@ def retrieve_script_context(
         db = cm.__enter__()
     try:
         parts: list[str] = []
+        # pin 重定向:引用剧本(pinned/floating)检索读 pin 目标的数据;非 pin 原样,零影响。
+        script_id = _resolve_effective_script_id(db, script_id)
         fact_rows = db.execute(
             """
             select chapter, title, story_time_label, summary, events

@@ -1006,20 +1006,23 @@ async def api_clone_public_script(script_id: int, user=Depends(require_user)):
             return json_response({"ok": False, "error": "该剧本未公开,无法导入"}, status_code=403)
         if int(row["owner_id"]) == int(user["id"]):
             return json_response({"ok": False, "error": "这是你自己的剧本,无需订阅"}, status_code=400)
-        # 2. O(1) INSERT subscription(主键冲突即已订阅)
-        db.execute(
+        # 2. O(1) INSERT subscription(主键冲突即已订阅)。RETURNING 1 只在【真正插入】
+        #    时返回一行 → 据此判断是否首次订阅,避免重复订阅也把 clone_count +1(指标虚高)。
+        inserted = db.execute(
             """
             insert into user_script_subscriptions (user_id, script_id)
             values (%s, %s)
             on conflict (user_id, script_id) do nothing
+            returning 1
             """,
             (user["id"], script_id),
-        )
-        # 3. 热度计数 +1(仅首次订阅时,但 on conflict do nothing 不区分,简化只 +1)
-        try:
-            db.execute("update scripts set clone_count = clone_count + 1 where id = %s", (script_id,))
-        except Exception:
-            pass
+        ).fetchone()
+        # 3. 热度计数 +1(仅首次订阅)
+        if inserted:
+            try:
+                db.execute("update scripts set clone_count = clone_count + 1 where id = %s", (script_id,))
+            except Exception:
+                pass
     return json_response({
         "ok": True,
         "script_id": script_id,

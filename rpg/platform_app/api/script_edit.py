@@ -247,6 +247,48 @@ async def api_fork_script(request: Request, script_id: int, user=Depends(require
                 (int(new_book["id"]), new_id, script_id),
             )
 
+        # 7b. 复制 phase_digests（阶段摘要 — script 级,GM 检索会读;fork 漏掉会让新剧本丢阶段上下文）
+        db.execute(
+            """
+            INSERT INTO phase_digests
+              (script_id, phase_label, chapter_min, chapter_max, summary,
+               key_events, key_locations, key_characters,
+               story_time_label_start, story_time_label_end, chapter_count)
+            SELECT %s, phase_label, chapter_min, chapter_max, summary,
+                   key_events, key_locations, key_characters,
+                   story_time_label_start, story_time_label_end, chapter_count
+            FROM phase_digests WHERE script_id = %s
+            ON CONFLICT DO NOTHING
+            """,
+            (new_id, script_id),
+        )
+
+        # 7c. 复制 script_worldlines（世界树主/支线 — 用 wl_key 文本键,无需 id 重映射）
+        db.execute(
+            """
+            INSERT INTO script_worldlines
+              (script_id, wl_key, label, parent_wl, branch_at_node, is_primary, source, metadata)
+            SELECT %s, wl_key, label, parent_wl, branch_at_node, is_primary, source, metadata
+            FROM script_worldlines WHERE script_id = %s
+            ON CONFLICT DO NOTHING
+            """,
+            (new_id, script_id),
+        )
+
+        # 7d. 复制 script_worldline_nodes（世界树节点 — 同样 wl_key/node_key 文本键)
+        db.execute(
+            """
+            INSERT INTO script_worldline_nodes
+              (script_id, wl_key, node_key, seq, label, summary, chapter_min, chapter_max,
+               anchor_keys, must_preserve, may_vary, causal_centrality, first_revealed_chapter)
+            SELECT %s, wl_key, node_key, seq, label, summary, chapter_min, chapter_max,
+                   anchor_keys, must_preserve, may_vary, causal_centrality, first_revealed_chapter
+            FROM script_worldline_nodes WHERE script_id = %s
+            ON CONFLICT DO NOTHING
+            """,
+            (new_id, script_id),
+        )
+
         # 8. 初始 commit（fork 类型）
         commit_id = _write_commit(
             db,

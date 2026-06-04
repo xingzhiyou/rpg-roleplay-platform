@@ -28,7 +28,7 @@ import {
   AdminFeedbackPage,
 } from './pages/admin.jsx';
 import PolicyNoticeBanner from './components/PolicyNoticeBanner.jsx';
-import { FeedbackDrawer } from './components/FeedbackDrawer.jsx';
+import { FeedbackQuickModal } from './components/FeedbackQuickModal.jsx';
 import HelpDrawerRoot from './components/HelpDrawer.jsx';
 // Cloudscape shell(AWS 控制台架构 + 暖色主题)
 import CSTopNavigation from '@cloudscape-design/components/top-navigation';
@@ -4154,7 +4154,7 @@ function PlatformShellCS({ page, setPage, children, assistant, assistantOpen, on
     if (id === 'signout') {
       (async () => { try { await window.api?.auth?.logout?.(); } catch (_) {} location.replace('Login.html'); })();
     } else if (id === 'feedback') {
-      plNavigate('feedback');
+      setFeedbackOpen(true);
     } else if (id === 'help') {
       if (window.__openHelp) window.__openHelp(helpSlugForPage || 'intro');
     } else { setPage(id); }
@@ -4166,7 +4166,7 @@ function PlatformShellCS({ page, setPage, children, assistant, assistantOpen, on
   return (
     <>
       <PolicyNoticeBanner />
-      <FeedbackDrawer open={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
+      <FeedbackQuickModal open={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
       <WelcomeModal open={welcomeOpen} firstTime={welcomeFirstTime}
         onClose={() => { setWelcomeOpen(false); setWelcomeFirstTime(false); }} />
       <HelpDrawerRoot />
@@ -4214,7 +4214,7 @@ function PlatformShellCS({ page, setPage, children, assistant, assistantOpen, on
           {/* 反馈 + 使用须知 快捷按钮(CS Icon 替代 emoji) */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 4, paddingRight: 4, flexShrink: 0 }}>
             <button
-              onClick={() => plNavigate('feedback')}
+              onClick={() => setFeedbackOpen(true)}
               title={t('platform.menu.feedback')}
               style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '3px 10px', borderRadius: 6, border: '1px solid rgba(196,155,78,0.35)', background: 'transparent', color: '#c8c2b7', cursor: 'pointer', fontSize: 12.5, fontWeight: 500, whiteSpace: 'nowrap' }}
               onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(196,155,78,0.10)'; e.currentTarget.style.borderColor = 'rgba(196,155,78,0.6)'; }}

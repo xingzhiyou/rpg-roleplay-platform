@@ -3750,25 +3750,28 @@ function OnlineLibrarySection() {
     window.api?.federation?.providerInfo?.().then((r) => setIsProvider(!!r?.provider_enabled)).catch(() => setIsProvider(false));
   }, []);
 
+  // 角色分离:
+  //  - 提供方(在线服务,server 模式)只显示「令牌管理」;设备授权在独立 /device 页完成,
+  //    不在设置里放配对码填写窗口(避免在线服务器出现「连接到在线服务」这种自连客户端 UI)。
+  //  - 客户端(本地自部署)只显示连接器(连接在线服务 / 浏览 / 导入 / 发布)。
+  if (isProvider) {
+    return (
+      <SetGroup
+        title="在线剧本库 · 提供方"
+        description="本实例是在线服务,管理外部客户端(本地部署 / CLI)的接入。设备授权请用独立授权页 /device 完成。"
+      >
+        <PatManager />
+      </SetGroup>
+    );
+  }
   return (
     <SetGroup
-      title="在线剧本库(本地 ↔ 在线 打通)"
-      description="本地自部署实例可连接在线服务,浏览/完整导入公开剧本,或把自有剧本发布到在线库。"
+      title="在线剧本库(连接在线服务)"
+      description="连接在线服务,浏览 / 完整导入公开剧本,或把自有剧本发布到在线库。"
     >
       <ConnectorConnect conn={conn} onChange={reload} />
       {conn?.connected && <OnlineBrowse />}
       {conn?.connected && <OnlinePublish />}
-      {/* 提供方专属:仅 server 模式(在线服务节点)展示签发/批准入口;本地客户端不暴露(防权限泄漏)。 */}
-      {isProvider && (
-        <CSExpandableSection headerText="设备授权(批准外部客户端连接本服务)" variant="footer">
-          <DeviceApprove />
-        </CSExpandableSection>
-      )}
-      {isProvider && (
-        <CSExpandableSection headerText="个人访问令牌(供外部客户端连接本服务)" variant="footer">
-          <PatManager />
-        </CSExpandableSection>
-      )}
     </SetGroup>
   );
 }

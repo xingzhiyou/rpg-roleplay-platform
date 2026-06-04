@@ -700,7 +700,7 @@
       "feedback_section_title": "遇到问题，请反馈",
       "feedback_section_body": "点击顶栏「反馈」按钮 → 描述问题 → 提交。开发者会处理你的反馈。",
       "api_section_title": "平台不提供 API 代理",
-      "api_section_body": "GM 主对话需要你自行准备 AI API Key（Anthropic / OpenAI / Vertex / DeepSeek 等）。RAG Embedder 由 admin/vip 兜底；普通用户也建议自配。",
+      "api_section_body": "GM 主对话和 RAG Embedder 都需要你自行准备 AI API Key（Anthropic / OpenAI / Vertex / DeepSeek 等）。平台不代理、不兜底任何调用。",
       "go_settings": "去配 API Key",
       "close_btn": "我已了解，进入平台",
       "co_builder_label": "将我列入「测试期共建者」名单（开源发布时致谢）",

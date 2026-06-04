@@ -614,7 +614,7 @@
       "feedback_section_title": "Report Issues via Feedback",
       "feedback_section_body": "Click the \"Feedback\" button in the top bar → describe the issue → submit. The developer will handle your report.",
       "api_section_title": "No API Proxy Provided",
-      "api_section_body": "The GM chat requires your own AI API Key (Anthropic / OpenAI / Vertex / DeepSeek, etc.). RAG Embedder is covered for admin/vip users; regular users should configure their own.",
+      "api_section_body": "Both the GM chat and the RAG embedder require your own AI API Key (Anthropic / OpenAI / Vertex / DeepSeek, etc.). The platform does not proxy or cover any calls.",
       "go_settings": "Configure API Key",
       "close_btn": "I understand, enter the platform",
       "co_builder_label": "Include me in the Beta Co-builders list (acknowledged at open-source release)",

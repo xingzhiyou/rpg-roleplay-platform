@@ -210,7 +210,7 @@ function GCWelcomeModal({ open, onClose }) {
           <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>平台不提供 API 代理</div>
           <div style={{ fontSize: 13, lineHeight: 1.65, color: 'var(--text-quiet, #9a9590)' }}>
             GM 主对话和 RAG Embedder 都需要你自行准备 AI API Key（Anthropic / OpenAI / Vertex / DeepSeek 等）。
-            平台不代理、不兜底任何调用。
+            平台不为普通用户兜底,请自行配置。
           </div>
         </div>
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>

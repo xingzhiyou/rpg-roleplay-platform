@@ -1536,6 +1536,38 @@ MIGRATIONS: list[tuple[int, str, list[str]]] = [
         "('anchor_50','镌刻史册','累计记录 50 个历史锚点','🗿','探索','gold','{\"metric\":\"anchors_completed\",\"op\":\">=\",\"target\":50}',true,85)"
         " on conflict (id) do nothing",
     ]),
+    (60, "ensure_all_embedding_vec_columns", [
+        # v60: 自愈历史「pgvector 启用顺序」bug。try_enable_pgvector() 曾被排在
+        # versioned migrations *之后*（migrate.cmd_full / init_db），导致 fresh DB 跑
+        # v10/v18/v19/v40 时 pg_extension 里还没有 vector，所有
+        # `if exists(select 1 from pg_extension where extname='vector')` 条件块静默跳过，
+        # 但 migration 仍被标记 applied → 之后再启扩展也不回补 → 5 个向量列
+        # (document_chunks/memories/character_cards/worldbook_entries.embedding_vec +
+        #  kb_canon_entities.embedding) 永久缺失、语义检索静默退化为 ILIKE、/embed/status 崩。
+        #
+        # cmd_full / init_db 已改为「先启 pgvector 再迁移」；本迁移在扩展启用之后再幂等
+        # 断言一遍全部向量列 + HNSW 索引（add column / create index if not exists，安全重入），
+        # 既补齐任何被该 bug 影响的存量库，也修复历史上 v10 只建了部分列的列漂移
+        # (现网曾观察到只有 document_chunks 而缺 memories.embedding_vec)。
+        # 索引名与 v10/v40 完全一致，健康库上 if not exists 全部 no-op。
+        # 维度 = _EMBED_DIM（默认 768；自部署 EMBED_DIM 覆盖，与 v10/v40 保持一致）。
+        f"""
+        do $$
+        begin
+          if exists (select 1 from pg_extension where extname = 'vector') then
+            execute 'alter table document_chunks    add column if not exists embedding_vec vector({_EMBED_DIM})';
+            execute 'alter table memories            add column if not exists embedding_vec vector({_EMBED_DIM})';
+            execute 'alter table character_cards     add column if not exists embedding_vec vector({_EMBED_DIM})';
+            execute 'alter table worldbook_entries   add column if not exists embedding_vec vector({_EMBED_DIM})';
+            execute 'alter table kb_canon_entities   add column if not exists embedding vector({_EMBED_DIM})';
+            execute 'create index if not exists idx_doc_chunks_embedding_hnsw        on document_chunks   using hnsw (embedding_vec vector_cosine_ops)';
+            execute 'create index if not exists idx_memories_embedding_hnsw          on memories          using hnsw (embedding_vec vector_cosine_ops)';
+            execute 'create index if not exists idx_character_cards_embedding_hnsw   on character_cards   using hnsw (embedding_vec vector_cosine_ops)';
+            execute 'create index if not exists idx_worldbook_entries_embedding_hnsw on worldbook_entries using hnsw (embedding_vec vector_cosine_ops)';
+          end if;
+        end $$;
+        """,
+    ]),
 ]
 
 

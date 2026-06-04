@@ -273,10 +273,35 @@ DEFAULT_MODEL_CATALOG: dict[str, Any] = {
 }
 
 
+def _ensure_curated_embeddings(catalog: dict[str, Any]) -> dict[str, Any]:
+    """确保每个 provider 带上 DEFAULT_MODEL_CATALOG 里人工策展的 embedding 模型。
+
+    持久化 catalog(DB / 文件)可能是在新增 embedding 条目之前存的,不含它们 →
+    RAG 向量模型选择器会空。这里在 serve 时把 DEFAULT 的 embedding 模型并回去
+    (幂等、按 real_name 去重、只改内存不落库),让新增 embedding 自愈生效。
+    """
+    try:
+        default_by_id = {normalize_api_id(a.get("id")): a for a in DEFAULT_MODEL_CATALOG["apis"]}
+        for api in catalog.get("apis", []):
+            d = default_by_id.get(normalize_api_id(api.get("id")))
+            if not d:
+                continue
+            curated = [m for m in (d.get("models") or []) if "embedding" in (m.get("capabilities") or [])]
+            if not curated:
+                continue
+            have = {(m.get("real_name") or m.get("id")) for m in (api.get("models") or [])}
+            for m in curated:
+                if (m.get("real_name") or m.get("id")) not in have:
+                    api.setdefault("models", []).append(copy.deepcopy(m))
+    except Exception:
+        pass
+    return catalog
+
+
 def load_model_catalog() -> dict[str, Any]:
     db_catalog = _load_model_catalog_from_db()
     if db_catalog:
-        return db_catalog
+        return _ensure_curated_embeddings(db_catalog)
     MODEL_CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
     if not MODEL_CONFIG_FILE.exists():
         catalog = copy.deepcopy(DEFAULT_MODEL_CATALOG)
@@ -287,7 +312,7 @@ def load_model_catalog() -> dict[str, Any]:
             data = json.load(f)
     except Exception:
         data = {}
-    return _migrate_catalog(data)
+    return _ensure_curated_embeddings(_migrate_catalog(data))
 
 
 def save_model_catalog(catalog: dict[str, Any]) -> None:

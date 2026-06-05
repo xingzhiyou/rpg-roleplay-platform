@@ -1540,7 +1540,7 @@ function MeEditProfile() {
 
       {/* 保存按钮行 */}
       <CSSpaceBetween direction="horizontal" size="xs">
-        <CSButton href="#me">取消</CSButton>
+        <CSButton onClick={() => plNavigate('me')}>取消</CSButton>
         <CSButton variant="primary" onClick={onSave} loading={saving}>
           {saving ? "保存中…" : "保存资料"}
         </CSButton>
@@ -2145,11 +2145,11 @@ function ProfilePage() {
               继续《{lastSave.title || lastScript?.title || "上次存档"}》
             </CSButton>
           ) : (
-            <CSButton variant="primary" iconName="add-plus" href="#scripts">浏览剧本</CSButton>
+            <CSButton variant="primary" iconName="add-plus" onClick={() => plNavigate('scripts')}>浏览剧本</CSButton>
           )}
-          <CSButton iconName="folder" href="#scripts">剧本库</CSButton>
-          <CSButton iconName="user-profile" href="#cards">用户角色卡</CSButton>
-          <CSButton iconName="settings" href="#settings">设置</CSButton>
+          <CSButton iconName="folder" onClick={() => plNavigate('scripts')}>剧本库</CSButton>
+          <CSButton iconName="user-profile" onClick={() => plNavigate('cards')}>用户角色卡</CSButton>
+          <CSButton iconName="settings" onClick={() => plNavigate('settings')}>设置</CSButton>
         </CSSpaceBetween>
       </div>
 
@@ -2174,7 +2174,7 @@ function ProfilePage() {
           <div>
             <CSBox variant="awsui-key-label">库资产</CSBox>
             <CSBox fontSize="display-l" fontWeight="bold">{fmtN(stats?.assets)}</CSBox>
-            <CSBox color="text-body-secondary" fontSize="body-s">用量详见 <a href="#usage" style={{borderBottom: "1px dotted var(--muted-2)"}}>用量页</a></CSBox>
+            <CSBox color="text-body-secondary" fontSize="body-s">用量详见 <a href="/usage" onClick={(e) => { e.preventDefault(); plNavigate('usage'); }} style={{borderBottom: "1px dotted var(--muted-2)"}}>用量页</a></CSBox>
           </div>
         </CSColumnLayout>
       </CSContainer>
@@ -2205,7 +2205,7 @@ function ProfilePage() {
                 <CSBox>
                   @{user.username || "—"} · {user.role || "user"}
                   {" · "}
-                  <a href="#me" style={{ color: "var(--accent,#c96442)", borderBottom: "1px dotted var(--muted-2)" }}>个人主页 →</a>
+                  <a href="/me" onClick={(e) => { e.preventDefault(); plNavigate('me'); }} style={{ color: "var(--accent,#c96442)", borderBottom: "1px dotted var(--muted-2)" }}>个人主页 →</a>
                 </CSBox>
               ),
             },
@@ -2215,7 +2215,7 @@ function ProfilePage() {
 
       {/* 最近游玩 */}
       <CSContainer header={
-        <CSHeader variant="h2" actions={<CSButton href="#saves" iconName="caret-right-filled">全部存档</CSButton>}>
+        <CSHeader variant="h2" actions={<CSButton onClick={() => plNavigate('saves')} iconName="caret-right-filled">全部存档</CSButton>}>
           最近游玩 <span className="muted-2" style={{fontWeight: "normal"}}>按上次操作时间</span>
         </CSHeader>
       }>
@@ -2224,7 +2224,7 @@ function ProfilePage() {
             <CSSpaceBetween size="s">
               <CSBox>还没有任何存档</CSBox>
               <CSBox fontSize="body-s">去「剧本」页选一本剧本开始新游戏，存档会自动出现在这里。</CSBox>
-              <CSButton href="#saves-scripts" iconName="file">去剧本页</CSButton>
+              <CSButton onClick={() => plNavigate('scripts')} iconName="file">去剧本页</CSButton>
             </CSSpaceBetween>
           </CSBox>
         ) : (

@@ -1568,6 +1568,15 @@ MIGRATIONS: list[tuple[int, str, list[str]]] = [
         end $$;
         """,
     ]),
+    (61, "messages_save_role_created_idx", [
+        # 性能:message_row_by_index(删消息/回滚定位) 按 save_id + role 过滤、
+        # 按 created_at 排序后 OFFSET 取行。messages 此前只有 (session_id,turn,created_at)
+        # 索引,缺 save_id 维度 → 该查询退化为按 save_id 过滤的全表扫 + 排序,
+        # 删一条消息要 5–10s。补一个覆盖 (save_id, role, created_at, id) 的索引,
+        # OFFSET 定位变为索引顺序扫描。if not exists,健康/重复运行均 no-op。
+        "create index if not exists idx_messages_save_role_created "
+        "on messages(save_id, role, created_at, id)",
+    ]),
 ]
 
 

@@ -10,6 +10,7 @@ import { ConfirmModal, SettingsToggle, useAutoSave, usePlatformData, useReactive
 import AgentModelPicker from '../components/AgentModelPicker.jsx';
 import GmStyleEditor from '../components/GmStyleEditor.jsx';
 import { getCaps as _getCapsImported } from '../components/catalog-helpers.js';
+import { plNavigate } from '../router.js';
 // Cloudscape 原生组件(内容迁移,统一基线对齐)
 import CSContainer from '@cloudscape-design/components/container';
 import CSHeader from '@cloudscape-design/components/header';
@@ -855,7 +856,7 @@ function ApiDetailPanel({ api, onEdit, onVisibility, onValidate, onDeleteKey, on
                   { label: t('settings.models.usage_output_tokens'), value: usage.output_tokens != null ? Number(usage.output_tokens).toLocaleString() : '—' },
                   { label: t('settings.models.usage_cost'), value: usage.cost_usd != null ? `$${Number(usage.cost_usd).toFixed(2)}` : '—' },
                 ]} />
-                <CSBox fontSize="body-s" color="text-body-secondary">{t('settings.models.usage_detail')} <a href="#usage">{t('settings.models.usage_page')}</a>。</CSBox>
+                <CSBox fontSize="body-s" color="text-body-secondary">{t('settings.models.usage_detail')} <a href="/usage" onClick={(e) => { e.preventDefault(); plNavigate('usage'); }}>{t('settings.models.usage_page')}</a>。</CSBox>
               </CSSpaceBetween>
         ) },
       ]} />
@@ -2728,7 +2729,7 @@ function ModuleModelsSection() {
                         {!hasCred && (
                           <div style={{marginTop: 4, fontSize: 11, color: "var(--color-text-status-warning, #d18a00)"}}>
                             ⚠ 该 provider 还没配 API key,
-                            <a href="#" style={{marginLeft: 4}} onClick={(e) => { e.preventDefault(); window.location.hash = 'settings-keys'; }}>去配置 →</a>
+                            <a href="/apis" style={{marginLeft: 4}} onClick={(e) => { e.preventDefault(); plNavigate('apis'); }}>去配置 →</a>
                           </div>
                         )}
                         {/* task: embedder 兜底显式提醒 */}

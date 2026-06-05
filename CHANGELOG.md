@@ -20,6 +20,7 @@ Version scheme: `0.x-waveN[.M]` where `wave` matches the in-repo development cad
 - Main GM output now defaults to a 4K token BYOK budget, with higher user-configurable headroom, so story replies are not cut off by the old strict cap.
 
 ### Fixed
+- Self-hosted frontend bundles now treat an empty `<meta name="api-base" content="">` as an explicit same-origin API base, so login/schema requests no longer fall back to port 7860 when the backend serves `dist` on another local port.
 - Fresh/self-hosted database setup now enables pgvector before versioned migrations, and migration v60 backfills missing vector columns and HNSW indexes so semantic retrieval works on both new and previously drifted databases.
 - Game Console now turns invalid or expired BYOK API keys into an actionable settings prompt instead of showing only a generic chat failure.
 - Background phase summaries now use the save owner's model credentials, so long-memory compaction no longer falls back to an unconfigured server Vertex account.

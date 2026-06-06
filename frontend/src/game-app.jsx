@@ -827,7 +827,7 @@ function ChatArea({ history, runState, runStyle, narrativeFont, narrativeSize, h
               </p>
               <div className="gc-error-actions">
                 <button className="btn" onClick={onRetry} disabled={!onRetry}>重试本轮</button>
-                <button className="btn ghost" onClick={onShowSse} disabled={!onShowSse}>查看 SSE</button>
+                <button className="btn ghost" onClick={onShowSse} disabled={!onShowSse}>查看事件流</button>
               </div>
             </div>
           </div>

@@ -44,6 +44,7 @@ Version scheme: `0.x-waveN[.M]` where `wave` matches the in-repo development cad
 - Game Console model switching now writes the selected model to the active save and shows the session model after refresh.
 - Game Console now has a local Enter-key mode toggle so testers can choose between Enter-to-send and Enter-for-newline.
 - Game Console now restores the player's draft when chat streaming fails, closes, times out, or finishes without any GM reply.
+- Game Console chat streaming now distinguishes completed streams, backend errors, idle timeouts, manual stops, and true premature closes, so normal SSE close events no longer show a false "generation interrupted" error and the failure card exposes retry plus event-log details.
 - Model parameter settings now reload saved values after refresh, persist NSFW mode/presets, and let the main GM honor each user's max output token setting.
 - Chat usage records now include model finish reason and the applied output budget, making token-limit truncation visible in ops logs.
 - Vertex/Agent Platform chats now return a recoverable user-facing error when the Service Account JSON is missing instead of failing the request with a backend 500.

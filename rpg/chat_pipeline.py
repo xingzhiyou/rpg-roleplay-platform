@@ -765,8 +765,8 @@ async def run_rules_phase(
     # (d) curator 低 confidence **不再短路**。
     # 用户 harness 要求:每轮必须先推进剧情,绝不"一上来甩 (A)(B) 菜单回去 + 跳过 GM"。
     # curator 的 clarifying_question / candidate_actions / risk_flags 已通过 bundle 传给主 GM
-    # 作上下文;主 GM 照常出场推进剧情,回合末再用结构化 question op 给出动作选项
-    # (finalize 阶段 extract_trailing_choice 会确定性兜底,强制任何提问/选项结构化、不入正文)。
+    # 作上下文;主 GM 照常出场推进剧情,回合末用结构化 question op 给出动作选项
+    # (finalize 阶段确定性兜底会剥掉漏进正文的"问玩家下一步"句子;选项本身依赖 GM 走 question op)。
     _curator_plan = agent_result.get("curator_plan", {}) or {}
     _confidence = float(_curator_plan.get("confidence") or 1.0)
     if _confidence < clarify_threshold(api_user):
@@ -1538,25 +1538,6 @@ async def persist_turn_phase(
     # 确定性兜底:剥掉 GM 在 native tool_use 前泄漏进正文的英文"工具预告"元叙述
     # (例:"Let me mark the anchors that have been satisfied...")。不依赖 GM 听提示词。
     visible_response = strip_meta_tool_preamble(visible_response)
-
-    # harness 强约束(用户): GM 的提问/选项**必须结构化,绝不留在正文**。
-    # 这是确定性兜底 —— 不依赖 GM 听话:把正文尾部的问题/选项块抽进 pending_questions,
-    # 并从正文剥掉。本轮已有 GM 结构化 question op 时只清正文去重,不重复 push。
-    try:
-        from state.parsers import extract_trailing_choice
-        _body, _q, _opts = extract_trailing_choice(visible_response)
-        if len(_opts) >= 2:
-            _perm = state.data.get("permissions") or {}
-            _cur_turn = state.data.get("turn", 0)
-            _has_gm_q = any(
-                q.get("turn") == _cur_turn and str(q.get("source", "")).startswith("gm")
-                for q in (_perm.get("pending_questions") or [])
-            )
-            if not _has_gm_q:
-                state.add_pending_question(_q or "你接下来想怎么做?", source="gm:prose", options=_opts)
-            visible_response = _body
-    except Exception:
-        pass
 
     # 沉浸感确定性兜底(用户头号反馈):剥掉结尾"旁白向玩家显式提问下一步"的句子
     # ——只命中明确的决策反问(你接下来想怎么做 / 你打算如何应对 / 请玩家决定 等),

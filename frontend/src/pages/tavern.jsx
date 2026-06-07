@@ -31,6 +31,59 @@ import {
 
 import './tavern-platform.css';
 
+/* 专门的「选择角色」面板 —— 点一张卡即建对话并进入聊天。
+ * 与「角色卡」编辑页(UserCardsView)分离:这里只负责"挑谁聊",不做增删改。 */
+function TavernCharacterSelect({ onPick, onCreateNew, onImport }) {
+  const [cards, setCards] = useState(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    window.api.cards.myList()
+      .then((r) => {
+        const list = Array.isArray(r) ? r : (r?.cards || r?.items || []);
+        if (alive) setCards(list);
+      })
+      .catch(() => { if (alive) setCards([]); });
+    return () => { alive = false; };
+  }, []);
+  const pick = async (c) => {
+    if (busy) return;
+    setBusy(true);
+    try { await onPick(c); } finally { setBusy(false); }
+  };
+  return (
+    <div className="tvp-select-wrap">
+      <div className="tvp-select-head">
+        <h2 className="tvp-select-title serif">想和谁聊聊？</h2>
+        <div className="tvp-select-actions">
+          <CSButton iconName="add-plus" onClick={onCreateNew}>新建角色卡</CSButton>
+          <CSButton iconName="upload" onClick={onImport}>导入角色卡</CSButton>
+        </div>
+      </div>
+      {cards == null && <div className="muted-2 tvp-select-empty">加载中…</div>}
+      {cards != null && cards.length === 0 && (
+        <div className="tvp-select-empty muted-2">
+          还没有角色卡。点「新建角色卡」手动创建,或「导入角色卡」拖入 SillyTavern 角色卡(.png / .json / .webp)。
+        </div>
+      )}
+      {cards != null && cards.length > 0 && (
+        <div className="tvp-select-grid">
+          {cards.map((c) => (
+            <button
+              key={c.id} className="tvp-select-card" disabled={busy}
+              onClick={() => pick(c)} title={`与 ${c.name || '角色'} 对话`}
+            >
+              <span className="tvp-select-avatar" aria-hidden="true">{(c.name || '?').trim().slice(0, 1)}</span>
+              <span className="tvp-select-name">{c.name || '未命名角色'}</span>
+              {c.identity ? <span className="tvp-select-identity muted-2">{c.identity}</span> : null}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function TavernPage() {
   /* ── 列表 / 激活态 ───────────────────────────────────────────────── */
   const [chats, setChats] = useState([]);
@@ -116,13 +169,23 @@ export default function TavernPage() {
       setPersona(data.player || null);
     }
     if (Array.isArray(data.history)) {
+      // 后端 history 的 assistant 消息现在带 tool_ops / reasoning(record_turn 已持久化)→
+      // 映射成前端展示字段 _toolOps / _thinking,重开/刷新聊天后工具流 + 思考流仍可见。
+      let hist = data.history.map((m) => {
+        if (m && m.role === 'assistant') {
+          const mm = { ...m };
+          if (!mm._toolOps && Array.isArray(m.tool_ops) && m.tool_ops.length) mm._toolOps = m.tool_ops;
+          if (!mm._thinking && m.reasoning) mm._thinking = m.reasoning;
+          return mm;
+        }
+        return m;
+      });
+      // 兜底:刚完成那轮后端可能还没回带(异步持久化时序)→ 用本轮前端快照补挂最末 assistant。
       const ops = lastTurnToolOpsRef.current;
-      let hist = data.history;
       if (Array.isArray(ops) && ops.length > 0) {
-        // 把本轮后台工具流补挂回最末 assistant(后端 history 不带,纯前端展示态)
         let lastAssistant = -1;
         for (let i = hist.length - 1; i >= 0; i--) { if (hist[i] && hist[i].role === 'assistant') { lastAssistant = i; break; } }
-        if (lastAssistant >= 0) {
+        if (lastAssistant >= 0 && !(hist[lastAssistant]._toolOps && hist[lastAssistant]._toolOps.length)) {
           hist = hist.map((m, i) => (i === lastAssistant ? { ...m, _toolOps: ops } : m));
         }
         lastTurnToolOpsRef.current = null;
@@ -351,7 +414,22 @@ export default function TavernPage() {
             // 后端可能在 status 里回带最新 history,不强制覆盖流式气泡
           }
         },
-        on_reasoning: () => { if (isCurrentRun()) resetIdle(); },
+        on_reasoning: (data) => {
+          if (!isCurrentRun()) return;
+          resetIdle();
+          // 思考流挂到(或新建)流式 assistant 气泡的 _thinking,生成中即可见;done 后由后端
+          // 持久化的 reasoning 接管(applyState 映射),重开仍可见。
+          const piece = (data && (data.text || data.delta)) || '';
+          if (!piece) return;
+          setHistory((h) => {
+            const last = h[h.length - 1];
+            if (openedAssistant && last && last.role === 'assistant') {
+              return [...h.slice(0, -1), { ...last, _thinking: (last._thinking || '') + piece }];
+            }
+            openedAssistant = true;
+            return [...h, { role: 'assistant', content: '', ts, streaming: true, _thinking: piece }];
+          });
+        },
         // F1:后台工具流 —— tool_call {tool, arguments};tool_result {ok, result, error}
         on_tool_call: (data) => {
           if (!isCurrentRun()) return;
@@ -577,6 +655,19 @@ export default function TavernPage() {
     }
   };
 
+  // 选择角色面板:点一张卡 → 建一段绑定该角色卡的对话 → 直接进入聊天。
+  const pickCharacter = async (card) => {
+    if (!card || card.id == null) return;
+    try {
+      const r = await window.api.tavern.create({ character_card_id: card.id });
+      if (r && r.ok === false) throw new Error(r.error || '开始对话失败');
+      const sid = r && r.save && r.save.id;
+      if (sid != null) { setView('chat'); await openSaveId(sid, card.name || ''); }
+    } catch (e) {
+      window.__apiToast?.('开始对话失败', { kind: 'danger', detail: e?.message });
+    }
+  };
+
   // F2:本轮秒表展示 mm:ss(或 s.s)。
   const fmtElapsed = (ms) => {
     const total = Math.max(0, Math.floor((ms || 0) / 1000));
@@ -609,12 +700,20 @@ export default function TavernPage() {
             新建对话
           </CSButton>
           <CSButton
+            variant={view === 'select' ? 'normal' : 'link'}
+            iconName="user-profile"
+            onClick={() => setView('select')}
+            fullWidth
+          >
+            选择角色
+          </CSButton>
+          <CSButton
             variant={view === 'cards' ? 'normal' : 'link'}
             iconName="contact"
             onClick={() => setView('cards')}
             fullWidth
           >
-            角色卡
+            角色卡(编辑)
           </CSButton>
           <CSButton
             variant="link"
@@ -676,13 +775,19 @@ export default function TavernPage() {
 
       {/* ── 右:主区(chat / cards 切换)─────────────────────────── */}
       <main className="tvp-main">
-        {view === 'cards' ? (
+        {view === 'select' ? (
           <div className="tvp-cards-wrap">
-            <div className="tvp-cards-bar">
-              <CSButton variant="link" iconName="angle-left" onClick={() => setView('chat')}>
-                返回对话
-              </CSButton>
+            <div className="tvp-cards-body">
+              <TavernCharacterSelect
+                onPick={pickCharacter}
+                onCreateNew={() => setView('cards')}
+                onImport={() => setImportOpen(true)}
+              />
             </div>
+          </div>
+        ) : view === 'cards' ? (
+          /* 角色卡页 = 纯编辑/创建(无「返回对话」按钮;切回对话走左侧栏)。 */
+          <div className="tvp-cards-wrap">
             <div className="tvp-cards-body">
               <UserCardsView />
             </div>
@@ -695,7 +800,7 @@ export default function TavernPage() {
               <p className="tvp-hero-sub muted">新建一段对话,或从角色卡里挑一位。</p>
               <div className="tvp-hero-actions">
                 <CSButton variant="primary" iconName="add-plus" onClick={newChat}>新建对话</CSButton>
-                <CSButton iconName="contact" onClick={() => setView('cards')}>选择角色卡</CSButton>
+                <CSButton iconName="user-profile" onClick={() => setView('select')}>选择角色</CSButton>
               </div>
               <div
                 className="tvp-hero-drop"

@@ -149,6 +149,47 @@
   padding: 16px 20px 32px;
 }
 
+/* ── 选择角色面板 ─────────────────────────────────────────────── */
+.tvp-select-wrap { padding: 22px 22px 36px; max-width: 940px; margin: 0 auto; width: 100%; }
+.tvp-select-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; flex-wrap: wrap; margin-bottom: 18px;
+}
+.tvp-select-title { font-size: 22px; margin: 0; }
+.tvp-select-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.tvp-select-empty { padding: 36px 8px; text-align: center; line-height: 1.8; }
+.tvp-select-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+  gap: 12px;
+}
+.tvp-select-card {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 6px;
+  padding: 14px 14px 16px; text-align: left; cursor: pointer; font: inherit; color: inherit;
+  border: 1px solid var(--line); border-radius: 12px;
+  background: color-mix(in srgb, var(--accent) 3%, transparent);
+  transition: border-color .12s ease, background .12s ease, transform .08s ease;
+}
+.tvp-select-card:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 9%, transparent);
+  transform: translateY(-1px);
+}
+.tvp-select-card:disabled { opacity: 0.55; cursor: default; }
+.tvp-select-avatar {
+  width: 40px; height: 40px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; font-weight: 600; color: #fff; background: var(--accent);
+}
+.tvp-select-name { font-size: 14px; font-weight: 600; line-height: 1.3; }
+.tvp-select-identity {
+  font-size: 12px; line-height: 1.4;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+@media (max-width: 600px) {
+  .tvp-select-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+}
+
 /* ── 空状态 hero ──────────────────────────────────────────────── */
 .tvp-hero {
   flex: 1 1 auto;

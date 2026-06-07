@@ -456,9 +456,17 @@ async def api_context_breakdown(
             key = "system_prompt"
         cat_tokens[key] = cat_tokens.get(key, 0) + tok
 
-    from app import selected_model
+    from app import _get_user_preferences_cached, selected_model
     model = selected_model()
-    ctx_limit = int(context_window_for(model["api_id"], model["real_name"]) or 1_000_000)
+    ctx_limit = int(context_window_for(model["api_id"], model["real_name"]) or 0)
+    # 与 _payload 的圆环分母一致:min(模型原生, 用户 context_size 默认 16384)。
+    # 不再回退到悬空 1M —— 那是"未配置"假象,且与「模型参数」里的设置不符(用户报的 bug)。
+    try:
+        _prefs = _get_user_preferences_cached(api_user) if api_user else {}
+        _ucs = int(float(_prefs.get("settings.context_size") or _prefs.get("context_size") or 16384))
+        ctx_limit = min(ctx_limit, _ucs) if ctx_limit else _ucs
+    except Exception:
+        ctx_limit = ctx_limit or 16384
 
     breakdown = []
     used_sum = 0

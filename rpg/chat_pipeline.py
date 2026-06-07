@@ -589,6 +589,15 @@ async def run_context_phase(
     ctx.bundle = bundle
     ctx.ctx_text = ctx_text
 
+    # 上下文用量面板(ContextUsage 圆环 + breakdown)读 state.data.memory.last_context。
+    # 原本只在 run_rules_phase(Phase 3)末尾写,而酒馆(tavern_gm)跳过 Phase 3 → last_context
+    # 永不写入 → 前端 /api/chat/context-breakdown 全 0。这里在 context 组装后先记一次(所有模式
+    # 都经过 Phase 2);非酒馆模式 run_rules_phase 会再以含规则层的版本覆盖,酒馆模式靠这次写入。
+    try:
+        state.set_last_context(bundle.get("debug") or {})
+    except Exception:
+        pass
+
 
 # ---------------------------------------------------------------------------
 # Phase 3: 5E rules preflight (GamePolicy.preflight + combat gate)
@@ -1002,6 +1011,11 @@ async def run_gm_phase(
         log.warning(f"[chat] max_tokens preference skipped: {_mt_err}")
         _max_tokens = 800
 
+    # 工具流 + 思考流持久化:本轮累积进 state.data 临时键 → record_turn 落到 assistant 历史消息,
+    # 重开/刷新后聊天记录里仍可见(酒馆沉浸:工具调用 + 思考流不该生成完就消失)。每轮开头清零。
+    state.data["_turn_tool_ops"] = []
+    state.data["_turn_reasoning"] = []
+
     async for event in _bridge_sync_generator_to_async(
         lambda: gm.respond_stream_with_tools(
             message_for_model, bundle["prompt"], state,
@@ -1052,24 +1066,52 @@ async def run_gm_phase(
             response += chunk
             yield ("token", {"text": chunk})
         elif etype == "reasoning":
-            # #7 reasoning 流式: 思考过程单独走 reasoning 事件 — 不进 token(叙事)、
-            # 不累加进 response、不写 history。前端用它显示思考流并重置 idle 计时。
-            yield ("reasoning", {"text": event.get("text", "")})
+            # #7 reasoning 流式: 思考过程单独走 reasoning 事件 — 不进 token(叙事)、不累加进
+            # response。但**累积进 _turn_reasoning** → record_turn 落到 assistant 历史消息,
+            # 重开聊天后思考流仍可见(酒馆沉浸需求)。前端也用它显示思考流并重置 idle 计时。
+            _rtext = event.get("text", "")
+            yield ("reasoning", {"text": _rtext})
+            try:
+                state.data.setdefault("_turn_reasoning", []).append(_rtext)
+            except Exception:
+                pass
         elif etype == "tool_call":
             # R3/B4:小负载转发(tool 名 + args 摘要),供前端可折叠工具流;不淹没沉浸正文。
+            _t_args = _summarize_tool_args(event.get("arguments", {}))
             yield ("tool_call", {
                 "server_id": event.get("server_id", ""),
                 "tool": event.get("tool", ""),
-                "args_summary": _summarize_tool_args(event.get("arguments", {})),
+                "args_summary": _t_args,
             })
+            try:
+                state.data.setdefault("_turn_tool_ops", []).append({
+                    "tool": event.get("tool", ""), "args": _t_args,
+                    "ok": None, "result": None, "error": None, "_pending": True,
+                })
+            except Exception:
+                pass
         elif etype == "tool_result":
             # R3/B4:转发 ok + result 片段 + error 摘要(裁剪,控制 SSE 体积)。
+            _res_snip = _snippet_tool_result(event.get("result"))
+            _err_snip = _snippet_tool_result(event.get("error"), 200) or None
             yield ("tool_result", {
                 "tool": event.get("tool", ""),
                 "ok": event.get("ok", False),
-                "result_snippet": _snippet_tool_result(event.get("result")),
-                "error": _snippet_tool_result(event.get("error"), 200) or None,
+                "result_snippet": _res_snip,
+                "error": _err_snip,
             })
+            try:
+                _ops = state.data.setdefault("_turn_tool_ops", [])
+                _match = next((o for o in reversed(_ops) if o.get("_pending")), None)
+                if _match is None:
+                    _match = {"tool": event.get("tool", ""), "args": None, "_pending": False}
+                    _ops.append(_match)
+                _match["ok"] = bool(event.get("ok", False))
+                _match["result"] = _res_snip
+                _match["error"] = _err_snip
+                _match["_pending"] = False
+            except Exception:
+                pass
             # 酒馆铁律:agent 设好角色后,开场用角色卡的 first_mes **确定性贴出** —— 绝不让 LLM
             # 现编开场(用户:不允许开局调用 llm;有 first_mes 就贴、没有就留空)。命中即丢弃本轮
             # LLM 续写(含可能的前导寒暄),以 first_mes 作本轮唯一可见输出并停掉后续生成。

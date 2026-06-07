@@ -28,6 +28,30 @@ from state import GameState, strip_json_state_ops, strip_meta_tool_preamble
 
 log = get_logger(__name__)
 
+
+# 酒馆 v2(R3/B4):tool_call/tool_result 作为 SSE 转发给前端做"可折叠后台工具流"。
+# 为避免淹没沉浸 + 控制 SSE 体积:args 摘要 ≤200 字符,result 片段 ≤300 字符。
+def _summarize_tool_args(args: Any, limit: int = 200) -> str:
+    try:
+        s = json.dumps(args, ensure_ascii=False, default=str)
+    except Exception:
+        s = str(args)
+    return s if len(s) <= limit else s[:limit] + "…"
+
+
+def _snippet_tool_result(result: Any, limit: int = 300) -> str:
+    if result is None:
+        return ""
+    if isinstance(result, str):
+        s = result
+    else:
+        try:
+            s = json.dumps(result, ensure_ascii=False, default=str)
+        except Exception:
+            s = str(result)
+    return s if len(s) <= limit else s[:limit] + "…"
+
+
 # W1 容量优化: RPG_POSTPROC_MODE=async (默认) → GM 流完即入队 Phase 4, 不阻塞 worker。
 # RPG_POSTPROC_MODE=sync → 旧行为 (后处理阻塞主路径, 测试/debug 用)。
 _POSTPROC_MODE = os.environ.get("RPG_POSTPROC_MODE", "async").lower()
@@ -565,6 +589,15 @@ async def run_context_phase(
     ctx.bundle = bundle
     ctx.ctx_text = ctx_text
 
+    # 上下文用量面板(ContextUsage 圆环 + breakdown)读 state.data.memory.last_context。
+    # 原本只在 run_rules_phase(Phase 3)末尾写,而酒馆(tavern_gm)跳过 Phase 3 → last_context
+    # 永不写入 → 前端 /api/chat/context-breakdown 全 0。这里在 context 组装后先记一次(所有模式
+    # 都经过 Phase 2);非酒馆模式 run_rules_phase 会再以含规则层的版本覆盖,酒馆模式靠这次写入。
+    try:
+        state.set_last_context(bundle.get("debug") or {})
+    except Exception:
+        pass
+
 
 # ---------------------------------------------------------------------------
 # Phase 3: 5E rules preflight (GamePolicy.preflight + combat gate)
@@ -765,8 +798,8 @@ async def run_rules_phase(
     # (d) curator 低 confidence **不再短路**。
     # 用户 harness 要求:每轮必须先推进剧情,绝不"一上来甩 (A)(B) 菜单回去 + 跳过 GM"。
     # curator 的 clarifying_question / candidate_actions / risk_flags 已通过 bundle 传给主 GM
-    # 作上下文;主 GM 照常出场推进剧情,回合末再用结构化 question op 给出动作选项
-    # (finalize 阶段 extract_trailing_choice 会确定性兜底,强制任何提问/选项结构化、不入正文)。
+    # 作上下文;主 GM 照常出场推进剧情,回合末用结构化 question op 给出动作选项
+    # (finalize 阶段确定性兜底会剥掉漏进正文的"问玩家下一步"句子;选项本身依赖 GM 走 question op)。
     _curator_plan = agent_result.get("curator_plan", {}) or {}
     _confidence = float(_curator_plan.get("confidence") or 1.0)
     if _confidence < clarify_threshold(api_user):
@@ -930,7 +963,25 @@ async def run_gm_phase(
         import secrets as _secrets
 
         from tools_dsl.chat_tool_router import build_tool_call_router, build_unified_tool_list
-        unified_tools = build_unified_tool_list(mcp_tools, origin="llm_chat")
+        # 酒馆模式(tavern_gm)隐藏锚点/剧本/战斗/模组类工具,保留 memory/关系/世界书 overlay
+        _gm_mode = None
+        _tavern_bound_script_id = None
+        try:
+            from context_providers.registry import resolve_content_pack
+            _gm_mode = (resolve_content_pack(state).get("gm_policy") or {}).get("mode")
+        except Exception:
+            _gm_mode = None
+        # 酒馆 v2(R2):绑定剧本后,重开剧本读工具(search_canon / lookup_* / get_*)。
+        try:
+            _tv = (getattr(state, "data", {}) or {}).get("tavern") or {}
+            _bsid = _tv.get("bound_script_id")
+            _tavern_bound_script_id = int(_bsid) if _bsid else None
+        except Exception:
+            _tavern_bound_script_id = None
+        unified_tools = build_unified_tool_list(
+            mcp_tools, origin="llm_chat", mode=_gm_mode,
+            bound_script_id=_tavern_bound_script_id,
+        )
         _gm_trace_id = f"gm-{_secrets.token_urlsafe(6)}"
         gm_tool_router = build_tool_call_router(
             user_id=int(api_user.get("id")) if api_user else 0,
@@ -959,6 +1010,11 @@ async def run_gm_phase(
     except Exception as _mt_err:
         log.warning(f"[chat] max_tokens preference skipped: {_mt_err}")
         _max_tokens = 800
+
+    # 工具流 + 思考流持久化:本轮累积进 state.data 临时键 → record_turn 落到 assistant 历史消息,
+    # 重开/刷新后聊天记录里仍可见(酒馆沉浸:工具调用 + 思考流不该生成完就消失)。每轮开头清零。
+    state.data["_turn_tool_ops"] = []
+    state.data["_turn_reasoning"] = []
 
     async for event in _bridge_sync_generator_to_async(
         lambda: gm.respond_stream_with_tools(
@@ -1010,21 +1066,62 @@ async def run_gm_phase(
             response += chunk
             yield ("token", {"text": chunk})
         elif etype == "reasoning":
-            # #7 reasoning 流式: 思考过程单独走 reasoning 事件 — 不进 token(叙事)、
-            # 不累加进 response、不写 history。前端用它显示思考流并重置 idle 计时。
-            yield ("reasoning", {"text": event.get("text", "")})
+            # #7 reasoning 流式: 思考过程单独走 reasoning 事件 — 不进 token(叙事)、不累加进
+            # response。但**累积进 _turn_reasoning** → record_turn 落到 assistant 历史消息,
+            # 重开聊天后思考流仍可见(酒馆沉浸需求)。前端也用它显示思考流并重置 idle 计时。
+            _rtext = event.get("text", "")
+            yield ("reasoning", {"text": _rtext})
+            try:
+                state.data.setdefault("_turn_reasoning", []).append(_rtext)
+            except Exception:
+                pass
         elif etype == "tool_call":
+            # R3/B4:小负载转发(tool 名 + args 摘要),供前端可折叠工具流;不淹没沉浸正文。
+            _t_args = _summarize_tool_args(event.get("arguments", {}))
             yield ("tool_call", {
                 "server_id": event.get("server_id", ""),
                 "tool": event.get("tool", ""),
-                "arguments": event.get("arguments", {}),
+                "args_summary": _t_args,
             })
+            try:
+                state.data.setdefault("_turn_tool_ops", []).append({
+                    "tool": event.get("tool", ""), "args": _t_args,
+                    "ok": None, "result": None, "error": None, "_pending": True,
+                })
+            except Exception:
+                pass
         elif etype == "tool_result":
+            # R3/B4:转发 ok + result 片段 + error 摘要(裁剪,控制 SSE 体积)。
+            _res_snip = _snippet_tool_result(event.get("result"))
+            _err_snip = _snippet_tool_result(event.get("error"), 200) or None
             yield ("tool_result", {
+                "tool": event.get("tool", ""),
                 "ok": event.get("ok", False),
-                "result": event.get("result"),
-                "error": event.get("error"),
+                "result_snippet": _res_snip,
+                "error": _err_snip,
             })
+            try:
+                _ops = state.data.setdefault("_turn_tool_ops", [])
+                _match = next((o for o in reversed(_ops) if o.get("_pending")), None)
+                if _match is None:
+                    _match = {"tool": event.get("tool", ""), "args": None, "_pending": False}
+                    _ops.append(_match)
+                _match["ok"] = bool(event.get("ok", False))
+                _match["result"] = _res_snip
+                _match["error"] = _err_snip
+                _match["_pending"] = False
+            except Exception:
+                pass
+            # 酒馆铁律:agent 设好角色后,开场用角色卡的 first_mes **确定性贴出** —— 绝不让 LLM
+            # 现编开场(用户:不允许开局调用 llm;有 first_mes 就贴、没有就留空)。命中即丢弃本轮
+            # LLM 续写(含可能的前导寒暄),以 first_mes 作本轮唯一可见输出并停掉后续生成。
+            if _gm_mode == "tavern_gm" and event.get("tool") == "set_tavern_character" and event.get("ok"):
+                _fm = str(((getattr(state, "data", {}) or {}).get("tavern") or {}).get("first_mes") or "").strip()
+                response = _fm
+                if _fm:
+                    yield ("token", {"text": _fm})
+                _gm_stop.set()
+                break
         elif etype == "tool_error":
             yield ("tool_error", {
                 "error": event.get("error", ""),
@@ -1538,25 +1635,6 @@ async def persist_turn_phase(
     # 确定性兜底:剥掉 GM 在 native tool_use 前泄漏进正文的英文"工具预告"元叙述
     # (例:"Let me mark the anchors that have been satisfied...")。不依赖 GM 听提示词。
     visible_response = strip_meta_tool_preamble(visible_response)
-
-    # harness 强约束(用户): GM 的提问/选项**必须结构化,绝不留在正文**。
-    # 这是确定性兜底 —— 不依赖 GM 听话:把正文尾部的问题/选项块抽进 pending_questions,
-    # 并从正文剥掉。本轮已有 GM 结构化 question op 时只清正文去重,不重复 push。
-    try:
-        from state.parsers import extract_trailing_choice
-        _body, _q, _opts = extract_trailing_choice(visible_response)
-        if len(_opts) >= 2:
-            _perm = state.data.get("permissions") or {}
-            _cur_turn = state.data.get("turn", 0)
-            _has_gm_q = any(
-                q.get("turn") == _cur_turn and str(q.get("source", "")).startswith("gm")
-                for q in (_perm.get("pending_questions") or [])
-            )
-            if not _has_gm_q:
-                state.add_pending_question(_q or "你接下来想怎么做?", source="gm:prose", options=_opts)
-            visible_response = _body
-    except Exception:
-        pass
 
     # 沉浸感确定性兜底(用户头号反馈):剥掉结尾"旁白向玩家显式提问下一步"的句子
     # ——只命中明确的决策反问(你接下来想怎么做 / 你打算如何应对 / 请玩家决定 等),

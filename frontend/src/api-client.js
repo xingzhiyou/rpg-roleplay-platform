@@ -152,10 +152,16 @@
   // ---- SSE helper for /api/chat & /api/opening ---------------
   // Posts a JSON body and parses the streaming response into
   // structured event objects: { event, data }.
-  async function sseStream(path, body, handlers) {
+  function sseStream(path, body, handlers) {
     handlers = handlers || {};
     const url = (path.startsWith("http") ? path : BASE + path);
     const ctl = new AbortController();
+    const isAbort = (e) => ctl.signal.aborted || (e && e.name === "AbortError");
+    const abortPayload = (e) => ({
+      reason: ctl.signal.reason || null,
+      message: (e && e.message) || "请求已取消",
+      url,
+    });
     const promise = (async () => {
       let res;
       try {
@@ -167,6 +173,10 @@
           signal: ctl.signal,
         });
       } catch (e) {
+        if (isAbort(e)) {
+          if (handlers.onAbort) handlers.onAbort(abortPayload(e));
+          return;
+        }
         if (handlers.onError) handlers.onError(new ApiError("network", 0, e && e.message));
         return;
       }
@@ -183,7 +193,14 @@
       let buf = "";
       while (true) {
         let chunk;
-        try { chunk = await reader.read(); } catch (e) { break; }
+        try { chunk = await reader.read(); } catch (e) {
+          if (isAbort(e)) {
+            if (handlers.onAbort) handlers.onAbort(abortPayload(e));
+            return;
+          }
+          if (handlers.onError) handlers.onError(new ApiError("stream_read", 0, (e && e.message) || "流式读取失败", { url }));
+          return;
+        }
         if (chunk.done) break;
         buf += decoder.decode(chunk.value, { stream: true });
         let idx;
@@ -199,7 +216,13 @@
       }
       if (handlers.onClose) handlers.onClose();
     })();
-    return { stop: () => ctl.abort(), done: promise };
+    return {
+      stop: (reason) => {
+        try { ctl.abort(reason || "client_stop"); } catch (_) { ctl.abort(); }
+      },
+      done: promise,
+      signal: ctl.signal,
+    };
   }
   function parseSseBlock(raw) {
     if (!raw) return null;
@@ -600,6 +623,53 @@
     // ---------- Chat history (SillyTavern JSONL import) ----------
     chats: {
       importTavern: (body) => POST(`${API_PREFIX}/me/chats/import-tavern`, body),
+    },
+
+    // ---------- Tavern mode (SillyTavern-style 1:1 character chat) ----------
+    // 注意:酒馆端点挂在 /api/tavern/*(无 /v1 前缀),与上面的 ${API_PREFIX} 不同。
+    // 流式发送复用现有 api.game.chat({message, save_id}) + api.game.stop()。
+    tavern: {
+      // 活跃对话列表(updated_at desc)
+      list: () => GET(`/api/tavern/chats`),
+      // 归档对话列表
+      listArchived: () => GET(`/api/tavern/chats`, { archived: 1 }),
+      // 用一张已有 pc 卡建对话 body {character_card_id, persona_card_id?, title?}
+      create: (body) => POST(`/api/tavern/chats`, body),
+      // 导入酒馆角色卡:File(.png/.json/.webp)→ multipart;否则 JSON body
+      // ({json}/{json_string}/{base64}/{png_base64}) → 建+激活对话
+      importCharacter: (fileOrBody) => {
+        if (fileOrBody instanceof File || fileOrBody instanceof Blob) {
+          const fd = new FormData();
+          fd.append("file", fileOrBody);
+          return _send(`/api/tavern/import-character`, { method: "POST", body: fd, signal: timeoutSignal(60000) });
+        }
+        return POST(`/api/tavern/import-character`, fileOrBody || {});
+      },
+      // 激活某对话(切换对话前必须先激活,/api/chat 才会落到正确的 save)
+      activate: (id) => POST(`/api/tavern/chats/${id}/activate`, {}),
+      // 归档 / 取消归档 body {archived: bool}
+      archive: (id, archived) => PATCH(`/api/tavern/chats/${id}/archive`, { archived: !!archived }),
+      // 重命名 body {title}
+      rename: (id, title) => POST(`/api/tavern/chats/${id}/rename`, { title }),
+      // 类 Claude:按对话内容自动生成标题(后端幂等,仅 title 为空时生成)
+      autotitle: (id) => POST(`/api/tavern/chats/${id}/autotitle`, {}),
+      // 删除对话
+      remove: (id) => DEL(`/api/tavern/chats/${id}`, {}),
+      // 导入 SillyTavern 聊天记录 JSONL:File → multipart;否则 {jsonl, title?}
+      importJsonl: (fileOrBody, title) => {
+        if (fileOrBody instanceof File || fileOrBody instanceof Blob) {
+          const fd = new FormData();
+          fd.append("file", fileOrBody);
+          if (title) fd.append("title", title);
+          return _send(`/api/tavern/chats/import-jsonl`, { method: "POST", body: fd, signal: timeoutSignal(60000) });
+        }
+        if (typeof fileOrBody === "string") {
+          return POST(`/api/tavern/chats/import-jsonl`, { jsonl: fileOrBody, title: title || undefined });
+        }
+        return POST(`/api/tavern/chats/import-jsonl`, fileOrBody || {});
+      },
+      // 导出对话为 JSONL(返回可直接下载的 URL,后端响应是 attachment)
+      exportJsonl: (id) => BASE + `/api/tavern/chats/${id}/export-jsonl`,
     },
 
     // ---------- Library / files ----------

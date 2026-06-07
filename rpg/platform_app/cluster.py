@@ -23,6 +23,10 @@ from .db import connect, init_db
 
 # 进程唯一标识：hostname + pid + 启动时的随机数
 WORKER_ID = f"{socket.gethostname()}-{os.getpid()}-{secrets.token_hex(4)}"
+try:
+    STOP_SIGNAL_MAX_AGE_SEC = max(1, int(os.getenv("RPG_STOP_SIGNAL_MAX_AGE_SEC", "900")))
+except ValueError:
+    STOP_SIGNAL_MAX_AGE_SEC = 900
 
 
 def _stable_lock_id(job_key: str) -> int:
@@ -40,8 +44,7 @@ def _stable_lock_id(job_key: str) -> int:
 #  Stop signal: 跨进程取消正在跑的 chat
 # ══════════════════════════════════════════════════════════════════════
 # 注: user_id 加 FK + cascade, 防止用户被删后 stop_signals 残留孤儿行。
-# run_id 仍是 bigint, 但 cluster.py 内 request_stop 调用方应保证 run_id
-# 跨 worker 唯一（chat handler 应改用 UUID-based run_id 或 sequence）。
+# run_id 仍是 bigint; 调用方必须传入进程重启后也不重复的 run_id。
 _STOP_TABLE_DDL = """
 create table if not exists stop_signals (
   user_id bigint not null references users(id) on delete cascade,
@@ -63,7 +66,10 @@ def request_stop(user_id: int, run_id: int) -> None:
     _ensure_stop_table()
     with connect() as db:
         db.execute(
-            "insert into stop_signals(user_id, run_id) values (%s, %s) on conflict do nothing",
+            """
+            insert into stop_signals(user_id, run_id) values (%s, %s)
+            on conflict (user_id, run_id) do update set requested_at = now()
+            """,
             (int(user_id), int(run_id)),
         )
 
@@ -75,9 +81,19 @@ def is_stop_requested(user_id: int, run_id: int) -> bool:
     try:
         _ensure_stop_table()
         with connect() as db:
+            db.execute(
+                "delete from stop_signals where requested_at < now() - (interval '1 second' * %s)",
+                (int(STOP_SIGNAL_MAX_AGE_SEC),),
+            )
             row = db.execute(
-                "select 1 from stop_signals where user_id = %s and run_id = %s",
-                (int(user_id), int(run_id)),
+                """
+                select 1
+                from stop_signals
+                where user_id = %s
+                  and run_id = %s
+                  and requested_at >= now() - (interval '1 second' * %s)
+                """,
+                (int(user_id), int(run_id), int(STOP_SIGNAL_MAX_AGE_SEC)),
             ).fetchone()
         return bool(row)
     except Exception:

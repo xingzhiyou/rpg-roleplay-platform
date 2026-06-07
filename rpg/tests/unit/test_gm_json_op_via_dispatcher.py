@@ -67,6 +67,26 @@ class PathToolMapping(unittest.TestCase):
         m = map_op_to_tool("memory.facts", "事实A", op_kind="append")
         self.assertEqual(m, ("add_memory_fact", {"text": "事实A"}))
 
+    def test_known_events_scalar_maps_to_set_world_known_event(self):
+        # 回归:曾错映射到已删工具 add_world_event + 错 arg text →
+        # dispatcher 恒失败。canonical 工具 = set_world_known_event,arg = event。
+        m = map_op_to_tool("world.known_events", "巡逻兵换班")
+        self.assertEqual(m, ("set_world_known_event", {"event": "巡逻兵换班"}))
+
+    def test_known_events_single_element_list_maps(self):
+        m = map_op_to_tool("world.known_events", ["独苗事件"], op_kind="append", append=True)
+        self.assertEqual(m, ("set_world_known_event", {"event": "独苗事件"}))
+
+    def test_known_events_multi_element_list_returns_none(self):
+        # dispatcher 单次只发一个工具调用、apply_ops 不展开 list →
+        # 多元素 list 必须退回 None 走老路径(kind="list" 逐条 dedup-append 全部),
+        # 否则只写首条、其余丢失。
+        self.assertIsNone(
+            map_op_to_tool("world.known_events", ["事件甲", "事件乙"], op_kind="append", append=True)
+        )
+        # 空 list 同样退回老路径(老路径 _split_items([]) → no-op)
+        self.assertIsNone(map_op_to_tool("world.known_events", [], op_kind="append", append=True))
+
     def test_worldline_user_variable(self):
         m = map_op_to_tool("worldline.user_variables.trust_X", "高")
         self.assertEqual(m, ("set_user_variable", {"key": "trust_X", "value": "高"}))
@@ -108,6 +128,32 @@ class GMJsonOpRoutesToDispatcher(unittest.TestCase):
         last = tool_calls[-1]
         self.assertEqual(last["tool"], "set_world_time")
         self.assertEqual(last["origin"], "llm_chat")
+
+    def test_known_events_scalar_routes_via_dispatcher(self):
+        """GM 写 op {path:world.known_events, value:X} 应通过 dispatcher 调
+        set_world_known_event(非 destructive,llm_chat 允许),写进 world.known_events
+        并留下 tool_call 审计 —— 而非旧 bug 那样恒失败 fall-through 绕过统一审计。"""
+        result = self.state.apply_state_write_typed(
+            "world.known_events", "巡逻兵换班", source="gm", append=True,
+        )
+        self.assertIn("set_world_known_event", result, f"返回应含工具名;实际 {result}")
+        self.assertIn("巡逻兵换班", self.state.data["world"]["known_events"])
+        audit = self.state.data["permissions"]["audit_log"]
+        tool_calls = [a for a in audit if a.get("kind") == "tool_call"]
+        self.assertTrue(
+            any(a.get("tool") == "set_world_known_event" for a in tool_calls),
+            f"应有 set_world_known_event 的 tool_call 审计;实际 {tool_calls}",
+        )
+
+    def test_known_events_multi_list_appends_all_via_legacy(self):
+        """多元素 list 退回老路径(map 返 None),老路径 kind='list' 逐条 dedup-append
+        全部元素 —— 不能因为路由 dispatcher 而只写首条丢掉其余。"""
+        result = self.state.apply_state_write_typed(
+            "world.known_events", ["事件甲", "事件乙"], source="gm", append=True,
+        )
+        ke = self.state.data["world"]["known_events"]
+        self.assertIn("事件甲", ke, f"首条应在;实际 {ke}")
+        self.assertIn("事件乙", ke, f"第二条不能丢;实际 {ke} / 返回 {result}")
 
     def test_destructive_op_blocked(self):
         """GM 写 op {path:player.name, value:X} 应被 dispatcher 拒绝

@@ -454,7 +454,7 @@ function App() {
     running: false, publicStage: null, label: '', detail: '',
     totalElapsed: 0, completedAt: 0, completedElapsed: 0, rawSteps: [],
   });
-  const runRef = useRef({ timers: [], stopped: false, sse: null, doneTimer: null });
+  const runRef = useRef({ timers: [], stopped: false, sse: null, doneTimer: null, runId: 0 });
 
   const [pendingWrites, setPendingWrites] = useState(
     (INITIAL_STATE.permissions && INITIAL_STATE.permissions.pending_writes) || []
@@ -735,7 +735,7 @@ function App() {
     rc.timers = [];
     if (rc.doneTimer) { clearTimeout(rc.doneTimer); rc.doneTimer = null; }
     if (rc.inactivityTimer) { clearTimeout(rc.inactivityTimer); rc.inactivityTimer = null; }
-    if (rc.sse) { try { rc.sse.stop(); } catch (_) {} rc.sse = null; }
+    if (rc.sse) { try { rc.sse.stop('unmount'); } catch (_) {} rc.sse = null; }
   }, []);
   useEffect(() => {
     if (pickedCommand) return;
@@ -750,7 +750,8 @@ function App() {
     runRef.current.timers = [];
     if (runRef.current.doneTimer) { clearTimeout(runRef.current.doneTimer); runRef.current.doneTimer = null; }
     if (runRef.current.inactivityTimer) { clearTimeout(runRef.current.inactivityTimer); runRef.current.inactivityTimer = null; }
-    if (runRef.current.sse) { try { runRef.current.sse.stop(); } catch (_) {} runRef.current.sse = null; }
+    runRef.current.runId = (runRef.current.runId || 0) + 1;
+    if (runRef.current.sse) { try { runRef.current.sse.stop('manual_stop'); } catch (_) {} runRef.current.sse = null; }
     try { window.api.game.stop(); } catch (_) {}
     setRunState((r) => ({ ...r, running: false, label: '已停止', detail: '', publicStage: null, completedAt: 0, completedElapsed: r.totalElapsed }));
   }, []);
@@ -766,11 +767,14 @@ function App() {
     //  覆盖前一个,前者永远 stop 不掉 → 既串戏又泄漏。)
     {
       const rc = runRef.current;
-      if (rc.sse) { try { rc.sse.stop(); } catch (_) {} rc.sse = null; try { window.api.game.stop(); } catch (_) {} }
+      if (rc.sse) { rc.runId = (rc.runId || 0) + 1; try { rc.sse.stop('superseded'); } catch (_) {} rc.sse = null; try { window.api.game.stop(); } catch (_) {} }
       rc.timers.forEach((t) => { try { clearTimeout(t); } catch (_) {} try { clearInterval(t); } catch (_) {} });
       rc.timers = [];
       if (rc.inactivityTimer) { clearTimeout(rc.inactivityTimer); rc.inactivityTimer = null; }
     }
+    const runId = (runRef.current.runId || 0) + 1;
+    runRef.current.runId = runId;
+    const isCurrentRun = () => runRef.current.runId === runId;
     const ts = new Date().toLocaleTimeString().slice(0, 5);
     const sentAttachments = attachments;
     setHistory((h) => [...h, { role: 'user', content: playerText, ts, attachments: sentAttachments }]);
@@ -788,7 +792,12 @@ function App() {
     setClicheNotice(null);  // 反馈#22: 新一轮清掉上轮的套路比喻提示
     if (runRef.current.doneTimer) { clearTimeout(runRef.current.doneTimer); runRef.current.doneTimer = null; }
     runRef.current.stopped = false;
-    const logEvent = (kind, payload) => setSseLog((l) => (l.length >= 500 ? l : [...l, { t: Date.now(), kind, payload }]));
+    let lastSseEvent = { t: Date.now(), kind: 'send', payload: { message_len: String(playerText || '').length } };
+    const logEvent = (kind, payload) => {
+      const entry = { t: Date.now(), kind, payload };
+      lastSseEvent = entry;
+      setSseLog((l) => (l.length >= 500 ? l : [...l, entry]));
+    };
     const tickerId = setInterval(() => {
       if (runRef.current.stopped) { clearInterval(tickerId); return; }
       setRunState((r) => ({ ...r, totalElapsed: Date.now() - startedAt }));
@@ -799,8 +808,23 @@ function App() {
     const STREAM_IDLE_TIMEOUT_MS = 120000;
     let openedAssistant = false;
     let gotReceipt = false;  // #13: 本轮是否收到 system_receipt(斜杠命令回执)
+    let gotDone = false;
+    let streamFailed = false;
     let reasoningBuf = '';   // #7: 本轮累计的 reasoning(思考过程)文本
+    const describeLastSseEvent = () => {
+      const ev = lastSseEvent || {};
+      const age = ev.t ? Math.max(0, Math.round((Date.now() - ev.t) / 1000)) : null;
+      const suffix = age == null ? '' : `（${age} 秒前）`;
+      if (ev.kind === 'token') return `最后收到正文片段${suffix}`;
+      if (ev.kind === 'reasoning') return `最后收到模型思考片段${suffix}`;
+      if (ev.kind === 'agent') return `最后停在后端阶段 ${(ev.payload && ev.payload.phase) || 'agent'}${suffix}`;
+      if (ev.kind === 'status') return `最后收到状态更新${suffix}`;
+      if (ev.kind === 'usage') return `最后收到用量统计${suffix}`;
+      if (ev.kind === 'send') return `请求已发出, 但还没有收到后端事件${suffix}`;
+      return `最后收到 ${ev.kind || '未知'} 事件${suffix}`;
+    };
     const restoreFailedDraft = () => {
+      if (!isCurrentRun()) return;
       if (openedAssistant) return;
       setText((cur) => (String(cur || '').trim() ? cur : playerText));
       setAttachments((cur) => (Array.isArray(cur) && cur.length ? cur : sentAttachments));
@@ -813,7 +837,10 @@ function App() {
     const resetInactivityTimer = () => {
       if (runRef.current.inactivityTimer) clearTimeout(runRef.current.inactivityTimer);
       runRef.current.inactivityTimer = setTimeout(() => {
-        try { runRef.current.sse && runRef.current.sse.stop && runRef.current.sse.stop(); } catch (_) {}
+        if (!isCurrentRun()) return;
+        streamFailed = true;
+        logEvent('idle_timeout', { ms: STREAM_IDLE_TIMEOUT_MS });
+        try { runRef.current.sse && runRef.current.sse.stop && runRef.current.sse.stop('idle_timeout'); } catch (_) {}
         restoreFailedDraft();
         setRunState((r) => {
           if (!r.running) return r;
@@ -825,15 +852,18 @@ function App() {
     };
     resetInactivityTimer();
     const _chatSaveId = activeSave?.id ?? null;
-    runRef.current.sse = await window.api.game.chat(
+    runRef.current.sse = window.api.game.chat(
       { message: playerText, text: playerText, attachments: sentAttachments, model, command: pickedCommand?.id || null, save_id: _chatSaveId },
       {
         // task #61: HTTP 层错误（如 409 save_id_mismatch）
         onError: (err) => {
+          if (!isCurrentRun()) return;
+          streamFailed = true;
           clearInterval(tickerId);
           if (runRef.current.inactivityTimer) { clearTimeout(runRef.current.inactivityTimer); runRef.current.inactivityTimer = null; }
           const code = err && err.payload && err.payload.code;
           const detail = err && err.payload && err.payload.message;
+          logEvent('http_error', { status: err && err.status, code, message: (err && err.message) || detail || '请求失败' });
           if (code === 'save_id_mismatch') {
             setRunState((r) => ({ ...r, running: false, label: '存档冲突', detail: detail || '存档已切换', publicStage: null, completedAt: 0 }));
             setHasError(detail || '当前激活存档已切换，请刷新页面后重试');
@@ -847,7 +877,27 @@ function App() {
           // 撤回本轮用户消息
           restoreFailedDraft();
         },
+        onAbort: (data) => {
+          if (!isCurrentRun()) return;
+          const reason = (data && data.reason) || '';
+          logEvent('abort', { reason, stopped: runRef.current.stopped });
+          clearInterval(tickerId);
+          if (runRef.current.inactivityTimer) { clearTimeout(runRef.current.inactivityTimer); runRef.current.inactivityTimer = null; }
+          if (runRef.current.stopped || reason === 'manual_stop' || reason === 'superseded' || reason === 'unmount' || reason === 'idle_timeout') {
+            streamFailed = true;
+            runRef.current.sse = null;
+            return;
+          }
+          streamFailed = true;
+          const msg = '连接被浏览器取消，上一条输入已保留。可能是页面切换、浏览器中止了请求，或网络代理重置了连接。请直接重试。';
+          restoreFailedDraft();
+          setRunState((r) => ({ ...r, running: false, label: '已取消', detail: '浏览器取消了流式请求', publicStage: null, completedAt: 0 }));
+          setHasError(msg);
+          window.__apiToast?.('生成已取消', { kind: 'warn', detail: '浏览器取消了流式请求', duration: 5000 });
+          runRef.current.sse = null;
+        },
         on_status: (data) => {
+          if (!isCurrentRun()) return;
           logEvent('status', data);
           if (data && data.player) setGame((g) => {
             const n = { ...g };
@@ -865,6 +915,7 @@ function App() {
           }
         },
         on_reasoning: (data) => {
+          if (!isCurrentRun()) return;
           // #7 深度思考: 思考过程流式 — 重置 idle 计时(防止长思考被误判超时)并在
           // thinking pill 显示思考预览。reasoning 不进主叙事 transcript(单独事件)。
           resetInactivityTimer();
@@ -875,6 +926,7 @@ function App() {
           setRunState((r) => (r.running ? { ...r, label: '思考中', detail: '💭 ' + reasoningBuf.slice(-90).replace(/\s+/g, ' ').trim() } : r));
         },
         on_token: (data) => {
+          if (!isCurrentRun()) return;
           resetInactivityTimer();
           logEvent('token', { len: ((data && (data.text || data.delta)) || '').length });
           const piece = (data && (data.text || data.delta)) || '';
@@ -899,6 +951,7 @@ function App() {
           }
         },
         on_agent: (data) => {
+          if (!isCurrentRun()) return;
           resetInactivityTimer();
           logEvent('agent', data);
           if (!data || !data.phase) return;
@@ -921,6 +974,7 @@ function App() {
           });
         },
         on_rewind: (data) => {
+          if (!isCurrentRun()) return;
           // 反馈#42: 重写型 /set —— 后端已回滚上一轮并将以"上一轮的原始输入"在纠正后的状态下
           // 重演本轮。前端同步抹掉乐观插入的 /set 气泡 + 被回滚的那一轮(assistant+user),换上
           // 重演用的原始输入气泡,随后到来的 GM token 会开一条新的 assistant 气泡。
@@ -939,6 +993,7 @@ function App() {
           window.__apiToast?.('已回滚上一轮，按你的修正重演…', { kind: 'info', duration: 2500 });
         },
         on_updates: (data) => {
+          if (!isCurrentRun()) return;
           logEvent('updates', data);
           const stage = data && data.stage;
           // #13 沉浸感: /set 等 directive 确认(pre_llm)是确定性回执,以 toast 呈现,
@@ -955,6 +1010,7 @@ function App() {
           });
         },
         on_system_receipt: (data) => {
+          if (!isCurrentRun()) return;
           // #13 沉浸感: 斜杠命令(/time /loc /rel /var 等)的确定性回执 → toast,不进
           // 主叙事 transcript。gotReceipt 防止 on_done 把本轮误判为"空回复"恢复草稿。
           resetInactivityTimer();
@@ -970,17 +1026,21 @@ function App() {
           });
         },
         on_cliche_notice: (data) => {
+          if (!isCurrentRun()) return;
           // 反馈#22: 后端检测到套路比喻 → 复用 ConfirmStrip(GM 询问窗口)提示,按钮复用 onRetry
           logEvent('cliche_notice', data);
           if (data && Array.isArray(data.phrases) && data.phrases.length) setClicheNotice(data);
         },
         on_usage: (data) => {
+          if (!isCurrentRun()) return;
           // #11: 后端在 done 前发独立 usage 事件(input/output/cached/reasoning tokens
           // + context 占用 + cost_usd),存起来给输入框下方 footer 显示。
           logEvent('usage', data);
           if (data) setLastUsage(data);
         },
         on_done: (data) => {
+          if (!isCurrentRun()) return;
+          gotDone = true;
           if (runRef.current.inactivityTimer) { clearTimeout(runRef.current.inactivityTimer); runRef.current.inactivityTimer = null; }
           if (data && data.usage) setLastUsage(data.usage);  // #11: 兜底(若无独立 usage 事件)
           logEvent('done', { status: !!data && data.status ? 'ok' : 'noop', interrupted: data && data.interrupted, usage: data && data.usage });
@@ -1079,6 +1139,8 @@ function App() {
           setPickedCommand(null);
         },
         on_error: (data) => {
+          if (!isCurrentRun()) return;
+          streamFailed = true;
           logEvent('error', data);
           clearInterval(tickerId);
           if (runRef.current.doneTimer) { clearTimeout(runRef.current.doneTimer); runRef.current.doneTimer = null; }
@@ -1090,14 +1152,22 @@ function App() {
           restoreFailedDraft();
         },
         onClose: () => {
+          if (!isCurrentRun()) return;
+          const lastDetail = describeLastSseEvent();
+          logEvent('close', { got_done: gotDone, stream_failed: streamFailed, stopped: runRef.current.stopped, last_event: lastSseEvent && lastSseEvent.kind });
           clearInterval(tickerId);
           if (runRef.current.inactivityTimer) { clearTimeout(runRef.current.inactivityTimer); runRef.current.inactivityTimer = null; }
+          if (gotDone || streamFailed || runRef.current.stopped) {
+            runRef.current.sse = null;
+            return;
+          }
           setRunState((r) => {
             if (!r.running) return r;
-            setHasError('流式输出意外中断,可能是模型 safety filter 或网络问题。请重试。');
-            window.__apiToast?.('生成中断', { kind: 'warn', detail: '流式连接关闭但没收到完成事件,可能是模型 safety filter 截断', duration: 4000 });
+            const msg = `连接中断：流式连接关闭但没有收到完成事件。${lastDetail}。上一条输入已保留，可直接重试。`;
+            setHasError(msg);
+            window.__apiToast?.('生成中断', { kind: 'warn', detail: lastDetail, duration: 5000 });
             restoreFailedDraft();
-            return { ...r, running: false, label: '中断', detail: '连接关闭但未收到完成事件', publicStage: null, completedAt: 0 };
+            return { ...r, running: false, label: '中断', detail: lastDetail, publicStage: null, completedAt: 0 };
           });
           setHistory((h) => {
             const last = h[h.length - 1];
@@ -1188,7 +1258,10 @@ function App() {
   }, [runState.running, startRun]);
   const onStop = () => stopRun();
   const onRetry = useCallback(() => {
-    if (runState.running) return;
+    if (runState.running) {
+      window.__apiToast?.('上一轮还在生成或收尾，请先停止后再重试', { kind: 'warn', duration: 2400 });
+      return;
+    }
     // 优先用本轮 lastPlayerText;为空时(刷新后、首轮即失败、lastPlayerText 未及写入)
     // 从历史里回捞最后一条非空玩家输入,避免"重试本轮"静默无反应。
     let t2 = (lastPlayerText && lastPlayerText.trim()) || '';
@@ -1206,6 +1279,7 @@ function App() {
       if (out.length && out[out.length - 1].role === 'user' && (out[out.length - 1].content || '').trim() === t2) out.pop();
       return out;
     });
+    window.__apiToast?.('正在重试上一轮', { kind: 'info', duration: 1600 });
     startRun(t2);
   }, [lastPlayerText, history, runState.running, startRun]);
   // 反馈:每条消息的「重新生成这一轮」(MsgActions 派发 rpg-regenerate 事件,携 message_index)。
@@ -1486,7 +1560,7 @@ function App() {
               </div>
             </div>
             <div style={{ overflow: 'auto', padding: '8px 16px', fontFamily: 'var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace)', fontSize: 12, lineHeight: 1.5 }}>
-              {sseLog.length === 0 && <div style={{ padding: '24px 0', color: 'var(--muted, #888)' }}>暂无事件（本轮未开始或已被清空）</div>}
+              {sseLog.length === 0 && <div style={{ padding: '24px 0', color: 'var(--muted, #888)' }}>暂无本轮事件。刷新页面后事件流不会保留；如果刚刚失败，请重试后再打开这里。</div>}
               {sseLog.map((ev, i) => (
                 <div key={i} style={{ padding: '4px 0', borderBottom: '1px dashed var(--line-soft, #2a2d33)' }}>
                   <span style={{ color: 'var(--muted-2, #777)' }}>[{new Date(ev.t).toISOString().slice(11, 23)}]</span>{' '}

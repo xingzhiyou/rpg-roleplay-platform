@@ -36,13 +36,23 @@ def map_op_to_tool(path: str, value: Any, *, op_kind: str = "set",
     if path == "world.time":
         return "set_world_time", {"target": str(value or "")}
     if path == "world.known_events":
-        # 总是 append 语义
+        # 总是 append 语义。canonical 工具是 set_world_known_event(arg 名 event)。
+        # 历史 bug:这里曾映射到已删工具 add_world_event(task #14 删,见
+        # command_tools_register.py 注释)+ 错 arg text → dispatcher 恒返"未知工具"
+        # 失败 → 每条 known_events op 都白走一次 dispatcher 再 fall-through 老路径,
+        # 绕过统一审计 / dedup / 100 条硬上限。
+        #
+        # dispatcher 单次只发一个工具调用,而本函数的 apply_ops 调用方不展开 list,
+        # 故多元素 / 空 list 退回 None 走老路径(kind="list" 会逐条 dedup-append 全部
+        # 元素,避免丢条);标量 / 单元素 list 才路由到 set_world_known_event,获得
+        # 统一审计 + dedup + 100 上限。
         if isinstance(value, list):
-            # 多条 → 只能逐条返回,这里只处理第一条 (调用方应展开)
-            v = value[0] if value else ""
+            if len(value) != 1:
+                return None
+            v = value[0]
         else:
             v = value
-        return "add_world_event", {"text": str(v or "")}
+        return "set_world_known_event", {"event": str(v or "")}
     if path.startswith("world.") and path not in {"world.timeline"} and not path.startswith("world.timeline."):
         # 其它 world.* 标量属性 (weather / atmosphere / season / region)
         key = path[len("world."):]

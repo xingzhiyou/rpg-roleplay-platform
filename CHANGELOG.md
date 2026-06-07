@@ -20,6 +20,7 @@ Version scheme: `0.x-waveN[.M]` where `wave` matches the in-repo development cad
 - Main GM output now defaults to a 4K token BYOK budget, with higher user-configurable headroom, so story replies are not cut off by the old strict cap.
 
 ### Fixed
+- Game Console stop signals now use restart-safe run identifiers and ignore stale database stop rows, so old manual-stop requests no longer interrupt later chat generations with "this round was interrupted".
 - New game creation now blocks scripts whose import/rebuild job is still running or whose required chapters/timeline anchors are missing, so users cannot start a setup flow that would stall before selecting a starting point.
 - Agent model selectors now allow manual model names for custom OpenAI-compatible credentials, so users can use providers whose `/models` endpoint is unavailable or incomplete.
 - Script import now invalidates stale chapter-split previews when the file or rule changes, retries an expired preview upload once during confirm, shows cancellation as a clear terminal state, and auto-selects the best chapter split candidate when all rules score below 0.80.
@@ -44,6 +45,7 @@ Version scheme: `0.x-waveN[.M]` where `wave` matches the in-repo development cad
 - Game Console model switching now writes the selected model to the active save and shows the session model after refresh.
 - Game Console now has a local Enter-key mode toggle so testers can choose between Enter-to-send and Enter-for-newline.
 - Game Console now restores the player's draft when chat streaming fails, closes, times out, or finishes without any GM reply.
+- Game Console chat streaming now distinguishes completed streams, backend errors, idle timeouts, manual stops, and true premature closes, so normal SSE close events no longer show a false "generation interrupted" error and the failure card exposes retry plus event-log details.
 - Model parameter settings now reload saved values after refresh, persist NSFW mode/presets, and let the main GM honor each user's max output token setting.
 - Chat usage records now include model finish reason and the applied output budget, making token-limit truncation visible in ops logs.
 - Vertex/Agent Platform chats now return a recoverable user-facing error when the Service Account JSON is missing instead of failing the request with a backend 500.

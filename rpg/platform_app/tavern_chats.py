@@ -228,16 +228,10 @@ def save_to_chat_jsonl(save_id: int, user_id: int | None = None) -> str:
             ).fetchone()
         if not save:
             raise ValueError("存档不存在")
-        commits = db.execute(
-            """
-            select turn_index, kind, player_input, gm_output
-            from branch_commits
-            where save_id = %s
-            order by turn_index asc, id asc
-            """,
-            (int(save_id),),
-        ).fetchall() or []
-
+    # 完整导出从 state_snapshot.history 取(权威全量转录:含 create_tavern_save seed 的开场
+    # first_mes + 后续每轮)。旧实现从 branch_commits 取会漏掉 seed 开场(它只进 history、不是
+    # commit)→ 仅有开场、未发言的对话导出只剩 header → parse_chat_jsonl 报「不含有效消息」→
+    # 无法再导入。改读 history 同时修复「内容不全」与「无法导入」(与 parse_chat_jsonl 镜像往返)。
     snap = save.get("state_snapshot") or {}
     if not isinstance(snap, dict):
         snap = {}
@@ -252,29 +246,33 @@ def save_to_chat_jsonl(save_id: int, user_id: int | None = None) -> str:
         or "Character"
     )
 
+    history = snap.get("history") if isinstance(snap.get("history"), list) else []
+
     lines: list[str] = []
     lines.append(json.dumps(
         {"user_name": user_name, "character_name": character_name, "create_date": ""},
         ensure_ascii=False,
     ))
 
-    for c in commits:
-        # 跳过 turn-0 root(seed_tree 的根 commit:无玩家输入/无 GM 输出,或 kind='root')
-        if str(c.get("kind") or "") == "root":
+    # compact digest 注入的「前情提要 ack」占位不导出,避免污染往返。
+    _SKIP_ACK = "[已收到前情提要,继续在此基础上叙事]"
+    for m in history:
+        if not isinstance(m, dict):
             continue
-        if int(c.get("turn_index") or 0) == 0 and not (c.get("player_input") or c.get("gm_output")):
+        role = m.get("role")
+        content = str(m.get("content") or "").strip()
+        if not content or content == _SKIP_ACK:
             continue
-        pin = str(c.get("player_input") or "").strip()
-        gout = str(c.get("gm_output") or "").strip()
-        if pin:
-            lines.append(json.dumps(
-                {"name": user_name, "is_user": True, "mes": pin, "send_date": ""},
-                ensure_ascii=False,
-            ))
-        if gout:
-            lines.append(json.dumps(
-                {"name": character_name, "is_user": False, "mes": gout, "send_date": ""},
-                ensure_ascii=False,
-            ))
+        is_user = (role == "user")
+        lines.append(json.dumps(
+            {
+                "name": user_name if is_user else character_name,
+                "is_user": is_user,
+                "mes": content,
+                "send_date": "",
+                "extra": {},
+            },
+            ensure_ascii=False,
+        ))
 
-    return "\n".join(lines)
+    return "\n".join(lines) + "\n"

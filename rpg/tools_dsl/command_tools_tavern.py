@@ -320,6 +320,116 @@ def _t_tavern_bind_script(state: Any, args: dict) -> str:
     return f"已绑定剧本 #{script_id}（{row.get('title') or '剧本'}）— 现在可在对话中翻阅其设定/原著。"
 
 
+def _t_ask_player_choice(state: Any, args: dict) -> str:
+    """向玩家弹出一个有限选项的选择题(网页里以可点按钮呈现)。写入 state.data['permissions']
+    ['pending_questions'] → 前端 ConfirmStrip 渲染;玩家点选后其选择作为下一条消息发回。
+    需要玩家在分支/偏好上做抉择时调它,而不是替玩家决定或裸文本列 1/2/3。"""
+    question = (args.get("question") or "").strip()
+    if not question:
+        return "失败: question 为空"
+    options = args.get("options") or []
+    if not isinstance(options, list):
+        return "失败: options 必须是数组"
+    clean = [str(o).strip() for o in options if str(o).strip()]
+    if len(clean) < 2:
+        return "失败: options 至少 2 项"
+    if len(clean) > 6:
+        return "失败: options 最多 6 项"
+    import secrets as _s
+    qid = f"qchoice_{_s.token_urlsafe(6)}"
+    allow_free = args.get("allow_free_text")
+    allow_free = True if allow_free is None else bool(allow_free)
+    permissions = state.data.setdefault("permissions", {})
+    permissions.setdefault("pending_questions", []).append({
+        "id": qid,
+        "question": question,
+        "options": clean,
+        "source": "agent:choice",
+        "turn": state.data.get("turn", 0),
+        "allow_free_text": allow_free,
+    })
+    return f"已向玩家弹出选择题(等其在界面上点选,选择会作为下一条消息发回):{question}"
+
+
+def _t_import_character_card(state: Any, args: dict) -> str:
+    """解析并导入一张 SillyTavern 角色卡,设为当前扮演角色。复用平台已有酒馆卡导入。
+    来源(优先级):card_json(V2 JSON 字符串)> base64(卡内容)> 本轮玩家上传的附件(.png/.json/.webp)。
+    用于:玩家在输入框上传一张角色卡并让你导入时。"""
+    user_id = _resolve_user_id(state, args)
+    if user_id is None:
+        return "失败: 无法解析当前用户(save_id 缺失)"
+    blob = None
+    fname = "card.json"
+    cj = args.get("card_json")
+    b64 = args.get("base64")
+    if cj:
+        blob = (cj if isinstance(cj, str) else json.dumps(cj, ensure_ascii=False)).encode("utf-8")
+    elif b64:
+        import base64 as _b64
+        try:
+            blob = _b64.b64decode(str(b64))
+        except Exception as exc:
+            return f"失败: base64 解码失败: {exc}"
+        fname = "card.png"
+    else:
+        ups = state.data.get("_uploaded_files") or []
+        if not ups:
+            return "失败: 没有可导入的角色卡。请玩家先在输入框上传一张 .png/.json/.webp 角色卡,或改用 card_json 传入。"
+        target = ups[-1]
+        fname = str(target.get("name") or "card")
+        path = target.get("path")
+        if not path:
+            return "失败: 上传附件路径缺失"
+        try:
+            from pathlib import Path as _P
+            blob = _P(str(path)).read_bytes()
+        except Exception as exc:
+            return f"失败: 读取上传文件失败: {exc}"
+    try:
+        from platform_app import tavern_cards as _tc, user_cards as _uc
+        low = fname.lower()
+        if low.endswith(".png") or low.endswith(".webp"):
+            v2 = _tc.parse_png_card(blob)
+        else:
+            v2 = _tc.parse_card(blob.decode("utf-8", errors="replace"))
+        payload = _tc.tavern_to_user_card(v2)
+        card = _uc.upsert_user_card(user_id, payload)
+    except ValueError as exc:
+        return f"失败: {exc}"
+    except Exception as exc:
+        return f"失败: {type(exc).__name__}: {exc}"
+    meta = card.get("metadata") or {}
+    tavern = state.data.setdefault("tavern", {})
+    tavern["character"] = _card_to_character_snapshot(card)
+    tavern["character_card_id"] = int(card["id"]) if card.get("id") is not None else None
+    tavern["system_prompt"] = str(meta.get("system_prompt") or "")
+    tavern["post_history_instructions"] = str(meta.get("post_history_instructions") or "")
+    tavern["scenario"] = str(meta.get("scenario") or "")
+    tavern["alternate_greetings"] = meta.get("alternate_greetings") or []
+    tavern["first_mes"] = str(meta.get("first_mes") or "")
+    state.data.pop("_uploaded_files", None)  # 用掉,避免下轮重复导入
+    return f"已导入并扮演角色 → {tavern['character'].get('name') or '角色'}(卡 #{tavern.get('character_card_id')})"
+
+
+def _t_export_character_card(state: Any, args: dict) -> str:
+    """把当前扮演的角色卡导出为 SillyTavern V2 JSON(返回 JSON 字符串,可被其它前端/平台导入)。"""
+    user_id = _resolve_user_id(state, args)
+    if user_id is None:
+        return "失败: 无法解析当前用户"
+    cid = (state.data.get("tavern") or {}).get("character_card_id")
+    if not cid:
+        return "失败: 当前对话没有绑定角色卡,无可导出"
+    try:
+        from platform_app import tavern_cards as _tc, user_cards as _uc
+        card = _uc.get_user_card(user_id, int(cid))
+        if not card:
+            return f"失败: 找不到角色卡 #{cid}"
+        v2 = _tc.user_card_to_tavern_v2(card)
+        return json.dumps(v2, ensure_ascii=False)
+    except Exception as exc:
+        return f"失败: {type(exc).__name__}: {exc}"
+
+
 # ────────────────────────────────────────────────────────────
 # 注册
 # ────────────────────────────────────────────────────────────
@@ -449,6 +559,73 @@ def register_tavern_tools() -> None:
             scope="save",
             origins=_BIND_ORIGINS,
             destructive=True,
+        ))
+
+    if not registry.has("ask_player_choice"):
+        registry.register(ToolSpec(
+            name="ask_player_choice",
+            description=(
+                "向玩家弹出一道有限选项的选择题(网页里以可点按钮呈现),把决定权交回玩家。\n"
+                "当剧情走到需要玩家在 2-6 个分支/偏好里抉择时调它,玩家点选后其选择会作为下一条消息发回;\n"
+                "不要替玩家做选择,也不要在正文里裸列 1/2/3。allow_free_text=true 时额外给一个自由输入入口。"
+            ),
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "question": {"type": "string", "description": "问题文本"},
+                    "options": {
+                        "type": "array", "items": {"type": "string"},
+                        "description": "2-6 个候选答案(纯字符串)",
+                        "minItems": 2, "maxItems": 6,
+                    },
+                    "allow_free_text": {"type": "boolean", "default": True,
+                                        "description": "是否允许玩家自由输入(默认 true)"},
+                },
+                "required": ["question", "options"],
+            },
+            executor=_t_ask_player_choice,
+            scope="save",
+            origins=_WRITE_ORIGINS,
+            destructive=False,
+            input_examples=(
+                {"question": "今晚先去哪?", "options": ["天台", "图书馆", "回家"]},
+            ),
+        ))
+
+    if not registry.has("import_character_card"):
+        registry.register(ToolSpec(
+            name="import_character_card",
+            description=(
+                "解析并导入一张 SillyTavern 角色卡,设为当前扮演角色(复用平台酒馆卡导入)。\n"
+                "玩家在输入框上传了一张 .png/.json/.webp 角色卡并要你导入时调它(默认导入最近一张上传卡);\n"
+                "也可直接传 card_json(V2 JSON 字符串)或 base64。导入后立即以该角色继续对话。"
+            ),
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "card_json": {"type": "string", "description": "V2 角色卡 JSON 字符串(可选)"},
+                    "base64": {"type": "string", "description": "base64 编码的卡内容(.png/.json,可选)"},
+                },
+                "required": [],
+            },
+            executor=_t_import_character_card,
+            scope="save",
+            origins=_WRITE_ORIGINS,
+            destructive=False,
+            input_examples=({},),
+        ))
+
+    if not registry.has("export_character_card"):
+        registry.register(ToolSpec(
+            name="export_character_card",
+            description=(
+                "把当前扮演的角色卡导出为 SillyTavern V2 JSON 字符串(玩家想保存/迁移角色卡时用)。"
+            ),
+            input_schema={"type": "object", "properties": {}, "required": []},
+            executor=_t_export_character_card,
+            scope="save",
+            origins=_READ_ORIGINS,
+            destructive=False,
         ))
 
 

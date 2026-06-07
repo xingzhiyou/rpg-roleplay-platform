@@ -410,82 +410,135 @@ export function TavernChatArea({ history, running, saveId, charName, charInitial
   );
 }
 
-/* ── 两张卡抽屉:persona(可编辑)+ AI 角色卡(只读)──────────────────── */
-export function TwoCardDrawer({ open, character, persona, onClose, onSavePersona }) {
+/* ── 角色 / persona / 系统提示 面板 ──────────────────────────────────────
+ * inline=false(独立 tavern-app):portal 全屏抽屉(旧行为)。
+ * inline=true(Platform 内嵌 tavern.jsx):页内可折叠右侧栏,不盖顶栏(open=false → collapsed)。
+ * 新增「系统提示」tab —— 编辑本对话 system_prompt(onSaveSystemPrompt 持久化)。 */
+export function TwoCardDrawer({ open, character, persona, onClose, onSavePersona,
+                                inline = false, systemPrompt = '', onSaveSystemPrompt }) {
   const [form, setForm] = useState(() => cardFormInit(persona));
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [tab, setTab] = useState('character'); // 'character' | 'persona'
+  const [tab, setTab] = useState('character'); // 'character' | 'persona' | 'system'
+  const [spVal, setSpVal] = useState(systemPrompt || '');
+  const [spEditing, setSpEditing] = useState(false);
+  const [spSaving, setSpSaving] = useState(false);
 
   useEffect(() => { setForm(cardFormInit(persona)); setEditing(false); }, [persona, open]);
+  useEffect(() => { setSpVal(systemPrompt || ''); setSpEditing(false); }, [systemPrompt, open]);
   const u = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
-  if (!open) return null;
-  const charName = (character && character.name) || '角色';
+  // 非 inline(独立页 portal):open=false 不渲染。inline:始终渲染,靠 collapsed 类收起。
+  if (!inline && !open) return null;
   const personaName = (persona && persona.name) || '你的 persona';
 
   const doSave = async () => {
     setSaving(true);
-    try {
-      await onSavePersona(cardFormPayload(form, persona));
-      setEditing(false);
-    } finally { setSaving(false); }
+    try { await onSavePersona(cardFormPayload(form, persona)); setEditing(false); }
+    finally { setSaving(false); }
+  };
+  const doSaveSP = async () => {
+    setSpSaving(true);
+    try { await (onSaveSystemPrompt && onSaveSystemPrompt(spVal)); setSpEditing(false); }
+    finally { setSpSaving(false); }
   };
 
-  const node = (
-    <div className="tv-drawer-backdrop" onClick={onClose}>
-      <div className="tv-drawer" onClick={(e) => e.stopPropagation()}>
-        <header className="tv-drawer-head">
-          <div className="seg" style={{ display: 'flex' }}>
-            <button className={tab === 'character' ? 'active' : ''} onClick={() => setTab('character')}>
-              <Icon name="cards" size={12} /> AI 角色
-            </button>
-            <button className={tab === 'persona' ? 'active' : ''} onClick={() => setTab('persona')}>
-              <Icon name="user" size={12} /> 我的 persona
-            </button>
-          </div>
-          <button className="iconbtn" onClick={onClose} data-tip="关闭"><Icon name="close" size={15} /></button>
-        </header>
-        <div className="tv-drawer-body">
-          {tab === 'character' && (
-            character
-              ? <CardSheet card={character} kind="user" />
-              : <div className="muted-2" style={{ padding: 24, textAlign: 'center' }}>未找到该对话的角色卡。</div>
-          )}
-          {tab === 'persona' && (
-            <>
-              {!editing ? (
-                <>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                    <strong style={{ fontSize: 14 }}>{personaName}</strong>
-                    {persona && (
-                      <button className="btn ghost" onClick={() => setEditing(true)}>
-                        <Icon name="edit" size={12} /> 编辑
-                      </button>
-                    )}
-                  </div>
-                  {persona
-                    ? <CardSheet card={persona} kind="persona" />
-                    : <div className="muted-2" style={{ padding: 24, textAlign: 'center' }}>本对话未设置 persona 卡。</div>}
-                </>
-              ) : (
-                <>
-                  <CardEditFields form={form} u={u} kind="persona" />
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
-                    <button className="btn ghost" onClick={() => setEditing(false)} disabled={saving}>取消</button>
-                    <button className="btn primary" onClick={doSave} disabled={saving}>
-                      <Icon name="check" size={12} /> {saving ? '保存中…' : '保存'}
-                    </button>
-                  </div>
-                </>
+  const head = (
+    <header className="tv-drawer-head">
+      <div className="seg" style={{ display: 'flex' }}>
+        <button className={tab === 'character' ? 'active' : ''} onClick={() => setTab('character')}>
+          <Icon name="cards" size={12} /> AI 角色
+        </button>
+        <button className={tab === 'persona' ? 'active' : ''} onClick={() => setTab('persona')}>
+          <Icon name="user" size={12} /> 我的 persona
+        </button>
+        <button className={tab === 'system' ? 'active' : ''} onClick={() => setTab('system')}>
+          <Icon name="settings" size={12} /> 系统提示
+        </button>
+      </div>
+      <button className="iconbtn" onClick={onClose} data-tip={inline ? '折叠' : '关闭'}>
+        <Icon name={inline ? 'chevron_right' : 'close'} size={15} />
+      </button>
+    </header>
+  );
+
+  const body = (
+    <div className="tv-drawer-body">
+      {tab === 'character' && (
+        character
+          ? <CardSheet card={character} kind="user" />
+          : <div className="muted-2" style={{ padding: 24, textAlign: 'center' }}>未找到该对话的角色卡。</div>
+      )}
+      {tab === 'persona' && (
+        !editing ? (
+          <>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <strong style={{ fontSize: 14 }}>{personaName}</strong>
+              {persona && (
+                <button className="btn ghost" onClick={() => setEditing(true)}><Icon name="edit" size={12} /> 编辑</button>
               )}
+            </div>
+            {persona
+              ? <CardSheet card={persona} kind="persona" />
+              : <div className="muted-2" style={{ padding: 24, textAlign: 'center' }}>本对话未设置 persona 卡。</div>}
+          </>
+        ) : (
+          <>
+            <CardEditFields form={form} u={u} kind="persona" />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
+              <button className="btn ghost" onClick={() => setEditing(false)} disabled={saving}>取消</button>
+              <button className="btn primary" onClick={doSave} disabled={saving}>
+                <Icon name="check" size={12} /> {saving ? '保存中…' : '保存'}
+              </button>
+            </div>
+          </>
+        )
+      )}
+      {tab === 'system' && (
+        <div className="tv-sysprompt">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <strong style={{ fontSize: 14 }}>系统提示词</strong>
+            {!spEditing && onSaveSystemPrompt && (
+              <button className="btn ghost" onClick={() => setSpEditing(true)}><Icon name="edit" size={12} /> 编辑</button>
+            )}
+          </div>
+          {!spEditing ? (
+            (spVal || '').trim()
+              ? <div className="tv-sysprompt-view" style={{ whiteSpace: 'pre-wrap', fontSize: 13, lineHeight: 1.7 }}>{spVal}</div>
+              : <div className="muted-2" style={{ padding: 16, lineHeight: 1.7 }}>本对话未设置系统提示词。点「编辑」自定义 AI 的行为/人设/越狱(仅影响本对话)。</div>
+          ) : (
+            <>
+              <textarea
+                value={spVal} onChange={(e) => setSpVal(e.target.value)} rows={14}
+                placeholder="输入系统提示词(人设 / 行为约束 / 越狱指令等)…"
+                style={{ width: '100%', resize: 'vertical', fontSize: 13, lineHeight: 1.6 }}
+              />
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
+                <button className="btn ghost" onClick={() => { setSpVal(systemPrompt || ''); setSpEditing(false); }} disabled={spSaving}>取消</button>
+                <button className="btn primary" onClick={doSaveSP} disabled={spSaving}>
+                  <Icon name="check" size={12} /> {spSaving ? '保存中…' : '保存'}
+                </button>
+              </div>
             </>
           )}
         </div>
-      </div>
+      )}
     </div>
   );
-  return createPortal(node, document.body);
+
+  if (inline) {
+    return (
+      <aside className={'tvp-drawer-panel' + (open ? '' : ' collapsed')} aria-hidden={!open}>
+        <div className="tvp-drawer-panel-inner">{head}{body}</div>
+      </aside>
+    );
+  }
+  return createPortal(
+    <div className="tv-drawer-backdrop" onClick={onClose}>
+      <div className="tv-drawer" onClick={(e) => e.stopPropagation()}>{head}{body}</div>
+    </div>,
+    document.body,
+  );
 }
 
 /* ══════════════════════════════════════════════════════════════════

@@ -1115,7 +1115,7 @@ async def run_gm_phase(
             # 酒馆铁律:agent 设好角色后,开场用角色卡的 first_mes **确定性贴出** —— 绝不让 LLM
             # 现编开场(用户:不允许开局调用 llm;有 first_mes 就贴、没有就留空)。命中即丢弃本轮
             # LLM 续写(含可能的前导寒暄),以 first_mes 作本轮唯一可见输出并停掉后续生成。
-            if _gm_mode == "tavern_gm" and event.get("tool") == "set_tavern_character" and event.get("ok"):
+            if _gm_mode == "tavern_gm" and event.get("tool") in ("set_tavern_character", "import_character_card") and event.get("ok"):
                 _fm = str(((getattr(state, "data", {}) or {}).get("tavern") or {}).get("first_mes") or "").strip()
                 response = _fm
                 if _fm:

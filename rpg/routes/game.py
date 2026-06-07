@@ -546,6 +546,19 @@ async def api_chat(
     if not message_for_model.strip():
         return StreamingResponse(iter([_sse("error", {"message": "空消息"})]), media_type="text/event-stream")
 
+    # F#1:把本轮上传的角色卡文件(.png/.json/.webp)落盘路径挂到 state,供 agent 的
+    # import_character_card 工具读取(只读服务端 user 作用域落盘路径,非 agent 注入 → 安全)。
+    try:
+        _card_files = [
+            {"name": a.get("name"), "path": a.get("path")}
+            for a in (attachments or [])
+            if str(a.get("name") or "").lower().endswith((".png", ".json", ".webp"))
+        ]
+        if _card_files and api_user:
+            _ensure_loaded(api_user).data["_uploaded_files"] = _card_files
+    except Exception:
+        pass
+
     # task #61: 多 tab 冲突检测 — 前端带 save_id 时校验是否与 user_runtime 匹配
     client_save_id = body_dict.get("save_id")
     if client_save_id and api_user:

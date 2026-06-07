@@ -22,7 +22,7 @@ import CSButton from '@cloudscape-design/components/button';
 
 import { Icon } from '../game-icons.jsx';
 import { GameToastStack } from '../game-app.jsx';
-import { Composer } from '../game-composer.jsx';
+import { Composer, ConfirmStrip } from '../game-composer.jsx';
 import { TavernImportModal, UserCardsView } from './cards.jsx';
 import { ModelParamsSection } from './settings.jsx';
 import {
@@ -114,6 +114,7 @@ export default function TavernPage() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [renameTarget, setRenameTarget] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [exportTarget, setExportTarget] = useState(null);  // 导出二次确认
   const [paramsOpen, setParamsOpen] = useState(false);   // 采样参数(模型参数)抽屉
 
   // 输入框「完全复用」游戏页 Composer 所需的状态(与 game-console.jsx 一致):
@@ -558,6 +559,35 @@ export default function TavernPage() {
     if (!t2 || running) return;
     startRun(t2);
   }, [running, startRun]);
+
+  // F#2 弹出式选择:ask_player_choice 工具写 pending_questions → ConfirmStrip 渲染。
+  // 玩家点选 → 清掉该 pending(后端+乐观)→ 把选择作为下一条消息发回角色。
+  const pendingQuestions = (gameState && (
+    (gameState.permissions && gameState.permissions.pending_questions) ||
+    (gameState.data && gameState.data.permissions && gameState.data.permissions.pending_questions)
+  )) || [];
+  // ConfirmStrip 契约:onAnswer(handleId, choice)(两参),onDismiss(handleId)(一参);handleId={id,index}。
+  const _dropPending = (id, index) => setGameState((gs) => {
+    if (!gs) return gs;
+    const perms = gs.permissions || (gs.data && gs.data.permissions) || {};
+    const pq = (perms.pending_questions || []).filter((q, i) => !((id != null && q.id === id) || (id == null && i === index)));
+    if (gs.permissions) return { ...gs, permissions: { ...gs.permissions, pending_questions: pq } };
+    return { ...gs, data: { ...(gs.data || {}), permissions: { ...((gs.data && gs.data.permissions) || {}), pending_questions: pq } } };
+  });
+  const onChoiceAnswer = useCallback(async (handleId, choice) => {
+    const id = handleId && handleId.id; const index = handleId && handleId.index;
+    try { await window.api.game.clearQuestions({ id, index, choice }); } catch (_) {}
+    _dropPending(id, index);
+    const c = (choice == null ? '' : String(choice)).trim();
+    if (c && !running) startRun(c);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [running, startRun]);
+  const onChoiceDismiss = useCallback(async (handleId) => {
+    const id = handleId && handleId.id; const index = handleId && handleId.index;
+    try { await window.api.game.clearQuestions({ id, index, choice: null }); } catch (_) {}
+    _dropPending(id, index);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   // 输入框「完全复用」游戏页 Composer：斜杠 / 附件 / 清命令 等回调(与 game-console 一致)
   const onSlashPick = (cmd) => {
     if (cmd && typeof cmd.trigger === 'string' && cmd.trigger.endsWith(' ')) {
@@ -565,14 +595,33 @@ export default function TavernPage() {
     }
     setPickedCommand(cmd); setText(''); setShowSlash(false);
   };
+  // F#1:真实文件上传 —— file/image/card 走文件选择器读成 data_url 真实附件;
+  // 角色卡(.png/.json/.webp)上传后,agent 可用 import_character_card 工具解析导入。
+  const fileInputRef = useRef(null);
+  const pendingAttachRef = useRef({ kind: 'file' });
   const onAttachPick = (item) => {
-    const fixtures = {
-      file: { name: '文件.md', kind: 'file' }, image: { name: '图片.png', kind: 'image' },
-      card: { name: '角色卡', kind: 'card' }, world: { name: '世界书', kind: 'world' },
-      mcp: { name: 'MCP', kind: 'mcp' }, skill: { name: 'Skill', kind: 'skill' },
-    };
-    setAttachments((a) => [...a, fixtures[item.id] || { name: item.label || '附件', kind: 'file' }]);
     setShowPlus(false);
+    if (item.id === 'file' || item.id === 'image' || item.id === 'card') {
+      pendingAttachRef.current = { kind: item.id };
+      const inp = fileInputRef.current;
+      if (inp) {
+        inp.value = '';
+        inp.accept = item.id === 'card' ? '.png,.json,.webp' : (item.id === 'image' ? 'image/*' : '');
+        inp.click();
+      }
+      return;
+    }
+    const fixtures = { world: { name: '世界书', kind: 'world' }, mcp: { name: 'MCP', kind: 'mcp' }, skill: { name: 'Skill', kind: 'skill' } };
+    setAttachments((a) => [...a, fixtures[item.id] || { name: item.label || '附件', kind: 'file' }]);
+  };
+  const onFilePicked = (e) => {
+    const f = e.target && e.target.files && e.target.files[0];
+    if (!f) return;
+    const kind = (pendingAttachRef.current && pendingAttachRef.current.kind) || 'file';
+    if (f.size > 12 * 1024 * 1024) { window.__apiToast?.('文件过大(上限 12MB)', { kind: 'warn', duration: 2400 }); return; }
+    const reader = new FileReader();
+    reader.onload = () => setAttachments((a) => [...a, { name: f.name, type: f.type || 'application/octet-stream', data_url: String(reader.result || ''), kind }]);
+    reader.readAsDataURL(f);
   };
   const removeAttachment = (i) => setAttachments((a) => a.filter((_, j) => j !== i));
   const onRetry = useCallback(() => {
@@ -635,6 +684,23 @@ export default function TavernPage() {
       throw e;
     }
   }, [applyState]);
+
+  // F#3:系统提示词(本对话)= state.data.tavern.system_prompt;编辑经专用端点持久化后刷新。
+  const systemPrompt = (gameState && (
+    (gameState.tavern && gameState.tavern.system_prompt) ||
+    (gameState.data && gameState.data.tavern && gameState.data.tavern.system_prompt)
+  )) || '';
+  const onSaveSystemPrompt = useCallback(async (val) => {
+    if (activeId == null) return;
+    try {
+      await window.api.tavern.setSystemPrompt(activeId, val);
+      window.__apiToast?.('系统提示词已保存', { kind: 'ok', duration: 1500 });
+      try { const d = await window.api.game.state(); applyState(d); } catch (_) {}
+    } catch (e) {
+      window.__apiToast?.('保存失败', { kind: 'danger', detail: e?.message });
+      throw e;
+    }
+  }, [activeId, applyState]);
 
   /* ── 派生 ──────────────────────────────────────────────────────── */
   const charName = (character && character.name) || (activeChat && activeChat.character_name) || '角色';
@@ -830,9 +896,9 @@ export default function TavernPage() {
                   </span>
                 )}
                 {exportUrl && (
-                  <a className="iconbtn" href={exportUrl} target="_blank" rel="noopener" data-tip="导出 JSONL">
+                  <button className="iconbtn" onClick={() => setExportTarget(activeChat || { id: activeId })} data-tip="导出 JSONL">
                     <Icon name="download" size={15} />
-                  </a>
+                  </button>
                 )}
                 <button className="iconbtn" onClick={() => setDrawerOpen(true)} data-tip="角色卡 / persona">
                   <Icon name="cards" size={15} />
@@ -848,6 +914,15 @@ export default function TavernPage() {
             />
 
             <div className="gc-foot-wrap tvp-foot">
+              {/* F#2:agent 调 ask_player_choice → pending_questions → 复用 ConfirmStrip 渲染可点选择题。
+                  玩家点选 → onChoiceAnswer 把选择作为下一条消息发回(复用现有模组,非新造 UI)。 */}
+              {pendingQuestions.length > 0 && (
+                <ConfirmStrip
+                  pendingQuestions={pendingQuestions}
+                  onAnswer={onChoiceAnswer}
+                  onDismiss={onChoiceDismiss}
+                />
+              )}
               {/* 完全复用游戏页 Composer:同一组件、同一组控件(+ / 继续 / 完全访问 / 模型 / context 圆环),
                   靠 gameState 显示真实模型名 + context 圆环 + @mention。不再 hide 任何控件。 */}
               <Composer
@@ -871,12 +946,17 @@ export default function TavernPage() {
       </main>
 
       {/* ── 弹窗 / 抽屉 ──────────────────────────────────────────── */}
+      {/* F#1:真实文件上传隐藏输入(onAttachPick 触发)。 */}
+      <input ref={fileInputRef} type="file" style={{ display: 'none' }} onChange={onFilePicked} />
       <TavernImportModal open={importOpen} onClose={() => setImportOpen(false)} onConfirm={onImportConfirm} />
 
       <TwoCardDrawer
+        inline
         open={drawerOpen} character={character} persona={persona}
+        systemPrompt={systemPrompt}
         onClose={() => setDrawerOpen(false)}
         onSavePersona={onSavePersona}
+        onSaveSystemPrompt={onSaveSystemPrompt}
       />
 
       {/* 采样参数(模型参数)抽屉 —— 复用 settings 的 ModelParamsSection,写同一份偏好,影响所有调用 */}
@@ -908,6 +988,15 @@ export default function TavernPage() {
         danger
         onClose={() => setDeleteTarget(null)}
         onConfirm={() => deleteTarget && doDelete(deleteTarget)}
+      />
+
+      <ConfirmModal
+        open={!!exportTarget}
+        title="导出聊天记录?"
+        body={<>将「<strong>{exportTarget?.title || exportTarget?.character_name || charName}</strong>」的完整对话(含开场)导出为 SillyTavern JSONL 文件,可重新导入。</>}
+        confirmLabel="导出"
+        onClose={() => setExportTarget(null)}
+        onConfirm={() => { const u = exportUrl; setExportTarget(null); if (u) window.open(u, '_blank', 'noopener'); }}
       />
     </div>
   );

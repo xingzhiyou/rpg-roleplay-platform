@@ -16,7 +16,40 @@
   max-height: calc(100dvh - 46px);
   background: var(--bg, #1a1916);
   color: var(--text);
+  position: relative;  /* 供窄屏右侧栏 absolute 定位锚定(仍在 root 内 → 不盖顶栏) */
   overflow: hidden;
+}
+
+/* ── F#3 页内可折叠右侧栏(角色 / persona / 系统提示)—— 不盖顶栏,支持折叠 ───── */
+.tvp-drawer-panel {
+  flex: 0 0 auto;
+  width: 360px;
+  border-left: 1px solid var(--line);
+  background: var(--panel, var(--bg, #1a1916));
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  transition: width .16s ease, border-left-color .16s ease;
+}
+.tvp-drawer-panel.collapsed {
+  width: 0;
+  border-left-color: transparent;
+  pointer-events: none;
+}
+.tvp-drawer-panel-inner {
+  width: 360px;            /* 固定内容宽,折叠时被外层裁掉,文本不回流 */
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+}
+.tvp-drawer-panel .tv-drawer-head { flex: 0 0 auto; }
+.tvp-drawer-panel .tv-drawer-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+@media (max-width: 760px) {
+  /* 窄屏:右侧栏浮在主区上(半覆盖),仍只在 .tvp-root 内 → 顶栏照常可见 */
+  .tvp-drawer-panel { position: absolute; right: 0; top: 0; bottom: 0; z-index: 30; box-shadow: -8px 0 24px rgba(0, 0, 0, .35); }
+  .tvp-drawer-panel, .tvp-drawer-panel-inner { width: min(360px, 86vw); }
 }
 
 /* ── 左:两段式子侧栏 ───────────────────────────────────────────── */

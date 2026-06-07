@@ -330,6 +330,37 @@ async def api_tavern_rename(
     return _json({"ok": True, "title": title[:200]})
 
 
+@router.post("/api/tavern/chats/{chat_id}/system-prompt")
+async def api_tavern_set_system_prompt(
+    chat_id: int,
+    request: Request,
+    api_user: dict[str, Any] = Depends(get_current_user),
+) -> JSONResponse:
+    """body {"system_prompt": str} → 写 state.data.tavern.system_prompt(仅影响本对话)。
+    F#3:酒馆系统提示词编辑面板的持久化端点。读改写 state_snapshot + 清缓存让下次 /api/state 生效。"""
+    from platform_app.db import connect, init_db
+
+    user_id = _uid(api_user)
+    body = await request.json()
+    sp = str(body.get("system_prompt") or "")
+    if len(sp) > 16000:
+        sp = sp[:16000]
+    init_db()
+    with connect() as db:
+        if not _require_tavern_save(db, chat_id, user_id):
+            return _bad("无权操作该对话", 403)
+        # tavern 存档的 state_snapshot.tavern 一定存在(create_tavern_save 建好),jsonb_set 直接落键。
+        db.execute(
+            "update game_saves set "
+            "state_snapshot = jsonb_set(coalesce(state_snapshot, '{}'::jsonb), "
+            "'{tavern,system_prompt}', to_jsonb(%s::text), true), updated_at = now() "
+            "where id = %s and user_id = %s and save_kind = 'tavern'",
+            (sp, chat_id, user_id),
+        )
+    _invalidate_cache(api_user)
+    return _json({"ok": True, "system_prompt": sp})
+
+
 _TITLE_SYS = (
     '你为一段对话起一个简短的中文标题,概括主题或场景。'
     '只返回 JSON,格式 {"title":"标题"};标题 4-14 字,不含引号/书名号/标点/表情/解释。'

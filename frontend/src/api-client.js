@@ -651,6 +651,8 @@
       archive: (id, archived) => PATCH(`/api/tavern/chats/${id}/archive`, { archived: !!archived }),
       // 重命名 body {title}
       rename: (id, title) => POST(`/api/tavern/chats/${id}/rename`, { title }),
+      // F#3:编辑本对话系统提示词
+      setSystemPrompt: (id, sp) => POST(`/api/tavern/chats/${id}/system-prompt`, { system_prompt: sp }),
       // 类 Claude:按对话内容自动生成标题(后端幂等,仅 title 为空时生成)
       autotitle: (id) => POST(`/api/tavern/chats/${id}/autotitle`, {}),
       // 删除对话

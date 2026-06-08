@@ -18,6 +18,13 @@ _KB_READ_ORIGINS = frozenset({"ui_button", "api_direct", "console_assistant", "l
 _KB_WRITE_ORIGINS = frozenset({"ui_button", "api_direct", "console_assistant", "llm_chat", "llm_chat_json_op"})
 
 
+def _sanitize_kb_text(s, limit: int = 2000) -> str:
+    """SEC(M-3/M-16): KB 自由文本(summary/note)会被 lookup_entity/graph_neighbors 读回进 GM
+    上下文。中和 【】 状态写入标签 + 限长,防 llm_chat 写对抗指令做储存型注入 / 存储放大。"""
+    from context_engine.helpers import _neutralize_state_write_tags as _neu
+    return _neu(str(s or ""))[:limit]
+
+
 # ── helpers ──────────────────────────────────────────────────────────────────
 def _save_ctx(db, save_id: int, user_id: int) -> dict | None:
     """取存档上下文:script_id / active commit_id / 进度 / 元知识模式。"""
@@ -254,7 +261,7 @@ def _t_kb_upsert_entity(user_id: int, args: dict) -> str:
         live_repo.upsert_entity(
             db, save_id, ctx["commit_id"], lk,
             name=(args.get("name") or lk), type=(args.get("type") or "character"),
-            status=(args.get("status") or "active"), summary=(args.get("summary") or ""),
+            status=(args.get("status") or "active"), summary=_sanitize_kb_text(args.get("summary")),
             attrs=args.get("attrs") if isinstance(args.get("attrs"), dict) else None,
             origin=(args.get("origin") or "player"),
         )
@@ -265,7 +272,7 @@ def _t_kb_record_event(user_id: int, args: dict) -> str:
     from platform_app.db import connect
     from kb import live_repo
     save_id = _int(args.get("save_id"))
-    summary = (args.get("summary") or "").strip()
+    summary = _sanitize_kb_text((args.get("summary") or "").strip())
     lk = (args.get("logical_key") or summary[:24]).strip()
     if not save_id or not summary:
         return "失败: 需要 save_id 和 summary"
@@ -296,7 +303,8 @@ def _t_kb_set_relationship(user_id: int, args: dict) -> str:
         if err:
             return err
         live_repo.set_relationship(db, save_id, ctx["commit_id"], f"{frm}->{to}",
-                                   from_key=frm, to_key=to, kind=kind, note=(args.get("note") or ""))
+                                   from_key=frm, to_key=to, kind=kind,
+                                   note=_sanitize_kb_text(args.get("note"), 300))
         return f"已设关系 {frm}→{to}: {kind}"
 
 

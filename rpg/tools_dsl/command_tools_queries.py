@@ -270,13 +270,13 @@ def _t_list_available_tools(args: dict) -> str:
         tools = reg.list_for_origin(origin)
     else:
         tools = reg.list_all()
+    # SEC(I-1): 不向 LLM 暴露 origins / destructive 元数据 —— 这是攻击面地图(便于设计注入链)。
+    # 仅返回 name/description/scope 供自发现;破坏性工具本就被 dispatcher 从 llm_chat 硬阻。
     out = [
         {
             "name": t.name,
             "description": t.description,
             "scope": t.scope,
-            "origins": sorted(t.origins),
-            "destructive": t.destructive,
         }
         for t in tools
     ]

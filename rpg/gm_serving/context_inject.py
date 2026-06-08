@@ -63,10 +63,13 @@ def build_constant_layer(db, script_id: int, *, budget_tokens: int | None = None
         if use_cache:
             _CONST_CACHE[ckey] = (time.monotonic(), "")
         return ""
+    # SEC(C-2/H-12): constant 世界书内容会逐字进所有订阅者的 GM 最高优先级层。中和 【】 状态写入
+    # 标签,切断「订阅恶意公开剧本 → 注入伪指令 → apply_structured_updates 落库」链路。
+    from context_engine.helpers import _neutralize_state_write_tags as _neu
     parts = ["【世界观铁律 · 每轮常驻】"]
     used = _est_tokens(parts[0])
     for r in rows:
-        block = f"· {r['title']}:{r['content']}"
+        block = f"· {_neu(r['title'])}:{_neu(r['content'])}"
         t = _est_tokens(block)
         if used + t > budget_tokens:
             break

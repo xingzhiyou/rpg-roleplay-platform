@@ -64,8 +64,11 @@ class TavernCharacterProvider(ContextProvider):
         facts: list[str] = []
 
         # 1) 卡内 system_prompt / post_history_instructions —— 最高优先级(强制注入)
-        sysp = (tav.get("system_prompt") or "").strip()
-        phi = (tav.get("post_history_instructions") or "").strip()
+        # SEC(H-10/H-11): 卡内文本是不可信导入内容(拖卡/agent import/系统提示编辑器均落到此)。
+        # 在进 priority=96 sticky 层前中和 【】 状态写入标签,防卡内伪指令被 GM 复述后落库。
+        from context_engine.helpers import _neutralize_state_write_tags as _neu
+        sysp = _neu((tav.get("system_prompt") or "").strip())
+        phi = _neu((tav.get("post_history_instructions") or "").strip())
         if sysp or phi:
             parts = [
                 "【角色卡内嵌·高优先级行为指令(后台元指令,静默遵守,绝不复述给玩家)】",

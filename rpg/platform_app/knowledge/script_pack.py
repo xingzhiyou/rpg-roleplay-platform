@@ -533,7 +533,12 @@ def import_script_pack(zip_bytes: bytes, user_id: int) -> dict[str, Any]:
                             json.dumps(entry.get("regex_keys") or [], ensure_ascii=False, default=str),
                             int(entry.get("priority") or 50),
                             int(entry.get("token_budget") or 600),
-                            str(entry.get("insertion_position") or "worldbook"),
+                            # SEC(C-2): 导入包的 insertion_position 必须命中白名单,非法值降级为 worldbook,
+                            # 防止任意字符串/越权写入 constant 常驻层(每轮无条件注入全体订阅者)。
+                            (str(entry.get("insertion_position") or "worldbook")
+                             if str(entry.get("insertion_position") or "worldbook")
+                             in {"worldbook", "constant", "before_context", "after_context"}
+                             else "worldbook"),
                             int(entry.get("sticky_turns") or 0),
                             int(entry.get("cooldown_turns") or 0),
                             float(entry.get("probability") or 100.0),

@@ -1339,10 +1339,11 @@ function NpcCardsView() {
    覆盖 user_character_cards 全部角色相关列:name / identity / aliases / tags /
    appearance / personality / speech_style / current_status / secrets /
    sample_dialogue / token_budget / priority / enabled / scope。 */
-function CardEditModal({ card, isNew, kind, onClose, onSave, targetScriptOptions = [], targetScriptId = "", onTargetScriptChange }) {
+function CardEditModal({ card, isNew, kind, onClose, onSave, onDelete, targetScriptOptions = [], targetScriptId = "", onTargetScriptChange }) {
   const { t } = useTranslation();
   const [form, setForm] = useStatePL(() => cardFormInit(card));
   const [submitting, setSubmitting] = useStatePL(false);
+  const [deleting, setDeleting] = useStatePL(false);
   const u = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const nameOk = !!form.name.trim();
 
@@ -1352,6 +1353,23 @@ function CardEditModal({ card, isNew, kind, onClose, onSave, targetScriptOptions
     try { await onSave?.(cardFormPayload(form, card)); }
     catch (_) { /* 父级 onSaveCard 已 toast */ }
     finally { setSubmitting(false); }
+  };
+
+  // 删除入口:仅在编辑已存在卡片(非新建)时显示。删除前弹原生 confirm,
+  // 避免误触;父级 onDelete 负责实际 API + 列表刷新 + toast。
+  const doDelete = async () => {
+    if (isNew || deleting) return;
+    const ok = await window.__confirm?.({
+      title: t('cards.confirm.delete_title'),
+      message: t('cards.confirm.delete_message', { name: form.name || card?.name || '' }),
+      danger: true,
+      confirmText: t('cards.confirm.delete_btn'),
+    });
+    if (!ok) return;
+    setDeleting(true);
+    try { await onDelete?.(card); }
+    catch (_) { /* 父级 onDelete 已 toast */ }
+    finally { setDeleting(false); }
   };
 
   const node = (
@@ -1399,6 +1417,18 @@ function CardEditModal({ card, isNew, kind, onClose, onSave, targetScriptOptions
                     {isNew ? t('cards.editor.btn_create') : t('cards.editor.btn_save')}
                   </CSButton>
                   <CSButton variant="link" onClick={onClose}>{t('cards.editor.btn_cancel')}</CSButton>
+                  {/* 编辑已存在卡时,提供删除入口(新建态无 id,不可删) */}
+                  {!isNew && onDelete && (
+                    <CSButton
+                      iconName="remove"
+                      variant="link"
+                      onClick={doDelete}
+                      loading={deleting}
+                      disabled={deleting || submitting}
+                    >
+                      {t('cards.detail.btn_delete')}
+                    </CSButton>
+                  )}
                 </div>
               </CSSpaceBetween>
             </CSContainer>

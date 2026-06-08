@@ -832,7 +832,32 @@ function ScriptDetailPanel({ script: s, savesCount, scriptSaves = [], embedStatu
                   <CSBox color="text-body-secondary" fontSize="body-s">{cardSnippet(c, 200) || '—'}</CSBox>
                 ) },
                 { id: 'act', content: (c) => (
-                  <CSButton variant="inline-link" iconName="edit" onClick={() => setNpcEdit({ card: c, isNew: false })}>{t('scripts.editor.view_edit')}</CSButton>
+                  <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <CSButton variant="inline-link" iconName="edit" onClick={() => setNpcEdit({ card: c, isNew: false })}>{t('scripts.editor.view_edit')}</CSButton>
+                    {/* 删除入口:列表态就能用,不用先打开编辑模态框 */}
+                    <CSButton
+                      variant="inline-link"
+                      iconName="remove"
+                      onClick={async () => {
+                        if (!c || !c.id) return;
+                        const ok = await window.__confirm?.({
+                          title: t('cards.confirm.delete_title'),
+                          message: t('cards.confirm.delete_message', { name: c.name || '' }),
+                          danger: true,
+                          confirmText: t('cards.confirm.delete_btn'),
+                        });
+                        if (!ok) return;
+                        try {
+                          await window.api.cards.scriptDelete(s.id, c.id);
+                          window.__apiToast?.(t('cards.toast.deleted', { name: c.name || '' }), { kind: 'ok' });
+                          setNpc(null); // 触发 NPC 列表重新拉取
+                          try { window.dispatchEvent(new CustomEvent('rpg-scripts-updated')); } catch (_) {}
+                        } catch (e) {
+                          window.__apiToast?.(t('cards.toast.delete_fail'), { kind: 'danger', detail: e?.message || String(e) });
+                        }
+                      }}
+                    >{t('cards.detail.btn_delete')}</CSButton>
+                  </div>
                 ) },
               ],
             }}
@@ -923,6 +948,22 @@ function ScriptDetailPanel({ script: s, savesCount, scriptSaves = [], embedStatu
               setNpc(null); // 触发 NPC 列表重新拉取
             } catch (e) {
               window.__apiToast?.(t('scripts.toast.save_fail'), { kind: 'danger', detail: e?.message });
+            }
+          }}
+          /* 删除入口:仅在编辑已存在卡时显示。调后端 scriptDelete 端点,
+             然后清本地列表触发 reload。toast 复用 cards.toast.deleted / delete_fail。 */
+          onDelete={async (card) => {
+            const cardId = card?.id;
+            if (!cardId) throw new Error(t('cards.toast.npc_script_required'));
+            try {
+              await window.api.cards.scriptDelete(s.id, cardId);
+              window.__apiToast?.(t('cards.toast.deleted', { name: card.name || '' }), { kind: 'ok' });
+              setNpcEdit(null);
+              setNpc(null);
+              try { window.dispatchEvent(new CustomEvent('rpg-scripts-updated')); } catch (_) {}
+            } catch (e) {
+              window.__apiToast?.(t('cards.toast.delete_fail'), { kind: 'danger', detail: e?.message || String(e) });
+              throw e; // 让 CardEditModal 不进入提交中态
             }
           }}
         />

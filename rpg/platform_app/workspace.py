@@ -1126,7 +1126,8 @@ _SAVE_LIST_COLUMNS = """
     (state_snapshot->>'turn')::int as turn,
     (state_snapshot->'player'->>'name') as player_name,
     coalesce(jsonb_array_length(state_snapshot->'history'), 0) as history_count,
-    coalesce((state_snapshot->'world'->>'time'), '') as world_time
+    coalesce((state_snapshot->'world'->>'time'), '') as world_time,
+    coalesce(save_kind, 'game') as save_kind
 """
 
 

@@ -570,7 +570,10 @@ function BranchesPage({ nav }) {
     (async () => {
       try {
         const r = await window.api.saves.list();
-        const list = (Array.isArray(r) ? r : (r?.items || r?.saves || [])).map(normSave);
+        // 存档 = 游戏模式专属;酒馆会话(save_kind='tavern')不进存档列表(它们在酒馆页)。
+        const list = (Array.isArray(r) ? r : (r?.items || r?.saves || []))
+          .filter(s => (s && (s.save_kind || 'game')) !== 'tavern')
+          .map(normSave);
         setSaves(list);
         if (list.length) setSelectedSave(prev => prev && list.some(s => s.id === prev) ? prev : list[0].id);
       } catch (_) {}
@@ -839,7 +842,10 @@ export function MobileSaves({ nav }) {
   const reload = useCallback(async () => {
     try {
       const r = await window.api.saves.list();
-      const list = (Array.isArray(r) ? r : (r?.items || r?.saves || [])).map(normSave);
+      // 存档 = 游戏模式专属;酒馆会话(save_kind='tavern')不进存档列表(它们在酒馆页)。
+      const list = (Array.isArray(r) ? r : (r?.items || r?.saves || []))
+        .filter(s => (s && (s.save_kind || 'game')) !== 'tavern')
+        .map(normSave);
       setSaves(list);
     } catch (_) { setSaves([]); }
     try {

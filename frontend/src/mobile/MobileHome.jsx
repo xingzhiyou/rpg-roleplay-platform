@@ -16,7 +16,8 @@ export function MobileHome({ nav }) {
   const platform = usePlatformData();
   const user = useReactiveUser();
   const scripts = Array.isArray(platform.scripts) ? platform.scripts : [];
-  const saves = Array.isArray(platform.saves) ? platform.saves : [];
+  // 存档 = 游戏模式专属;酒馆会话(save_kind='tavern')不算存档(继续游戏/最近存档都不该指向它)。
+  const saves = (Array.isArray(platform.saves) ? platform.saves : []).filter((s) => (s && (s.save_kind || 'game')) !== 'tavern');
   const stats = platform.stats || {};
   const database = platform.database || {};
 

@@ -336,6 +336,16 @@ def _run(job_id: str, user_id: int, script_id: int, options: dict[str, Any]) -> 
         with connect() as db:
             db.execute("update import_jobs set finished_at=now() where job_id=%s", (job_id,))
     finally:
+        # 兜底:无论上面走哪条路径(正常 / rebuild 早退 / except / 被吞的取消信号),
+        # 都确保不留 status='running' 的僵尸行。已收尾的行 finalize 是 no-op(幂等)。
+        try:
+            from platform_app.import_pipeline import finalize_job_if_unterminated
+            finalize_job_if_unterminated(job_id)
+        except Exception as _exc:
+            import logging as _logging
+            _logging.getLogger(__name__).warning(
+                "finalize_job_if_unterminated failed for %s: %s", job_id, _exc, exc_info=True,
+            )
         try:
             if release_job_lock is not None:
                 release_job_lock(f"llm_extract_job:{job_id}")

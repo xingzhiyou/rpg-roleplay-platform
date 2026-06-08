@@ -582,6 +582,9 @@ def _run_pipeline(job_id: str, user_id: int, script_id: int, options: dict[str, 
                 (err, job_id),
             )
     finally:
+        # 兜底:无论上面走哪条路径(正常 / 早退 / 异常 / 被吞的取消),都确保不留
+        # status='running' 的僵尸行。已收尾的行 finalize 是 no-op(幂等)。
+        finalize_job_if_unterminated(job_id)
         _RUNNING.pop(job_id, None)
         # 释放全局并发 semaphore，让下一个排队任务得以推进
         _IMPORT_GLOBAL_SEM.release()
@@ -598,6 +601,122 @@ def _finalize_cancelled(ctl: JobController) -> None:
             "update import_jobs set status='cancelled', stage='cancelled', finished_at=now() where job_id=%s",
             (ctl.job_id,),
         )
+
+
+# 终态:已收尾,无需再兜底。非终态(pending/queued/running)= worker 还应在跑或排队。
+_TERMINAL_STATUSES = ("done", "done_with_errors", "failed", "cancelled")
+
+
+def finalize_job_if_unterminated(job_id: str) -> str | None:
+    """确定性收尾兜底 —— 放在 worker 的 finally 块里调用。
+
+    worker 线程退出时(无论正常返回、早退 return、还是异常路径漏标),若 import_jobs
+    行仍停在非终态,强制落终态 + finished_at,杜绝 status='running' 的僵尸行
+    (前端"导入中"卡死 + 重启前"有无活跃导入"检查被误导)。
+
+    判定:
+      - cancel_requested=true → 'cancelled'(用户取消)
+      - 否则 → 'failed'(线程已结束却没正常收尾:被吞的异常 / 早退漏标等)
+
+    where 子句二次校验非终态,与正常收尾路径幂等、无竞态(谁先落终态谁赢,不互相覆盖)。
+    本函数吞掉自身异常 —— 它是 finally 兜底,绝不能反过来 mask 掉原始异常。
+
+    返回最终落的 status;已是终态(无需动)或行不存在返回 None。
+    """
+    try:
+        init_db()
+        with connect() as db:
+            row = db.execute(
+                "select status, cancel_requested from import_jobs where job_id = %s",
+                (job_id,),
+            ).fetchone()
+            if not row:
+                return None
+            status = (row.get("status") or "").strip()
+            if status in _TERMINAL_STATUSES:
+                return None
+            final = "cancelled" if row.get("cancel_requested") else "failed"
+            note = "cancelled" if final == "cancelled" else "worker exited without finalizing"
+            db.execute(
+                "update import_jobs "
+                "   set status = %s, "
+                "       finished_at = coalesce(finished_at, now()), "
+                "       error = case when coalesce(error, '') = '' then %s else error end, "
+                "       updated_at = now() "
+                " where job_id = %s "
+                "   and status not in ('done', 'done_with_errors', 'failed', 'cancelled')",
+                (final, note, job_id),
+            )
+        return final
+    except Exception:
+        import logging as _log
+        _log.getLogger(__name__).warning(
+            "[finalize_job_if_unterminated] failed for job_id=%s", job_id, exc_info=True,
+        )
+        return None
+
+
+def reap_zombie_import_jobs(stale_hours: float | None = None) -> dict[str, Any]:
+    """僵尸回收(startup self-heal)—— 把卡死的 running 行标 failed。
+
+    场景:worker 线程被卡死(LLM 网络挂起 / 超时未触发 / 进程被 kill)→ finally 永不
+    执行,job 永久停在 status='running'。本次部署就因 llm_63 取消后仍 running 卡了很久,
+    只能靠 token_usage 活动旁证判活。startup 调一次兜底(本进程刚起,这些行绝无 worker
+    真在跑),把"既无进度更新、又无 LLM 活动"的 running 行标 failed + finished_at。
+
+    判定(需全部满足,避免误杀正在跑的长任务):
+      - status = 'running'
+      - kind <> 'knowledge_sync'(那类由 recover_pending_sync_jobs 走 resubmit 恢复,别抢)
+      - 自身进度信号 coalesce(heartbeat_at, updated_at, started_at, created_at) 早于 N 小时前
+      - 该 (user_id, script_id) 近 N 小时无 token_usage(LLM 仍在干活的旁证;
+        script_id 为空的行不受此条约束,纯按时间判定)
+
+    stale_hours: 默认读 env IMPORT_ZOMBIE_STALE_HOURS,缺省 6 小时。
+    返回 {ok, reaped, jobs:[{job_id, kind, script_id}...]}。
+    """
+    import os
+    if stale_hours is None:
+        try:
+            stale_hours = float(os.environ.get("IMPORT_ZOMBIE_STALE_HOURS", "6"))
+        except (TypeError, ValueError):
+            stale_hours = 6.0
+    init_db()
+    secs = float(stale_hours) * 3600.0
+    with connect() as db:
+        rows = db.execute(
+            """
+            update import_jobs j
+               set status = 'failed',
+                   finished_at = coalesce(j.finished_at, now()),
+                   error = case when coalesce(j.error, '') = ''
+                                then 'reaped_zombie_stale_running' else j.error end,
+                   updated_at = now()
+             where j.status = 'running'
+               and j.kind <> 'knowledge_sync'
+               and coalesce(j.heartbeat_at, j.updated_at, j.started_at, j.created_at)
+                   < now() - make_interval(secs => %s)
+               and not exists (
+                   select 1 from token_usage tu
+                    where tu.user_id = j.user_id
+                      and j.script_id is not null
+                      and (tu.metadata->>'script_id') = j.script_id::text
+                      and tu.created_at > now() - make_interval(secs => %s)
+               )
+            returning j.job_id, j.kind, j.script_id
+            """,
+            (secs, secs),
+        ).fetchall()
+    reaped = [
+        {"job_id": r["job_id"], "kind": r.get("kind"), "script_id": r.get("script_id")}
+        for r in rows
+    ]
+    if reaped:
+        import logging as _log
+        _log.getLogger(__name__).warning(
+            "[reap_zombie_import_jobs] reaped %d stale running job(s): %s",
+            len(reaped), [r["job_id"] for r in reaped],
+        )
+    return {"ok": True, "reaped": len(reaped), "jobs": reaped}
 
 
 # ══════════════════════════════════════════════════════════════════════

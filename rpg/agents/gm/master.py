@@ -679,8 +679,24 @@ class GameMaster:
             return
 
         self._active_state = state
-        system = self._build_system() + _format_tools_for_prompt(tools)
+        _base_system = self._build_system()
+        _tools_blob = _format_tools_for_prompt(tools)
+        system = _base_system + _tools_blob
         messages = state.history_messages()
+        # BUGFIX(上下文用量 breakdown 漏算):context-engine 的 layer bundle **不含**以下真实发送构成 ——
+        # ① 系统模板(_build_system)与 ② 工具定义(_format_tools_for_prompt)拼进 system 字符串;
+        # ③ 历史走 messages[](#18 复读修复后不再是 recent_chat 层)。三者都不是 layer,breakdown 否则
+        # 全归 0 / 错桶。这里把真实 token 估算记进 last_context(Phase 2 已写入的 dict 上 merge),
+        # 供 /api/chat/context-breakdown 读取还原 角色卡/对话历史/系统提示/工具 各项。
+        try:
+            from context_engine.core import _estimate_tokens as _ctx_est
+            _lc = ((getattr(state, "data", {}) or {}).get("memory") or {}).get("last_context")
+            if isinstance(_lc, dict):
+                _lc["system_prompt_tokens"] = _ctx_est(_base_system)
+                _lc["tools_tokens"] = _ctx_est(_tools_blob)
+                _lc["history_tokens"] = sum(_ctx_est((m or {}).get("content") or "") for m in messages)
+        except Exception:
+            pass
         messages.append({
             "role": "user",
             "content": self._turn_message(user_input, state, retrieved_context),

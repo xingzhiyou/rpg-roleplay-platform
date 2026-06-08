@@ -409,6 +409,10 @@ _LAYER_CATEGORY = {
     "player_card": ("character_cards", "角色卡", "#e05c7a"),
     "npc_cards": ("character_cards", "角色卡", "#e05c7a"),
     "novel_characters": ("character_cards", "角色卡", "#e05c7a"),
+    # 酒馆模式的卡层(AI 角色 / 用户 persona / 卡内高优先级指令)—— 此前未映射 → 错归 system_prompt。
+    "tavern_character": ("character_cards", "角色卡", "#e05c7a"),
+    "tavern_persona": ("character_cards", "角色卡", "#e05c7a"),
+    "tavern_card_system": ("character_cards", "角色卡", "#e05c7a"),
     # 世界书
     "worldbook": ("worldbook", "世界书", "#3dbad4"),
     "novel_worldbook": ("worldbook", "世界书", "#3dbad4"),
@@ -456,6 +460,13 @@ async def api_context_breakdown(
             key = "system_prompt"
         cat_tokens[key] = cat_tokens.get(key, 0) + tok
 
+    # layer bundle 之外的真实发送构成(master.respond_stream_with_tools 记录到 last_context):
+    # 系统模板 + 工具定义拼进 system 字符串;历史走 messages[] —— 三者都不是 context 层,
+    # 否则 breakdown 把它们漏算(角色卡/对话历史/工具 显示 0、总量严重偏低)。
+    cat_tokens["system_prompt"] = cat_tokens.get("system_prompt", 0) + int(last_ctx.get("system_prompt_tokens") or 0)
+    cat_tokens["tools"] = cat_tokens.get("tools", 0) + int(last_ctx.get("tools_tokens") or 0)
+    cat_tokens["history"] = cat_tokens.get("history", 0) + int(last_ctx.get("history_tokens") or 0)
+
     from app import _get_user_preferences_cached, selected_model
     model = selected_model()
     ctx_limit = int(context_window_for(model["api_id"], model["real_name"]) or 0)
@@ -482,7 +493,9 @@ async def api_context_breakdown(
 
     return JSONResponse({
         "ok": True,
-        "total_tokens": total_tokens or used_sum,
+        # total = 所有类目之和(含历史/系统/工具),与 breakdown 一致;不再只取 layer bundle 的
+        # estimated_tokens(那会漏掉历史/系统/工具,圆环与明细对不上)。
+        "total_tokens": used_sum or total_tokens,
         "ctx_limit": ctx_limit,
         "breakdown": breakdown,
     })

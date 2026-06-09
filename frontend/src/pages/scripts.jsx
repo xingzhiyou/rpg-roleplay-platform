@@ -543,6 +543,39 @@ function ScriptDetailPanel({ script: s, savesCount, scriptSaves = [], embedStatu
     }
   };
 
+  // 按需 AI 复核全部 NPC 卡:弹公用模型选择器(默认用户常用模型,可改)→ 用所选模型批量裁决
+  // (合并同人卡 / 锁定真主角 / 删非人名卡)。on-demand,不进导入流水线 → 零自动成本。
+  const [auditOpen, setAuditOpen] = useStatePL(false);
+  const [auditSel, setAuditSel] = useStatePL({ api_id: '', model: '' });
+  const [auditBusy, setAuditBusy] = useStatePL(false);
+  const runAudit = async () => {
+    setAuditBusy(true);
+    try {
+      const r = await window.api.cards.auditCards(s.id, auditSel.api_id, auditSel.model);
+      if (r && r.ok === false) {
+        if (r.needs_credentials) {
+          window.__apiToast?.(t('scripts.audit.need_key', { defaultValue: '该模型还没配 API Key' }),
+            { kind: 'warning', detail: t('scripts.audit.need_key_hint', { defaultValue: '去「设置 → API 与模型」配置后重试,或在上面换一个已配置的模型。' }) });
+        } else {
+          window.__apiToast?.(t('scripts.audit.fail', { defaultValue: 'AI 复核失败' }), { kind: 'danger', detail: r.error });
+        }
+        return;
+      }
+      const sm = (r && r.summary) || {};
+      const parts = [];
+      if (sm.protagonist) parts.push(`主角→${sm.protagonist}`);
+      if (Array.isArray(sm.merged) && sm.merged.length) parts.push(`合并 ${sm.merged.length} 组`);
+      if (Array.isArray(sm.dropped) && sm.dropped.length) parts.push(`删非人名 ${sm.dropped.length} 张`);
+      window.__apiToast?.(parts.length ? ('AI 复核完成:' + parts.join('、')) : 'AI 复核完成:无需改动', { kind: 'ok' });
+      setAuditOpen(false);
+      setNpc(null); // 触发 NPC 列表重新拉取
+    } catch (e) {
+      window.__apiToast?.(t('scripts.audit.fail', { defaultValue: 'AI 复核失败' }), { kind: 'danger', detail: e?.message });
+    } finally {
+      setAuditBusy(false);
+    }
+  };
+
   const doFork = async () => {
     setForkBusy(true);
     try {
@@ -812,7 +845,16 @@ function ScriptDetailPanel({ script: s, savesCount, scriptSaves = [], embedStatu
             cardsPerRow={[{ cards: 1 }, { minWidth: 480, cards: 2 }]}
             header={
               <CSHeader counter={`(${(npc || []).length})`}
-                actions={<CSButton iconName="add-plus" onClick={() => setNpcEdit({ card: null, isNew: true })}>{t('scripts.editor.add_npc')}</CSButton>}>
+                actions={
+                  <CSSpaceBetween direction="horizontal" size="xs">
+                    {isOwner && (npc || []).length >= 2 && (
+                      <CSButton iconName="search" onClick={() => setAuditOpen(true)}>
+                        {t('scripts.audit.btn', { defaultValue: 'AI 复核人名/语义' })}
+                      </CSButton>
+                    )}
+                    <CSButton iconName="add-plus" onClick={() => setNpcEdit({ card: null, isNew: true })}>{t('scripts.editor.add_npc')}</CSButton>
+                  </CSSpaceBetween>
+                }>
                 {t('scripts.editor.tab_npc')}
               </CSHeader>
             }
@@ -937,6 +979,39 @@ function ScriptDetailPanel({ script: s, savesCount, scriptSaves = [], embedStatu
         ) },
       ]} />
       </div>
+      {auditOpen && (
+        <CSModal
+          visible
+          onDismiss={() => { if (!auditBusy) setAuditOpen(false); }}
+          header={t('scripts.audit.title', { defaultValue: 'AI 复核 NPC 角色卡' })}
+          footer={
+            <CSBox float="right">
+              <CSSpaceBetween direction="horizontal" size="xs">
+                <CSButton onClick={() => setAuditOpen(false)} disabled={auditBusy}>{t('common.cancel', { defaultValue: '取消' })}</CSButton>
+                <CSButton variant="primary" loading={auditBusy} onClick={runAudit}>
+                  {t('scripts.audit.run', { defaultValue: '开始复核' })}
+                </CSButton>
+              </CSSpaceBetween>
+            </CSBox>
+          }
+        >
+          <CSSpaceBetween size="m">
+            <CSBox color="text-body-secondary" fontSize="body-s">
+              {t('scripts.audit.desc', { defaultValue: '用所选模型对本剧本全部 NPC 卡做一次复核:合并同一人的多张卡(如 金玉/玉儿/小玉)、识别并锁定真主角、删除官职/地名等非人名卡。按需触发,不影响导入流程与成本。' })}
+            </CSBox>
+            <AgentModelPicker
+              prefPrefix="card_audit"
+              variant="bare"
+              header={undefined}
+              description={t('scripts.audit.model_desc', { defaultValue: '选择本次复核用的模型(默认你的常用模型,可改;复核质量越好的模型越准)。' })}
+              defaultModel="deepseek-v4-flash"
+              persistOnMount
+              configHash="settings-models"
+              onChange={(api_id, model) => setAuditSel({ api_id, model })}
+            />
+          </CSSpaceBetween>
+        </CSModal>
+      )}
       {npcEdit && (
         <CardEditModal
           card={npcEdit.card}

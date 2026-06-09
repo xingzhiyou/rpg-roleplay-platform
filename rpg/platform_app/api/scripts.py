@@ -573,6 +573,30 @@ async def api_script_card_protagonist(script_id: int, card_id: int, user=Depends
         return json_response({"ok": False, "error": str(exc)}, status_code=400)
 
 
+@router.post("/api/scripts/{script_id}/audit-cards")
+async def api_audit_character_cards(request: Request, script_id: int, user=Depends(require_user)):
+    """按需 AI 复核本剧本全部 NPC 角色卡(仅 owner)。
+
+    用前端公用模型选择器选的模型(body.api_id/model,缺省读 card_audit.* 偏好→提取器默认)对全部
+    NPC 卡做一次批量裁决:合并同人卡 / 锁定真主角 / 删非人名卡。按需触发,不进导入流水线 → 零自动成本。
+    """
+    body = await request.json()
+    api_id = str(body.get("api_id") or "").strip()
+    model = str(body.get("model") or body.get("model_real_name") or "").strip()
+    from platform_app import import_pipeline
+    try:
+        from platform_app.knowledge.card_audit import audit_character_cards
+        return json_response({"ok": True, **audit_character_cards(user["id"], script_id, api_id, model)})
+    except import_pipeline.MissingUserCredentialError as exc:
+        return json_response({
+            "ok": False, "code": "credentials_required", "needs_credentials": True,
+            "api_id": exc.api_id, "model": exc.model, "credential_api_id": exc.credential_api_id,
+            "settings_hash": "settings-models", "error": str(exc),
+        }, status_code=400)
+    except ValueError as exc:
+        return json_response({"ok": False, "error": str(exc)}, status_code=400)
+
+
 @router.get("/api/scripts/{script_id}/worldbook")
 async def api_script_worldbook(script_id: int, limit: int | None = None, cursor: str | None = None, user=Depends(require_user)):
     try:

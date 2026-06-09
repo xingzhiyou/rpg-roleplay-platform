@@ -624,6 +624,8 @@
       scriptEnabled: (sid, cid, on) => POST(`${API_PREFIX}/scripts/` + sid + "/character-cards/" + cid + "/enabled", { enabled: !!on }),
       // 手动指定剧本主角(清其它卡主角标记 + 锁定不被重新提取覆盖)。仅 owner。
       scriptSetProtagonist: (sid, cid) => POST(`${API_PREFIX}/scripts/` + sid + "/character-cards/" + cid + "/protagonist", {}),
+      // 按需 AI 复核全部 NPC 卡(合并同人/锁定主角/删非人名)。model 由公用选择器传入(可空,后端读偏好兜底)。
+      auditCards: (sid, api_id, model) => POST(`${API_PREFIX}/scripts/` + sid + "/audit-cards", { api_id, model }),
     },
 
     // ---------- Chat history (SillyTavern JSONL import) ----------

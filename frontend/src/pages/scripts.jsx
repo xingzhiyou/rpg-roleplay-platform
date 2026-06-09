@@ -447,9 +447,9 @@ function SharingModeSelector({ script, currentUserId, onChanged }) {
 
   const commitOptions = commits.map(c => ({
     value: c.id,
-    label: `${(c.id || '').slice(0, 8)} · ${c.message || c.kind || ''}`,
+    label: `${String(c.id || '').slice(0, 8)} · ${c.message || c.kind || ''}`,
   }));
-  const selectedCommitOpt = commitOptions.find(o => o.value === pinCommitId) || (pinCommitId ? { value: pinCommitId, label: pinCommitId.slice(0, 8) } : null);
+  const selectedCommitOpt = commitOptions.find(o => o.value === pinCommitId) || (pinCommitId ? { value: pinCommitId, label: String(pinCommitId).slice(0, 8) } : null);
 
   return (
     <CSSpaceBetween size="xs">

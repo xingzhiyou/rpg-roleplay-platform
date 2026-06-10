@@ -505,17 +505,25 @@ export function MobileGame(gc) {
                 </div>
               )}
               {pendCount > 0 && <div className="cb-head"><Icon name="warn" size={13} /> 待确认 · {pendCount}</div>}
-              {(pendingQuestions || []).map((q) => (
-                <div key={q.id} className="cb-q">
-                  <div className="cb-q-row"><span className="cb-tag gm">GM 询问</span><span className="cb-q-text">{q.text || q.question}</span></div>
-                  <div className="cb-choices">
-                    {(q.choices || []).map((c, i) => (
-                      <button key={i} className={'cb-choice' + (i === 0 ? ' primary' : '')} onClick={() => onAnswerQuestion(q, c)}>{c}</button>
-                    ))}
-                    <button className="cb-choice" onClick={() => onDismissConfirm(q)}>忽略</button>
+              {(pendingQuestions || []).map((q) => {
+                // 兼容新旧数据形态:question/text 取一,options/choices 取一
+                const qText = q.question || q.text;
+                const qOpts = q.options || q.choices;
+                return (
+                  <div key={q.id} className="cb-q">
+                    <div className="cb-q-row"><span className="cb-tag gm">GM 询问</span><span className="cb-q-text">{qText}</span></div>
+                    <div className="cb-choices">
+                      {(qOpts || []).map((c, i) => {
+                        const label = typeof c === 'string' ? c : (c.text || c.label || c.id || JSON.stringify(c));
+                        return (
+                          <button key={i} className={'cb-choice' + (i === 0 ? ' primary' : '')} onClick={() => onAnswerQuestion(q, c)}>{label}</button>
+                        );
+                      })}
+                      <button className="cb-choice" onClick={() => onDismissConfirm(q)}>忽略</button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
               {(pendingWrites || []).map((wr) => (
                 <div key={wr.id} className={'cb-w ' + (wr.risk || 'low')}>
                   <div className="cb-w-row"><span className={'cb-tag risk ' + (wr.risk || 'low')}><Icon name="warn" size={11} /> 写入</span><span className="cb-field mono">{wr.field || wr.path || ''}</span></div>

@@ -217,7 +217,16 @@ def get_credential(user_id: int, api_id: str) -> dict[str, Any] | None:
         if not row or not row.get("enabled"):
             continue
         stored_api_id = row.get("api_id") or canonical
-        plaintext = decrypt_api_key(row.get("encrypted_key"), user_id, stored_api_id)
+        blob = row.get("encrypted_key")
+        # 密钥派生(HKDF info=api:<id>)与 AAD(api=<id>)都绑定 api_id。历史上凭据可能以
+        # 别名(如 'AgentPlatform')加密;migration v67 规范化重命名了 api_id 列却未重新
+        # 加密 blob,导致用当前列值解密会失败(AAD/密钥不匹配)。依次尝试 [当前列值] +
+        # [canonical 的全部别名],命中即恢复 —— 兼容任意历史 api_id 命名,无需重新加密迁移。
+        plaintext = ""
+        for _cand in [stored_api_id, *_credential_aliases(canonical)]:
+            plaintext = decrypt_api_key(blob, user_id, _cand)
+            if plaintext:
+                break
         if not plaintext:
             continue
         return {

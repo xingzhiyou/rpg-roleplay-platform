@@ -53,6 +53,86 @@ class ChatErrorNoLeak(unittest.TestCase):
         self.assertNotIn("invalid_request_error", msg)
         self.assertTrue(re.search(r"[0-9a-f]{8}", msg), "缺 error_id")
 
+    def test_deepseek_insufficient_balance_402_is_actionable(self):
+        # 生产实况(2026-06-10 uid=53):DeepSeek BYOK 余额耗尽,玩家按「请重试」连撞 7 次
+        exc = RuntimeError(
+            "Error code: 402 - {'error': {'message': 'Insufficient Balance', "
+            "'type': 'unknown_error', 'param': None, 'code': 'invalid_request_error'}}"
+        )
+        msg = _client_safe_error(exc)
+        self.assertIn("余额不足", msg)
+        self.assertIn("充值", msg)
+        self.assertNotIn("Insufficient", msg)
+        self.assertNotIn("请重试", msg, "余额不足重试无法恢复,不应引导重试")
+        self.assertTrue(re.search(r"[0-9a-f]{8}", msg), "缺 error_id")
+
+    def test_status_code_402_attr_is_actionable(self):
+        # openai/anthropic SDK 的 APIStatusError 带 status_code 属性,message 可能不含关键词
+        class _FakeAPIStatusError(Exception):
+            status_code = 402
+        msg = _client_safe_error(_FakeAPIStatusError("provider says no"))
+        self.assertIn("余额不足", msg)
+        self.assertNotIn("provider says no", msg)
+
+    def test_openai_insufficient_quota_maps_to_balance_not_ratelimit(self):
+        # OpenAI 配额耗尽走 429,但本质是计费问题:必须命中余额文案而非「稍候重试」
+        class _FakeAPIStatusError(Exception):
+            status_code = 429
+        exc = _FakeAPIStatusError(
+            "Error code: 429 - {'error': {'message': 'You exceeded your current quota, "
+            "please check your plan and billing details.', 'code': 'insufficient_quota'}}"
+        )
+        msg = _client_safe_error(exc)
+        self.assertIn("余额不足", msg)
+        self.assertIn("充值", msg)
+
+    def test_rate_limit_429_is_actionable(self):
+        class _FakeAPIStatusError(Exception):
+            status_code = 429
+        msg = _client_safe_error(_FakeAPIStatusError("Too many requests, slow down"))
+        self.assertIn("限流", msg)
+        self.assertIn("重试", msg)
+        self.assertNotIn("slow down", msg)
+        self.assertTrue(re.search(r"[0-9a-f]{8}", msg), "缺 error_id")
+
+    def test_status_code_401_attr_is_actionable(self):
+        class _FakeAPIStatusError(Exception):
+            status_code = 401
+        msg = _client_safe_error(_FakeAPIStatusError("Authentication Fails"))
+        self.assertIn("API Key 无效或已过期", msg)
+
+    def test_deepseek_auth_fails_message_without_status_attr(self):
+        # DeepSeek 401 文案不含既有 marker;靠 "authentication fails" 兜住
+        msg = _client_safe_error(RuntimeError(
+            "Error code: 401 - {'error': {'message': 'Authentication Fails (no such user)'}}"
+        ))
+        self.assertIn("API Key 无效或已过期", msg)
+
+    def test_vertex_resource_exhausted_maps_to_ratelimit(self):
+        # google.genai 的 ClientError 只有 .code 没有 .status_code,靠 message/code 兜住
+        class _FakeGenaiClientError(Exception):
+            code = 429
+        exc = _FakeGenaiClientError(
+            "429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': "
+            "'Quota exceeded for quota metric ...', 'status': 'RESOURCE_EXHAUSTED'}}"
+        )
+        msg = _client_safe_error(exc)
+        self.assertIn("限流", msg)
+        self.assertNotIn("RESOURCE_EXHAUSTED", msg)
+
+    def test_openrouter_insufficient_credits_maps_to_balance(self):
+        msg = _client_safe_error(RuntimeError(
+            "Error code: 402 - {'error': {'message': 'Insufficient credits', 'code': 402}}"
+        ))
+        self.assertIn("余额不足", msg)
+
+    def test_sqlstate_code_attr_not_mistaken_for_http_status(self):
+        # psycopg 等异常的字符串 code(sqlstate)不能被当 HTTP 状态码
+        class _FakeDBError(Exception):
+            code = "23505"
+        msg = _client_safe_error(_FakeDBError("duplicate key value violates unique constraint"))
+        self.assertIn("本轮处理出错", msg)
+
     def test_source_no_raw_str_exc_to_client_sse(self):
         # 两处 client-facing SSE error 不应再直传 str(exc)
         self.assertNotIn('_sse("error", {"message": str(exc)', SRC,

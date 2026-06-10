@@ -37,6 +37,17 @@ def assemble_gm_context(db, *, save_id: int, user_id: int, user_input: str = "",
     if not ctx:
         return {"error": "无权访问该存档", "injection_text": "", "kb_tools": []}
     script_id = ctx["script_id"]
+    if not script_id:
+        # 无剧本存档(酒馆未绑剧本/自由模式):常驻世界书/steering/KB 全是 script 域数据,
+        # 无可注入。不早退的话 script_id=None 会在下游 int() 处炸掉,Phase D 整轮静默跳过。
+        level = IM.classify_impact(user_input)
+        return {
+            "injection_text": "", "tokens": 0, "budget": 0, "steering": {},
+            "impact": {"level": level, "needs_offband_sim": IM.needs_offband_sim(level)},
+            "kb_tools": [],
+            "loop_guards": {"max_turns": MAX_GM_TOOL_TURNS, "max_budget_usd": MAX_GM_BUDGET_USD},
+            "_ctx": ctx,
+        }
 
     save_settings = _set.read_settings(db, save_id)
     steering_strength = save_settings.get("steering_strength", "guided")

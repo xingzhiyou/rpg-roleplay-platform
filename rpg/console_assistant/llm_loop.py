@@ -383,7 +383,18 @@ def _run_llm_loop(
         logging.getLogger("console_assistant").exception(
             "llm loop failed: %s", type(exc).__name__,
         )
-        yield _sse_event("error", {
-            "message": "助手内部错误，请稍后重试",
-            "code": "E_LLM_LOOP",
-        })
+        # 已知提供商错误(余额/key/限流)给可行动文案,与 routes/game.py 同一分类:
+        # BYOK 余额耗尽提示「请稍后重试」只会让用户连环撞墙
+        from agents.provider_errors import classify_provider_error
+        known = classify_provider_error(exc)
+        if known:
+            category, message = known
+            yield _sse_event("error", {
+                "message": message,
+                "code": f"E_PROVIDER_{category.upper()}",
+            })
+        else:
+            yield _sse_event("error", {
+                "message": "助手内部错误，请稍后重试",
+                "code": "E_LLM_LOOP",
+            })

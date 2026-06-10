@@ -23,33 +23,26 @@ _CLIENT_SAFE_RUNTIME_PREFIXES = (
     "Vertex AI 调用被拒(403)。",
 )
 
-_CLIENT_SAFE_AUTH_MARKERS = (
-    "incorrect api key",
-    "invalid api key",
-    "please pass a valid api key",
-    "401 unauthorized",
-)
-
 
 def _client_safe_error(exc: Exception) -> str:
     """把未预期异常转成对客户端安全的泛化文案 + error_id。
 
     str(exc) 可能含 DB 表名/连接串、文件路径、第三方 SDK 内部细节(乃至凭据上下文),
     绝不能直透进 SSE 给玩家。原始异常带 error_id 写服务端日志,客户端只拿 id 便于排障对账。
+    已知提供商错误(余额/key/限流)走 agents.provider_errors 统一分类,给可行动文案。
     """
+    from agents.provider_errors import classify_provider_error
+
     error_id = _secrets.token_hex(4)
     raw_message = str(exc).strip()
     if isinstance(exc, RuntimeError) and raw_message.startswith(_CLIENT_SAFE_RUNTIME_PREFIXES):
         _log.warning("[chat] client-safe stream error (error_id=%s): %s", error_id, raw_message)
         return f"{raw_message}\n\n如果已经上传,请重新测试凭证或切换到已配置的模型。(错误码 {error_id})"
-    raw_lower = raw_message.lower()
-    if any(marker in raw_lower for marker in _CLIENT_SAFE_AUTH_MARKERS):
-        _log.warning("[chat] client-safe auth stream error (error_id=%s): %s", error_id, type(exc).__name__)
-        return (
-            "当前模型的 API Key 无效或已过期。"
-            "请到「设置 → API 设置」重新测试凭证，或切换到已配置的模型。"
-            f"(错误码 {error_id})"
-        )
+    known = classify_provider_error(exc)
+    if known:
+        category, message = known
+        _log.warning("[chat] client-safe %s stream error (error_id=%s): %s", category, error_id, type(exc).__name__)
+        return f"{message}(错误码 {error_id})"
     _log.exception("[chat] unhandled stream error (error_id=%s)", error_id)
     return f"本轮处理出错,请重试(错误码 {error_id})"
 

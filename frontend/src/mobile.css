@@ -1591,3 +1591,49 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
   opacity: 0 !important; display: block !important;
   overflow: hidden; pointer-events: none; z-index: -1;
 }
+
+/* ── 角色卡头像图片 (Agent D: 移动端图片支持) ─────────────────────── */
+
+/* 卡网格 .av 区域图片模式 */
+.m-root .pl-charcard .mc-card-av-wrap {
+  height: 92px; overflow: hidden; display: block; position: relative;
+}
+.m-root .pl-charcard .mc-card-av-img {
+  width: 100%; height: 100%; object-fit: cover; display: block;
+  position: absolute; inset: 0; flex-shrink: 0;
+}
+.m-root .pl-charcard .mc-card-av-letter {
+  width: 100%; height: 100%; position: absolute; inset: 0;
+  display: grid; place-items: center;
+  font: 600 34px var(--font-serif); color: inherit;
+}
+
+/* CardAv 组件内联用图 (detail / editor 预览) */
+.m-root .mc-card-av-img {
+  width: 100%; height: 100%; object-fit: cover; display: block; flex-shrink: 0;
+  border-radius: inherit;
+}
+
+/* ViewOverview Hero 头像 56px — img 路径 */
+.m-root img.mc-me-avatar {
+  width: 56px; height: 56px; border-radius: 16px; flex-shrink: 0;
+  object-fit: cover; display: block;
+}
+/* 无图 div 回退 */
+.m-root div.mc-me-avatar {
+  width: 56px; height: 56px; border-radius: 16px; flex-shrink: 0;
+  background: var(--accent); color: #fff8f3;
+  font: 600 24px var(--font-serif); display: grid; place-items: center;
+}
+
+/* ViewEdit 头像预览 64px — img 路径 */
+.m-root img.mc-me-avatar-edit {
+  width: 64px; height: 64px; border-radius: 18px; flex-shrink: 0;
+  object-fit: cover; display: block;
+}
+/* 无图 div 回退 */
+.m-root div.mc-me-avatar-edit {
+  width: 64px; height: 64px; border-radius: 18px; flex-shrink: 0;
+  background: var(--accent); color: #fff8f3;
+  font: 600 28px var(--font-serif); display: grid; place-items: center;
+}

@@ -233,10 +233,12 @@ def _list_chats(user_id: int, archived: bool) -> list[dict[str, Any]]:
     with connect() as db:
         rows = db.execute(
             f"""
-            select id, title, state_snapshot, archived_at, updated_at, created_at
-            from game_saves
-            where user_id = %s and save_kind = 'tavern' and {arch_clause}
-            order by updated_at desc, id desc
+            select gs.id, gs.title, gs.state_snapshot, gs.archived_at, gs.updated_at, gs.created_at,
+                   cc.avatar_path as card_avatar
+            from game_saves gs
+            left join character_cards cc on cc.id = gs.tavern_character_card_id
+            where gs.user_id = %s and gs.save_kind = 'tavern' and gs.{arch_clause}
+            order by gs.updated_at desc, gs.id desc
             limit 200
             """,
             (user_id,),
@@ -274,6 +276,7 @@ def _list_chats(user_id: int, archived: bool) -> list[dict[str, Any]]:
                 "id": r.get("id"),
                 "title": r.get("title"),
                 "character_name": char_name,
+                "avatar_path": r.get("card_avatar") or (character or {}).get("avatar_path") or "",
                 "last_snippet": last_snippet,
                 "updated_at": r.get("updated_at"),
                 "archived_at": r.get("archived_at"),

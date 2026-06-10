@@ -264,8 +264,9 @@ function CardSheet({ card, kind = 'user' }) {
         <AvatarImg
           src={raw.avatar_path}
           name={raw.name || '?'}
-          size={52}
+          size={64}
           shape="rounded"
+          zoomable
           className="pl-card-avatar serif"
         />
         <div style={{ minWidth: 0, flex: 1 }}>
@@ -411,8 +412,11 @@ function OnlineCardsView() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 14 }}>
             {(items || []).map((c) => (
               <div key={c.id} style={{ border: '1px solid var(--line, #36322d)', borderRadius: 10, padding: 14, background: 'var(--panel, #211f1d)', display: 'grid', gap: 8 }}>
-                <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
-                  <strong style={{ fontSize: 15 }}>{c.name || '(未命名)'}</strong>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <AvatarImg src={c.avatar_path || null} name={c.name || '?'} size={40} shape="rounded" />
+                    <strong style={{ fontSize: 15 }}>{c.name || '(未命名)'}</strong>
+                  </div>
                   <span style={{ fontSize: 11, color: 'var(--text-quiet, #9a948c)' }}>♥ {c.clone_count || 0}</span>
                 </div>
                 {c.identity && <div style={{ fontSize: 12, color: 'var(--accent, #c96442)' }}>{String(c.identity).slice(0, 40)}</div>}
@@ -545,6 +549,7 @@ function CardGrid({ cards, onEdit, kind, filter, empty, onDeleted, onDuplicate, 
       cardDefinition={{
         header: (c) => (
           <CSSpaceBetween direction="horizontal" size="xs" alignItems="center">
+            <AvatarImg src={(c._raw?.avatar_path) || c.avatar_path || null} name={c.name} size={56} shape="rounded" zoomable />
             <CSBox key="name" variant="h3" padding="n">{c.name}</CSBox>
             {c.pinned && <CSBadge key="pin" color="blue">{t('cards.list.pinned')}</CSBadge>}
             {(c._raw?.is_public ?? c.is_public) && kind !== 'npc' && (
@@ -709,10 +714,13 @@ function UserCardsView() {
       empty={<CSBox textAlign="center" color="inherit" padding={{ vertical: 'l' }}>{q ? t('cards.empty.no_match') : t('cards.empty.no_user_cards')}</CSBox>}
       columnDefinitions={[
         { id: 'name', header: t('cards.list.col_card'), cell: (c) => (
-          <div style={{ maxWidth: 'min(560px, 46vw)' }}>
-            <CSBox fontWeight="bold">{c.name}</CSBox>
-            <div style={{ ...ELLIPSIS_1, fontSize: 12.5, color: 'var(--text-quiet, #968f85)' }}>
-              {_oneLine(c.role !== '—' ? c.role : c.bio, 80)}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, maxWidth: 'min(560px, 46vw)' }}>
+            <AvatarImg src={(c._raw?.avatar_path) || c.avatar_path || null} name={c.name} size={36} shape="rounded" />
+            <div style={{ minWidth: 0 }}>
+              <CSBox fontWeight="bold">{c.name}</CSBox>
+              <div style={{ ...ELLIPSIS_1, fontSize: 12.5, color: 'var(--text-quiet, #968f85)' }}>
+                {_oneLine(c.role !== '—' ? c.role : c.bio, 80)}
+              </div>
             </div>
           </div>
         ) },
@@ -979,6 +987,16 @@ function CardDetailPanel({ card, kind, onSave, onDuplicate, onDelete }) {
         }
       >{card.name}{fullName && <CSBox display="inline" color="text-status-inactive" fontSize="body-s" padding={{ left: 's' }}>{fullName}</CSBox>}</CSHeader>
     }>
+      {/* 当前头像展示 — avatarUrl state 由生图/设为当前等操作实时更新 */}
+      {avatarUrl && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '4px 0 12px' }}>
+          <AvatarImg src={avatarUrl} name={raw.name || '?'} size={96} shape="rounded" zoomable />
+          <div style={{ fontSize: 12.5, color: 'var(--text-quiet, #9a948c)', lineHeight: 1.6 }}>
+            <div style={{ fontWeight: 600, color: 'var(--text, #ebe7df)', fontSize: 14 }}>{raw.name || t('cards.detail.unnamed')}</div>
+            {raw.identity && <div>{_oneLine(raw.identity, 60)}</div>}
+          </div>
+        </div>
+      )}
       <CSTabs activeTabId={tab} onChange={({ detail }) => setTab(detail.activeTabId)} tabs={[
         { id: 'info', label: t('cards.detail.tab_info'), content: (
           <CSKeyValuePairs columns={4} items={[
@@ -1290,7 +1308,7 @@ function TavernImportModal({ open, onClose, onConfirm }) {
                 <div className="pl-import" style={{borderStyle: "solid", gap: 8, padding: "12px 14px"}}>
                   <div className="muted-2" style={{fontSize: 10.5, textTransform: "uppercase", letterSpacing: "0.14em"}}>{t('cards.import.preview_label')} · {parsed.format}</div>
                   <div className="pl-card-head" style={{margin: 0}}>
-                    <AvatarImg src={parsed.avatar_url || parsed.avatar_path || null} name={parsed.name} size={null} shape="rounded" className="pl-card-avatar serif" />
+                    <AvatarImg src={parsed.avatar_url || parsed.avatar_path || null} name={parsed.name} size={64} shape="rounded" className="pl-card-avatar serif" />
                     <div className="pl-card-id" style={{flex: 1}}>
                       <strong>{parsed.name}</strong>
                       <span className="muted-2" style={{fontSize: 11.5}}>{t('cards.import.preview_stats', { dialogues: parsed.example_count, tags: parsed.tags?.length || 0 })}</span>
@@ -1360,7 +1378,7 @@ function TavernImportModal({ open, onClose, onConfirm }) {
                 <div className="pl-import" style={{borderStyle: "solid", gap: 8, padding: "12px 14px"}}>
                   <div className="muted-2" style={{fontSize: 10.5, textTransform: "uppercase", letterSpacing: "0.14em"}}>{t('cards.import.chat_preview_label')}</div>
                   <div className="pl-card-head" style={{margin: 0}}>
-                    <AvatarImg src={null} name={chatParsed.charName} size={null} shape="rounded" className="pl-card-avatar serif" />
+                    <AvatarImg src={chatParsed?.avatar_url || null} name={chatParsed.charName} size={64} shape="rounded" className="pl-card-avatar serif" />
                     <div className="pl-card-id" style={{flex: 1}}>
                       <strong>{chatParsed.charName}</strong>
                       <span className="muted-2" style={{fontSize: 11.5}}>{t('cards.import.chat_preview_stats', { msgs: chatParsed.msgCount, user: chatParsed.userName })}</span>
@@ -1601,6 +1619,12 @@ function CardEditModal({ card, isNew, kind, onClose, onSave, targetScriptOptions
           <div style={{ width: 300, flexShrink: 0, position: 'sticky', top: 72 }}>
             <CSContainer header={<CSHeader variant="h2">{t('cards.editor.summary_title')}</CSHeader>}>
               <CSSpaceBetween size="m">
+                {/* 当前头像预览 */}
+                {(card?._raw?.avatar_path || card?.avatar_path) && (
+                  <div style={{ display: 'flex', justifyContent: 'center', paddingBottom: 4 }}>
+                    <AvatarImg src={card._raw?.avatar_path || card.avatar_path} name={form.name || '?'} size={72} shape="rounded" zoomable />
+                  </div>
+                )}
                 <CSStatusIndicator type={nameOk ? 'success' : 'pending'}>{t('cards.editor.name_required_status')}</CSStatusIndicator>
                 {kind === 'npc' && isNew && targetScriptOptions.length > 0 && (
                   <CSFormField label={t('cards.editor.target_script')} description={t('cards.editor.target_script_desc')}>

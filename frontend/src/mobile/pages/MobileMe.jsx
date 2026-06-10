@@ -7,6 +7,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Icon } from '../icons.jsx';
 import { usePlatformData, useReactiveUser, publishUser } from '../../platform-app.jsx';
+import AvatarImg from '../../components/AvatarImg.jsx';
 
 /* ── 工具函数 ────────────────────────────────────────────────────── */
 const fmtN = (n) => n == null ? '—' : Number(n).toLocaleString();
@@ -233,7 +234,6 @@ function ViewOverview({ nav, user }) {
     return () => { cancelled = true; };
   }, [saves.length]);
 
-  const initial = (user.display_name || '?').slice(0, 1);
   const regAt = fmtDate(user.created_at);
   const totalRounds = meStats?.total_rounds;
   const branches = meStats?.branches;
@@ -271,11 +271,13 @@ function ViewOverview({ nav, user }) {
             background: 'var(--panel)', border: '1px solid var(--line-soft)',
             borderRadius: 14, marginBottom: 16,
           }}>
-            <div style={{
-              width: 56, height: 56, borderRadius: 16, flexShrink: 0,
-              background: 'var(--accent)', display: 'grid', placeItems: 'center',
-              font: '600 24px var(--font-serif)', color: '#fff8f3',
-            }}>{initial}</div>
+            <AvatarImg
+              src={user.avatar_url || user._raw?.avatar_url}
+              name={user.display_name || user.username}
+              size={56}
+              shape="rounded"
+              className="mc-me-avatar"
+            />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 17, fontWeight: 700, fontFamily: 'var(--font-serif)', color: 'var(--text)' }}>
                 {user.display_name || '—'}
@@ -460,6 +462,8 @@ function ViewEdit({ nav, user }) {
     timezone: user._raw?.timezone || 'Asia/Shanghai',
   });
   const [saving, setSaving] = useState(false);
+  // 头像预览 URL：先用当前 user，上传成功后刷新
+  const [avatarUrl, setAvatarUrl] = useState(user.avatar_url || user._raw?.avatar_url || null);
   const avatarRef = useRef(null);
   const u = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
@@ -503,14 +507,25 @@ function ViewEdit({ nav, user }) {
     if (!file) return;
     if (file.size > 2 * 1024 * 1024) { nav.toast('文件最大 2MB', 'danger', 'warn'); return; }
     try {
-      await window.api.account.avatar(file);
+      // 乐观预览：用 object URL 即时显示选中的图片
+      const previewUrl = URL.createObjectURL(file);
+      setAvatarUrl(previewUrl);
+      const r = await window.api.account.avatar(file);
+      // 上传完成后用后端返回的正式 URL 替换（若有）
+      const serverUrl = r?.avatar_url || r?.url || null;
+      if (serverUrl) setAvatarUrl(serverUrl);
       nav.toast('头像已更新', 'ok', 'check');
-    } catch (e) { nav.toast('上传失败', 'danger', 'warn'); }
+    } catch (e) {
+      // 上传失败：还原到原始头像
+      setAvatarUrl(user.avatar_url || user._raw?.avatar_url || null);
+      nav.toast('上传失败', 'danger', 'warn');
+    }
   };
 
   const onResetAvatar = async () => {
     try {
       await window.api.account.avatarReset();
+      setAvatarUrl(null);
       nav.toast('已恢复默认头像', 'ok', 'check');
     } catch (e) { nav.toast('操作失败', 'danger', 'warn'); }
   };
@@ -525,13 +540,13 @@ function ViewEdit({ nav, user }) {
           <div className="pl-sec">
             <div className="pl-sec-head"><h2>头像</h2></div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '8px 0 12px' }}>
-              <div style={{
-                width: 64, height: 64, borderRadius: 18, flexShrink: 0,
-                background: 'var(--accent)', display: 'grid', placeItems: 'center',
-                font: '600 28px var(--font-serif)', color: '#fff8f3',
-              }}>
-                {(form.display_name || '?').slice(0, 1)}
-              </div>
+              <AvatarImg
+                src={avatarUrl}
+                name={form.display_name || user.display_name || user.username}
+                size={64}
+                shape="rounded"
+                className="mc-me-avatar-edit"
+              />
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <ActionBtn label="上传新头像" icon="upload" onClick={() => avatarRef.current?.click()} />
                 <ActionBtn label="恢复默认" icon="user" onClick={onResetAvatar} />

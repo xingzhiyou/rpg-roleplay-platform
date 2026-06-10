@@ -21,6 +21,7 @@ import { useResizable } from './responsive.jsx';
 import { NarrativeBlock, PlayerBlock, GameToastStack, SaveImagesStrip } from './game-app.jsx';
 import { Composer } from './game-composer.jsx';
 import { TavernImportModal, CardSheet, CardEditFields, cardFormInit, cardFormPayload } from './pages/cards.jsx';
+import AvatarImg from './components/AvatarImg.jsx';
 
 /* ── 相对时间 ─────────────────────────────────────────────────────── */
 export function relTime(ts) {
@@ -89,7 +90,7 @@ export function TavernChatItem({ chat, active, onOpen, onRename, onArchive, onDe
       role="button"
       tabIndex={0}
     >
-      <div className="tv-chat-avatar serif">{initial}</div>
+      <AvatarImg src={chat.avatar_path || null} name={chat.character_name || chat.title || '?'} size={36} shape="circle" className="tv-chat-avatar" />
       <div className="tv-chat-main">
         <div className="tv-chat-title-row">
           {editing ? (

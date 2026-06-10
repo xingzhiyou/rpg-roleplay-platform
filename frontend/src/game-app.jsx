@@ -667,12 +667,20 @@ function NarrativeBlock({ text, streaming, ts, msgIndex, saveId, commitId, think
   // Game Console 不传(undefined)→ 默认"主代理"(零回归)。
   const subLabel = speakerName === "" ? "" : (speakerName || "主代理");
   // task 121a: thinking 状态显示带 spinner 的 italic 文字,跟正式 narrative 区分
+  // speakerAvatar 兼容:若为 URL(/ 或 http 开头)则渲 AvatarImg,否则保持首字母 span(向后兼容)。
+  const isAvatarUrl = speakerAvatar && (speakerAvatar.startsWith('/') || speakerAvatar.startsWith('http'));
+  const avatarNode = speakerAvatar
+    ? (isAvatarUrl
+        ? <AvatarImg src={speakerAvatar} size={28} shape="circle" />
+        : <span className="gc-msg-avatar serif">{speakerAvatar}</span>)
+    : null;
+
   if (thinking) {
     return (
       <div className="gc-msg gc-msg-gm gc-msg-thinking">
         {!hideMeta && (
           <div className="gc-msg-meta">
-            {speakerAvatar && <span className="gc-msg-avatar serif">{speakerAvatar}</span>}
+            {avatarNode}
             <span className="gc-msg-tag">{tagLabel}</span>
             <span className="muted-2" style={{ fontSize: 11.5 }}>正在准备</span>
           </div>
@@ -687,7 +695,7 @@ function NarrativeBlock({ text, streaming, ts, msgIndex, saveId, commitId, think
     <div className="gc-msg gc-msg-gm">
       {!hideMeta && (
         <div className="gc-msg-meta">
-          {speakerAvatar && <span className="gc-msg-avatar serif">{speakerAvatar}</span>}
+          {avatarNode}
           <span className="gc-msg-tag">{tagLabel}</span>
           {subLabel && <span className="muted-2" style={{ fontSize: 11.5 }}>{subLabel}</span>}
         </div>

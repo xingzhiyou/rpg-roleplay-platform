@@ -781,11 +781,13 @@ function ScriptDetailPanel({ script: s, savesCount, scriptSaves = [], embedStatu
             {/* 剧本封面 */}
             {coverUrl && (
               <div style={{ display: 'flex', justifyContent: 'center' }}>
-                <img
+                <AvatarImg
                   src={coverUrl}
-                  alt={s.title}
-                  style={{ maxWidth: 280, maxHeight: 180, width: '100%', objectFit: 'cover', borderRadius: 8, display: 'block' }}
-                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                  name={s.title}
+                  size={280}
+                  shape="rounded"
+                  zoomable
+                  aspectRatio="16/9"
                 />
               </div>
             )}
@@ -894,19 +896,22 @@ function ScriptDetailPanel({ script: s, savesCount, scriptSaves = [], embedStatu
             }
             cardDefinition={{
               header: (c) => (
-                <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
-                  <CSBox variant="h3" padding="n">
-                    {c.name || t('scripts.editor.unnamed_npc')}
-                    {c.full_name && c.full_name !== c.name && (
-                      <CSBox display="inline" color="text-status-inactive" fontSize="body-s" padding={{ left: 'xs' }}>{c.full_name}</CSBox>
-                    )}
-                    {/* 主角 badge — 后端 _stage_cards canon importance 第 1 名标记 */}
-                    {c.metadata && c.metadata.is_protagonist && (
-                      <CSBox display="inline" padding={{ left: 'xs' }}>
-                        <CSBadge color="severity-high">主角</CSBadge>
-                      </CSBox>
-                    )}
-                  </CSBox>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <AvatarImg src={c.avatar_path || null} name={c.name || '?'} size={48} shape="rounded" zoomable />
+                    <CSBox variant="h3" padding="n">
+                      {c.name || t('scripts.editor.unnamed_npc')}
+                      {c.full_name && c.full_name !== c.name && (
+                        <CSBox display="inline" color="text-status-inactive" fontSize="body-s" padding={{ left: 'xs' }}>{c.full_name}</CSBox>
+                      )}
+                      {/* 主角 badge — 后端 _stage_cards canon importance 第 1 名标记 */}
+                      {c.metadata && c.metadata.is_protagonist && (
+                        <CSBox display="inline" padding={{ left: 'xs' }}>
+                          <CSBadge color="severity-high">主角</CSBadge>
+                        </CSBox>
+                      )}
+                    </CSBox>
+                  </div>
                   {c.enabled === false && <CSStatusIndicator type="stopped">{t('common.disabled')}</CSStatusIndicator>}
                 </div>
               ),
@@ -1151,9 +1156,10 @@ function ScriptsLibraryView() {
               <AvatarImg
                 src={s.cover_image_url}
                 name={s.title}
-                size={null}
+                size={140}
                 shape="rounded"
-                className=""
+                aspectRatio="16/9"
+                zoomable
               />
             ) : null },
             { id: 'author', content: (s) => (

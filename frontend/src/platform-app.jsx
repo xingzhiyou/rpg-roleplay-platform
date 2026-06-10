@@ -1044,7 +1044,7 @@ function AchvShareModal({ user, items, unlockedCount, total, onClose }) {
       <CSSpaceBetween size="m">
         <div className="pl-achv-share-card">
           <div className="pl-achv-share-head">
-            <div className="pl-achv-share-avatar">{(user.display_name || "?").slice(0, 1)}</div>
+            <AvatarImg src={user._raw?.avatar_url || null} name={user.display_name || '?'} size={40} shape="circle" className="pl-achv-share-avatar" />
             <div>
               <strong>{user.display_name}</strong>
               <div className="muted-2" style={{ fontSize: 12 }}>解锁 {unlockedCount} / {total} 成就</div>
@@ -1093,7 +1093,7 @@ export function PublicAchievementsPage() {
     <CSSpaceBetween size="l">
       <CSContainer>
         <CSSpaceBetween direction="horizontal" size="m">
-          <div className="pl-achv-share-avatar lg">{(data.display_name || data.username || "?").slice(0, 1)}</div>
+          <AvatarImg src={data.avatar_url || null} name={data.display_name || data.username || '?'} size={56} shape="circle" className="pl-achv-share-avatar lg" />
           <div>
             <CSBox variant="h2">{data.display_name || data.username}</CSBox>
             <CSBox color="text-body-secondary" fontSize="body-s">@{data.username} · 解锁 {data.unlocked_count} / {data.total} 成就</CSBox>
@@ -1210,7 +1210,7 @@ function MeOverview() {
       <CSContainer>
         <CSSpaceBetween size="m">
           <CSSpaceBetween direction="horizontal" size="m">
-            <div className="pl-me-avatar">{(user.display_name || "?").slice(0, 1)}</div>
+            <AvatarImg src={user._raw?.avatar_url || null} name={user.display_name || '?'} size={88} shape="circle" className="pl-me-avatar" zoomable />
             <div style={{flex: 1}}>
               <CSSpaceBetween size="xs">
                 <CSBox variant="h2">
@@ -4423,6 +4423,14 @@ function PlatformShellCS({ page, setPage, children, assistant, assistantOpen, on
               {t('platform.menu.guide_btn')}
             </button>
           </div>
+          {/* 用户头像小图:CSTopNavigation 不支持自定义头像节点,在其左侧注入一枚独立 AvatarImg */}
+          <button
+            onClick={() => setPage('profile')}
+            title={reactiveUser.display_name || '个人主页'}
+            style={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0, border: 0, background: 'transparent', padding: '0 6px', cursor: 'pointer' }}
+          >
+            <AvatarImg src={reactiveUser._raw?.avatar_url || null} name={reactiveUser.display_name || '?'} size={28} shape="circle" />
+          </button>
           <div style={{ flex: 1, minWidth: 0 }}>
           <CSTopNavigation
             identity={{ href: '#profile', title: '', onFollow: (e) => { e.preventDefault(); setPage('profile'); } }}

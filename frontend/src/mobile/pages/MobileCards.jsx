@@ -8,6 +8,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Icon } from '../icons.jsx';
+import AvatarImg from '../../components/AvatarImg.jsx';
 
 /* ── helpers ─────────────────────────────────────────────────────── */
 const _asCsv = (v) => Array.isArray(v) ? v.join(', ') : (v || '');
@@ -92,12 +93,33 @@ function SubHead({ title, sub, onBack, actions }) {
   );
 }
 
-/** 角色 avatar — 首字母色块 */
-function CardAv({ name, enabled, size = 72, radius = 20, colorClass = 'accent' }) {
+/** 角色 avatar — 有 src 则渲图片(AvatarImg 内部 onError 自动回退)，无 src 则首字母色块 */
+function CardAv({ src, name, enabled, size = 72, radius = 20, colorClass = 'accent', zoomable = false }) {
   const initial = (name || '?').trim().slice(0, 1);
+
+  const shapeStyle = { width: size, height: size, borderRadius: radius, flexShrink: 0 };
+
+  if (src) {
+    return (
+      <div style={{ ...shapeStyle, position: 'relative', overflow: 'hidden' }}>
+        <AvatarImg
+          src={src}
+          name={name}
+          size={size}
+          shape="square"
+          zoomable={zoomable}
+          className="mc-card-av-img"
+        />
+        {enabled === false && (
+          <span style={{ position: 'absolute', top: 7, right: 7, width: 9, height: 9, borderRadius: 999, background: 'var(--muted-3)', zIndex: 1 }} />
+        )}
+      </div>
+    );
+  }
+
   return (
     <div style={{
-      width: size, height: size, borderRadius: radius, flexShrink: 0,
+      ...shapeStyle,
       display: 'grid', placeItems: 'center', position: 'relative',
       font: `600 ${Math.round(size * 0.42)}px var(--font-serif)`,
       background: colorClass === 'accent'
@@ -292,7 +314,7 @@ function CardDetail({ card, kind, onEdit, onDuplicate, onDelete, onBack, onExpor
         <div className="pl-pad">
           {/* 头像 + 名字 */}
           <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start', marginBottom: 18 }}>
-            <CardAv name={card.name} enabled={raw.enabled} size={72} radius={20} />
+            <CardAv src={raw.avatar_path || raw.avatar_url} name={card.name} enabled={raw.enabled} size={72} radius={20} zoomable />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontFamily: 'var(--font-serif)', fontSize: 20, fontWeight: 600, color: 'var(--text)' }}>
                 {card.name || '(未命名)'}
@@ -441,7 +463,7 @@ function CardEditor({ card, isNew, kind, onBack, onSave, targetScripts = [], tar
         <div className="pl-pad">
           {/* 头像预览 */}
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 20 }}>
-            <CardAv name={form.name} enabled={form.enabled} size={76} radius={22} />
+            <CardAv src={card?.avatar_path || card?.avatar_url} name={form.name} enabled={form.enabled} size={76} radius={22} />
           </div>
 
           {/* 新建 NPC 时选剧本 */}
@@ -666,7 +688,10 @@ function ImportSheet({ show, onClose, onConfirm }) {
                   预览 · {parsed.format}
                 </div>
                 <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 10 }}>
-                  <div style={{ width: 44, height: 44, borderRadius: 13, background: 'var(--info-soft)', border: '1px solid rgba(122,166,194,0.3)', display: 'grid', placeItems: 'center', color: 'var(--info)', font: '600 20px var(--font-serif)', flexShrink: 0 }}>
+                  <div style={{ width: 44, height: 44, borderRadius: 13, background: 'var(--info-soft)', border: '1px solid rgba(122,166,194,0.3)', display: 'grid', placeItems: 'center', color: 'var(--info)', font: '600 20px var(--font-serif)', flexShrink: 0, overflow: 'hidden', position: 'relative' }}>
+                    {parsed._imageUrl ? (
+                      <img src={parsed._imageUrl} alt={parsed.name} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', position: 'absolute', inset: 0 }} onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                    ) : null}
                     {parsed.name.slice(0, 1)}
                   </div>
                   <div>
@@ -985,16 +1010,22 @@ function UserView({ nav }) {
           <div className="pl-grid">
             {filtered.map((c) => (
               <button key={c.id} className="pl-charcard" onClick={() => { setSelected(c); setView('detail'); }}>
-                <div className="av accent" style={{
-                  height: 92, display: 'grid', placeItems: 'center',
-                  font: '600 34px var(--font-serif)',
-                  background: 'linear-gradient(140deg, rgba(201,100,66,0.26), rgba(201,100,66,0.05))',
-                  color: 'var(--accent)', position: 'relative',
-                }}>
-                  {c.name.slice(0, 1)}
-                  {c.enabled === false && <span style={{ position: 'absolute', top: 7, right: 7, width: 9, height: 9, borderRadius: 999, background: 'var(--muted-3)' }} />}
-                  {c.pinned && <span style={{ position: 'absolute', top: 7, left: 7, fontSize: 10, color: 'var(--accent)', background: 'var(--accent-soft)', padding: '2px 5px', borderRadius: 6 }}>置顶</span>}
-                  {c.is_public && <span style={{ position: 'absolute', bottom: 7, right: 7, fontSize: 9, color: 'var(--ok)', background: 'var(--ok-soft)', padding: '2px 5px', borderRadius: 6 }}>公开</span>}
+                <div className="av accent mc-card-av-wrap" style={{ position: 'relative' }}>
+                  {(c._raw?.avatar_path || c._raw?.avatar_url) ? (
+                    <img
+                      src={c._raw.avatar_path || c._raw.avatar_url}
+                      alt={c.name}
+                      loading="lazy"
+                      className="mc-card-av-img"
+                      onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextSibling && (e.currentTarget.nextSibling.style.display = 'grid'); }}
+                    />
+                  ) : null}
+                  <div className="mc-card-av-letter" style={{ display: (c._raw?.avatar_path || c._raw?.avatar_url) ? 'none' : 'grid' }}>
+                    {c.name.slice(0, 1)}
+                  </div>
+                  {c.enabled === false && <span className="off-dot" />}
+                  {c.pinned && <span style={{ position: 'absolute', top: 7, left: 7, fontSize: 10, color: 'var(--accent)', background: 'var(--accent-soft)', padding: '2px 5px', borderRadius: 6, zIndex: 1 }}>置顶</span>}
+                  {c.is_public && <span style={{ position: 'absolute', bottom: 7, right: 7, fontSize: 9, color: 'var(--ok)', background: 'var(--ok-soft)', padding: '2px 5px', borderRadius: 6, zIndex: 1 }}>公开</span>}
                 </div>
                 <div className="cc-body">
                   <div className="cc-name">{c.name}</div>
@@ -1243,13 +1274,19 @@ function NpcView({ nav }) {
           <div className="pl-grid">
             {filtered.map((c) => (
               <button key={c.id} className="pl-charcard" onClick={() => { setSelected(c); setView('detail'); }}>
-                <div className="av" style={{
-                  height: 92, display: 'grid', placeItems: 'center',
-                  font: '600 34px var(--font-serif)',
-                  background: 'linear-gradient(140deg, var(--panel-3), var(--panel-2))',
-                  color: 'var(--text)', position: 'relative',
-                }}>
-                  {c.name.slice(0, 1)}
+                <div className="av mc-card-av-wrap" style={{ position: 'relative' }}>
+                  {(c._raw?.avatar_path || c._raw?.avatar_url) ? (
+                    <img
+                      src={c._raw.avatar_path || c._raw.avatar_url}
+                      alt={c.name}
+                      loading="lazy"
+                      className="mc-card-av-img"
+                      onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextSibling && (e.currentTarget.nextSibling.style.display = 'grid'); }}
+                    />
+                  ) : null}
+                  <div className="mc-card-av-letter" style={{ display: (c._raw?.avatar_path || c._raw?.avatar_url) ? 'none' : 'grid' }}>
+                    {c.name.slice(0, 1)}
+                  </div>
                 </div>
                 <div className="cc-body">
                   <div className="cc-name">{c.name}</div>

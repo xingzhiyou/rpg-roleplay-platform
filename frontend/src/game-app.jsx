@@ -973,10 +973,18 @@ function ChatArea({ history, runState, runStyle, narrativeFont, narrativeSize, h
     el.addEventListener("scroll", onScroll, { passive: true });
     return () => el.removeEventListener("scroll", onScroll);
   }, []);
-  // 新内容时:只在用户原本就在底部才跟随,否则不动 (Claude 风格 scroll lock)
+  // 新内容时的滚动策略:① 自己刚发消息(末条=玩家)→ 强制滚到底;② 否则双守卫——
+  // 用户已上滚(isAtBottom=false) 或 实时距底 >360px(防 ref 时序滞后/iOS 节流)→ 绝不跟随。
+  // 这样 GM 输出(含输出完成 running→false)在用户看上文时不会被硬拽回底部。
   useEffectA(() => {
-    if (!ref.current) return;
-    if (!isAtBottomRef.current) return;  // 用户主动上滚 → 不强制跟随
+    const el = ref.current;
+    if (!el) return;
+    const last = history && history[history.length - 1];
+    if (last && last.role === "user") {
+      isAtBottomRef.current = true;  // 自己发的:跟到底
+    } else if (!isAtBottomRef.current || (el.scrollHeight - el.scrollTop - el.clientHeight) > 360) {
+      return;  // 用户在看上文 → 不强制跟随
+    }
     const id = requestAnimationFrame(() => {
       if (ref.current) ref.current.scrollTop = ref.current.scrollHeight;
     });

@@ -661,6 +661,13 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 .m-root .confirm-zone { flex: none; padding: 4px 12px 6px; position: relative; z-index: 5; }
 .m-root .confirmbar { flex: none; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); overflow: hidden; box-shadow: 0 6px 22px rgba(0,0,0,0.3); }
 .m-root .cb-head { padding: 9px 13px; font: 600 11px var(--font-mono); text-transform: uppercase; letter-spacing: 0.12em; color: var(--warn); display: flex; align-items: center; gap: 6px; border-bottom: 1px solid var(--line-soft); background: var(--warn-soft); }
+/* GM 询问折叠抽屉:头部点击 toggle + 箭头旋转 + body max-height 过渡 */
+.m-root .cb-toggle { width: 100%; justify-content: space-between; border: 0; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.m-root .cb-head-l { display: flex; align-items: center; gap: 6px; }
+.m-root .cb-chev { display: inline-flex; color: var(--warn); transition: transform .3s var(--ease); transform: rotate(0deg); }
+.m-root .cb-chev.open { transform: rotate(180deg); }
+.m-root .cb-body { max-height: 60vh; overflow: hidden; transition: max-height .34s var(--ease), opacity .22s var(--ease); opacity: 1; }
+.m-root .cb-body.collapsed { max-height: 0; opacity: 0; }
 .m-root .cb-q, .m-root .cb-w { padding: 12px 13px; border-bottom: 1px solid var(--line-soft); }
 .m-root .cb-q:last-child, .m-root .cb-w:last-child { border-bottom: 0; }
 .m-root .cb-q-row { display: flex; align-items: baseline; gap: 8px; margin-bottom: 10px; }

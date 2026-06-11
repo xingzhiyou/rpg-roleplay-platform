@@ -368,8 +368,16 @@ export function TavernChatArea({ history, running, saveId, charName, charInitial
     return () => el.removeEventListener('scroll', onScroll);
   }, []);
 
+  // ① 自己刚发(末条=玩家)→ 滚到底;② 否则双守卫:已上滚 或 实时距底>360 → 不跟随(GM 输出完成不拽回)
   useEffect(() => {
-    if (!ref.current || !atBottomRef.current) return;
+    const el = ref.current;
+    if (!el) return;
+    const last = history && history[history.length - 1];
+    if (last && last.role === 'user') {
+      atBottomRef.current = true;
+    } else if (!atBottomRef.current || (el.scrollHeight - el.scrollTop - el.clientHeight) > 360) {
+      return;
+    }
     const id = requestAnimationFrame(() => { if (ref.current) ref.current.scrollTop = ref.current.scrollHeight; });
     return () => cancelAnimationFrame(id);
   }, [history.length, running]);

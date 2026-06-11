@@ -342,12 +342,33 @@ export function MobileGame(gc) {
   const running = runState.running;
   const anyOverlay = leftOpen || rightOpen || !!sheet;
 
+  const atBottomRef = useRef(true);
   const scrollBottom = useCallback((smooth) => {
     const el = chatRef.current; if (!el) return;
     requestAnimationFrame(() => el.scrollTo({ top: el.scrollHeight, behavior: smooth ? 'smooth' : 'auto' }));
   }, []);
-  useEffect(() => { scrollBottom(false); }, []);
-  useEffect(() => { scrollBottom(true); }, [history.length, running]);
+  // 此前手机游戏【完全没有守卫】→ 每次输出无条件拽回底部。补 onScroll 记录是否在底部。
+  useEffect(() => {
+    const el = chatRef.current; if (!el) return;
+    const onScroll = () => { atBottomRef.current = (el.scrollHeight - el.scrollTop - el.clientHeight) < 80; };
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => el.removeEventListener('scroll', onScroll);
+  }, []);
+  useEffect(() => { scrollBottom(false); }, []);  // 挂载滚底
+  // ① 自己刚发(末条=玩家)→ 滚底;② 否则双守卫:已上滚 或 实时距底>360 → 不跟随(GM 输出完成不拽回)
+  useEffect(() => {
+    const el = chatRef.current; if (!el) return;
+    const last = history && history[history.length - 1];
+    if (last && last.role === 'user') { atBottomRef.current = true; }
+    else if (!atBottomRef.current || (el.scrollHeight - el.scrollTop - el.clientHeight) > 360) { return; }
+    scrollBottom(true);
+  }, [history.length, running]);
+
+  // 手机 GM 询问可折叠(抽屉):默认展开;新询问到达自动展开;用户可手动点头部收起腾出视野。
+  // 发消息时 running=true → confirm-zone 自动隐藏(相当于关上一条),新询问回来 qSig 变→自动展开。
+  const [qCollapsed, setQCollapsed] = useState(false);
+  const qSig = (pendingQuestions || []).map((q) => q && q.id).join(',');
+  useEffect(() => { setQCollapsed(false); }, [qSig]);
   useEffect(() => { const ta = taRef.current; if (!ta) return; ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 120) + 'px'; }, [text]);
 
   const closeAll = () => { setLeftOpen(false); setRightOpen(false); };
@@ -504,37 +525,47 @@ export function MobileGame(gc) {
                   </div>
                 </div>
               )}
-              {pendCount > 0 && <div className="cb-head"><Icon name="warn" size={13} /> 待确认 · {pendCount}</div>}
-              {(pendingQuestions || []).map((q) => {
-                // 兼容新旧数据形态:question/text 取一,options/choices 取一
-                const qText = q.question || q.text;
-                const qOpts = q.options || q.choices;
-                return (
-                  <div key={q.id} className="cb-q">
-                    <div className="cb-q-row"><span className="cb-tag gm">GM 询问</span><span className="cb-q-text">{qText}</span></div>
-                    <div className="cb-choices">
-                      {(qOpts || []).map((c, i) => {
-                        const label = typeof c === 'string' ? c : (c.text || c.label || c.id || JSON.stringify(c));
-                        return (
-                          <button key={i} className={'cb-choice' + (i === 0 ? ' primary' : '')} onClick={() => onAnswerQuestion(q, c)}>{label}</button>
-                        );
-                      })}
-                      <button className="cb-choice" onClick={() => onDismissConfirm(q)}>忽略</button>
-                    </div>
+              {pendCount > 0 && (
+                <>
+                  {/* 折叠头(点击/下拉展开收起,抽屉式)——腾出视野;新询问到达自动展开 */}
+                  <button className="cb-head cb-toggle" onClick={() => setQCollapsed((c) => !c)} aria-expanded={!qCollapsed}>
+                    <span className="cb-head-l"><Icon name="warn" size={13} /> 待确认 · {pendCount}</span>
+                    <span className={'cb-chev' + (qCollapsed ? '' : ' open')}><Icon name="chevron_down" size={15} /></span>
+                  </button>
+                  <div className={'cb-body' + (qCollapsed ? ' collapsed' : '')}>
+                    {(pendingQuestions || []).map((q) => {
+                      // 兼容新旧数据形态:question/text 取一,options/choices 取一
+                      const qText = q.question || q.text;
+                      const qOpts = q.options || q.choices;
+                      return (
+                        <div key={q.id} className="cb-q">
+                          <div className="cb-q-row"><span className="cb-tag gm">GM 询问</span><span className="cb-q-text">{qText}</span></div>
+                          <div className="cb-choices">
+                            {(qOpts || []).map((c, i) => {
+                              const label = typeof c === 'string' ? c : (c.text || c.label || c.id || JSON.stringify(c));
+                              return (
+                                <button key={i} className={'cb-choice' + (i === 0 ? ' primary' : '')} onClick={() => onAnswerQuestion(q, c)}>{label}</button>
+                              );
+                            })}
+                            <button className="cb-choice" onClick={() => onDismissConfirm(q)}>忽略</button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {(pendingWrites || []).map((wr) => (
+                      <div key={wr.id} className={'cb-w ' + (wr.risk || 'low')}>
+                        <div className="cb-w-row"><span className={'cb-tag risk ' + (wr.risk || 'low')}><Icon name="warn" size={11} /> 写入</span><span className="cb-field mono">{wr.field || wr.path || ''}</span></div>
+                        {wr.to != null && <div className="cb-to">→ {typeof wr.to === 'object' ? JSON.stringify(wr.to) : String(wr.to)}</div>}
+                        {wr.reason && <div className="cb-w-reason">{wr.reason}</div>}
+                        <div className="cb-actions">
+                          <button className="cb-allow" onClick={() => onApprove(wr)}>允许</button>
+                          <button className="cb-deny" onClick={() => onReject(wr)}>拒绝</button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                );
-              })}
-              {(pendingWrites || []).map((wr) => (
-                <div key={wr.id} className={'cb-w ' + (wr.risk || 'low')}>
-                  <div className="cb-w-row"><span className={'cb-tag risk ' + (wr.risk || 'low')}><Icon name="warn" size={11} /> 写入</span><span className="cb-field mono">{wr.field || wr.path || ''}</span></div>
-                  {wr.to != null && <div className="cb-to">→ {typeof wr.to === 'object' ? JSON.stringify(wr.to) : String(wr.to)}</div>}
-                  {wr.reason && <div className="cb-w-reason">{wr.reason}</div>}
-                  <div className="cb-actions">
-                    <button className="cb-allow" onClick={() => onApprove(wr)}>允许</button>
-                    <button className="cb-deny" onClick={() => onReject(wr)}>拒绝</button>
-                  </div>
-                </div>
-              ))}
+                </>
+              )}
             </div>
           </div>
         )}

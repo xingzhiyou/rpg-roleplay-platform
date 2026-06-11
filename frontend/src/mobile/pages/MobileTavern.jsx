@@ -651,8 +651,16 @@ function ChatView({
     return () => el.removeEventListener('scroll', onScroll);
   }, []);
 
+  // ① 自己刚发(末条=玩家)→ 滚到底;② 否则双守卫:已上滚 或 实时距底>360 → 不跟随(输出完成不拽回)
   useEffect(() => {
-    if (!threadRef.current || !atBottomRef.current) return;
+    const el = threadRef.current;
+    if (!el) return;
+    const last = history && history[history.length - 1];
+    if (last && last.role === 'user') {
+      atBottomRef.current = true;
+    } else if (!atBottomRef.current || (el.scrollHeight - el.scrollTop - el.clientHeight) > 360) {
+      return;
+    }
     const id = requestAnimationFrame(() => {
       if (threadRef.current) threadRef.current.scrollTop = threadRef.current.scrollHeight;
     });

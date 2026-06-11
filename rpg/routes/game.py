@@ -33,7 +33,10 @@ def _client_safe_error(exc: Exception) -> str:
     """
     from agents.provider_errors import classify_provider_error
 
-    error_id = _secrets.token_hex(4)
+    # 字母前缀:token_hex(4) 约 2% 概率全是数字(如 65969875),紧跟「余额/配额已用尽」
+    # 文案会被用户误读成「本轮消耗了 6500 万 token」(生产实况:用户 @拾酒 据此问"token 消耗
+    # 这么大吗")。前缀 E 让它一眼是排障标识、不是数量。日志侧同 id,对账不受影响。
+    error_id = "E" + _secrets.token_hex(4)
     raw_message = str(exc).strip()
     if isinstance(exc, RuntimeError) and raw_message.startswith(_CLIENT_SAFE_RUNTIME_PREFIXES):
         _log.warning("[chat] client-safe stream error (error_id=%s): %s", error_id, raw_message)

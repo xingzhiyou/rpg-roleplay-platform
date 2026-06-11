@@ -665,7 +665,10 @@ function ScriptDetailPanel({ script: s, savesCount, scriptSaves = [], embedStatu
       } finally { if (!cancelled) setLoading(false); }
     })();
     return () => { cancelled = true; };
-  }, [tab, s.id]);
+    // 必须把 wb/npc/tl/ov 纳入依赖:保存/重建后用 setNpc(null) 触发重拉的模式靠的就是
+    // 这些值变 null 重跑本 effect(== null 守卫天然防循环)。此前漏了它们 → 保存后置 null
+    // 却不重拉 → 列表渲染 npc||[]=空,刷新切 tab 才恢复(用户反馈"保存后变空,刷新恢复"真因)。
+  }, [tab, s.id, wb, npc, tl, ov]);
 
   const es = embedStatus[s.id];
   const embedLabel = (() => {

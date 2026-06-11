@@ -909,6 +909,11 @@ function CardDetailPanel({ card, kind, onSave, onDuplicate, onDelete }) {
   const [autoSync, setAutoSync] = useStatePL(!!raw.auto_image_sync);
   const [autoSyncBusy, setAutoSyncBusy] = useStatePL(false);
   const [genPersonaBusy, setGenPersonaBusy] = useStatePL(false);
+  // W3-C1: 手动上传状态
+  const [uploadAvatarBusy, setUploadAvatarBusy] = useStatePL(false);
+  const [uploadPersonaBusy, setUploadPersonaBusy] = useStatePL(false);
+  const avatarInputRef = React.useRef(null);
+  const personaInputRef = React.useRef(null);
   useEffectPL(() => {
     setTab('info');
     setForm(cardFormInit(raw));
@@ -947,6 +952,38 @@ function CardDetailPanel({ card, kind, onSave, onDuplicate, onDelete }) {
     } finally { setGenPersonaBusy(false); }
   };
 
+  // W3-C1: 上传头像
+  const doUploadAvatar = async (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    e.target.value = '';
+    setUploadAvatarBusy(true);
+    window.__apiToast?.('正在上传头像…', { kind: 'info', duration: 2000 });
+    try {
+      const res = await window.api.cards.uploadAvatar(raw.id ?? card.id, file);
+      if (res && res.url) setAvatarUrl(res.url);
+      window.__apiToast?.('头像已更新', { kind: 'ok', duration: 2000 });
+    } catch (e2) {
+      window.__apiToast?.('上传失败', { kind: 'danger', detail: e2?.message });
+    } finally { setUploadAvatarBusy(false); }
+  };
+
+  // W3-C1: 上传人设图
+  const doUploadPersonaImage = async (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    e.target.value = '';
+    setUploadPersonaBusy(true);
+    window.__apiToast?.('正在上传人设图…', { kind: 'info', duration: 2000 });
+    try {
+      const res = await window.api.cards.uploadPersonaImage(raw.id ?? card.id, file);
+      if (res && res.url) setAvatarUrl(res.url);
+      window.__apiToast?.('人设图已上传并设为当前', { kind: 'ok', duration: 2200 });
+    } catch (e2) {
+      window.__apiToast?.('上传失败', { kind: 'danger', detail: e2?.message });
+    } finally { setUploadPersonaBusy(false); }
+  };
+
   const fullName = raw.full_name && raw.full_name !== raw.name ? raw.full_name : null;
   const chapterGate = (kind === 'npc' && raw.first_revealed_chapter > 1) ? raw.first_revealed_chapter : null;
 
@@ -971,11 +1008,29 @@ function CardDetailPanel({ card, kind, onSave, onDuplicate, onDelete }) {
         }}
       />
     )}
+    {/* W3-C1: 隐藏 file input — 头像上传 */}
+    <input
+      ref={avatarInputRef}
+      type="file"
+      accept="image/png,image/jpeg,image/webp"
+      style={{ display: 'none' }}
+      onChange={doUploadAvatar}
+    />
+    {/* W3-C1: 隐藏 file input — 人设图上传 */}
+    <input
+      ref={personaInputRef}
+      type="file"
+      accept="image/png,image/jpeg,image/webp"
+      style={{ display: 'none' }}
+      onChange={doUploadPersonaImage}
+    />
     <CSContainer header={
       <CSHeader variant="h2"
         actions={
           <CSSpaceBetween direction="horizontal" size="xs">
             <CSButton iconName="gen-ai" onClick={() => setGenAvatarOpen(true)}>AI 生成头像</CSButton>
+            <CSButton iconName="upload" loading={uploadAvatarBusy} disabled={uploadAvatarBusy}
+              onClick={() => avatarInputRef.current && avatarInputRef.current.click()}>上传图片</CSButton>
             {isPersonaOrPc && (
               <CSButton iconName="gen-ai" loading={genPersonaBusy} onClick={doGenPersonaImage}>生成人设图</CSButton>
             )}
@@ -1046,10 +1101,14 @@ function CardDetailPanel({ card, kind, onSave, onDuplicate, onDelete }) {
 
               {/* 手动生成 */}
               <CSContainer header={<CSHeader variant="h3" actions={
-                <CSButton iconName="gen-ai" loading={genPersonaBusy} onClick={doGenPersonaImage}>立即生成</CSButton>
+                <CSSpaceBetween direction="horizontal" size="xs">
+                  <CSButton iconName="gen-ai" loading={genPersonaBusy} onClick={doGenPersonaImage}>立即生成</CSButton>
+                  <CSButton iconName="upload" loading={uploadPersonaBusy} disabled={uploadPersonaBusy}
+                    onClick={() => personaInputRef.current && personaInputRef.current.click()}>上传人设图</CSButton>
+                </CSSpaceBetween>
               }>手动生成人设图</CSHeader>}>
                 <CSBox color="text-body-secondary" fontSize="body-s">
-                  根据当前角色的外貌、性格等描述生成人设图，加入异步队列后将自动更新头像。
+                  根据当前角色的外貌、性格等描述生成人设图，加入异步队列后将自动更新头像。也可直接上传本地图片作为人设图。
                 </CSBox>
               </CSContainer>
 

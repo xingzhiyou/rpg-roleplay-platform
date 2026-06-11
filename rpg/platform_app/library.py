@@ -1,143 +1,42 @@
+"""platform_app/library.py — 用户资产只读管理（S5 重构）。
+
+原"手动上传文件管理器"（list_dir/mkdir/upload/download_path）已完整删除。
+本模块现在只提供：
+  - list_assets        — 列出用户资产（调 assets_registry.list_user_assets）
+  - get_asset          — 查单个资产（owner 校验）
+  - asset_download_path — 解析物理路径供 FileResponse
+  - nullify_references  — 置空引用字段（删除前后处理）
+  - delete_asset_with_refs — 完整删除流程（引用检查 → 置空 → force 删）
+  - list_dir           — 兼容 shim（_deps.platform_for 调用，返回 list_assets 结构）
+  - decode_upload / safe_filename / unique_path — script_import 仍在引用的工具函数 shim
+    （S5 重构保留，因 script_import.py 的 txt 上传流程仍需它们）
+
+手动上传/mkdir 已彻底移除，不再暴露任意文件上传入口。
+"""
 from __future__ import annotations
 
 import base64
 import binascii
-import mimetypes
+import re as _re
 from pathlib import Path
 from typing import Any
 
-import fsspec
 
-from .db import connect, init_db, limit_value
+# ---------------------------------------------------------------------------
+# 兼容 shim — script_import.py / api/scripts.py 仍在引用这些工具函数
+# （剧本 txt 上传管线用，非文件库手动上传）
+# ---------------------------------------------------------------------------
 
-BASE = Path(__file__).resolve().parents[1]
-LIBRARY_ROOT = BASE / "platform_data" / "library"
-MAX_UPLOAD_BYTES = 64 * 1024 * 1024
-
-
-def list_dir(user_id: int, rel_path: str = "", limit: int | str | None = None, cursor: str | None = None) -> dict[str, Any]:
-    root = user_root(user_id)
-    current = safe_path(root, rel_path)
-    current.mkdir(parents=True, exist_ok=True)
-    entries = []
-    for item in sorted(current.iterdir(), key=lambda p: (not p.is_dir(), p.name.lower())):
-        stat = item.stat()
-        entries.append({
-            "name": item.name,
-            "path": str(item.relative_to(root)),
-            "type": "directory" if item.is_dir() else "file",
-            "size": stat.st_size,
-            "mime": mimetypes.guess_type(item.name)[0] or "",
-            "modified": int(stat.st_mtime),
-        })
-    if cursor:
-        entries = [item for item in entries if item["path"] > cursor]
-    page_limit = limit_value(limit)
-    has_more = len(entries) > page_limit
-    visible = entries[:page_limit]
-    rel = str(current.relative_to(root)) if current != root else ""
-    return {
-        "engine": "fsspec-local",
-        "path": rel,
-        "entries": visible,
-        "items": visible,
-        "page": {
-            "limit": page_limit,
-            "next_cursor": visible[-1]["path"] if has_more and visible else None,
-            "has_more": has_more,
-        },
-    }
-
-
-def mkdir(user_id: int, rel_path: str) -> dict[str, Any]:
-    root = user_root(user_id)
-    target = safe_path(root, rel_path)
-    fsspec.filesystem("file").makedirs(str(target), exist_ok=True)
-    return list_dir(user_id, parent_rel(root, target))
-
-
-def delete(user_id: int, rel_path: str) -> dict[str, Any]:
-    root = user_root(user_id)
-    target = safe_path(root, rel_path)
-    if target == root:
-        raise ValueError("不能删除库根目录")
-    if not target.exists():
-        raise FileNotFoundError(f"文件不存在: {rel_path}")
-    fsspec.filesystem("file").rm(str(target), recursive=True)
-    init_db()
-    with connect() as db:
-        db.execute("delete from assets where user_id = %s and rel_path = %s", (user_id, str(Path(rel_path))))
-    return list_dir(user_id, parent_rel(root, target))
-
-
-MAX_FILES_PER_REQUEST = 12
-
-
-def upload(user_id: int, rel_dir: str, files: list[dict[str, Any]]) -> dict[str, Any]:
-    root = user_root(user_id)
-    target_dir = safe_path(root, rel_dir)
-    target_dir.mkdir(parents=True, exist_ok=True)
-    # 超量明确拒绝，不再静默截断
-    if not isinstance(files, list) or not files:
-        raise ValueError("files 必须是非空列表")
-    if len(files) > MAX_FILES_PER_REQUEST:
-        raise ValueError(f"单次最多上传 {MAX_FILES_PER_REQUEST} 个文件，本次提交 {len(files)}")
-    fs = fsspec.filesystem("file")
-    init_db()
-    with connect() as db:
-        for item in files:
-            name = safe_filename(item.get("name") or "upload.bin")
-            data = decode_upload(item)
-            if len(data) > MAX_UPLOAD_BYTES:
-                raise ValueError(f"文件过大：{name}")
-            target = unique_path(target_dir / name)
-            with fs.open(str(target), "wb") as f:
-                f.write(data)
-            mime = item.get("type") or mimetypes.guess_type(target.name)[0] or "application/octet-stream"
-            db.execute(
-                """
-                insert into assets(user_id, name, rel_path, mime, kind, size)
-                values (%s, %s, %s, %s, %s, %s)
-                """,
-                (user_id, target.name, str(target.relative_to(root)), mime, kind_for(mime, target.suffix), len(data)),
-            )
-    return list_dir(user_id, rel_dir)
-
-
-def download_path(user_id: int, rel_path: str) -> Path:
-    target = safe_path(user_root(user_id), rel_path)
-    if not target.exists() or not target.is_file():
-        raise ValueError("文件不存在")
-    return target
-
-
-def user_root(user_id: int) -> Path:
-    root = LIBRARY_ROOT / f"user_{user_id}"
-    root.mkdir(parents=True, exist_ok=True)
-    return root
-
-
-def safe_path(root: Path, rel_path: str) -> Path:
-    root = root.resolve()
-    target = (root / (rel_path or "")).resolve()
-    if target != root and root not in target.parents:
-        raise ValueError("非法路径")
-    return target
-
-
-def parent_rel(root: Path, target: Path) -> str:
-    return str(target.parent.relative_to(root)) if target.parent != root else ""
-
-
-def decode_upload(item: dict[str, Any]) -> bytes:
-    encoded = str(item.get("base64") or item.get("content_base64") or item.get("contentBase64") or "")
+def decode_upload(item: dict) -> bytes:
+    """从前端上传的 item dict 解出原始 bytes（base64 / data_url 两路）。"""
+    encoded = str(
+        item.get("base64") or item.get("content_base64") or item.get("contentBase64") or ""
+    )
     data_url = str(item.get("data_url") or item.get("dataUrl") or "")
     if "," in data_url:
         encoded = data_url.split(",", 1)[1]
     if not encoded:
         raise ValueError("上传内容为空")
-    # 严格校验：validate=True 时遇到非法字符会抛 binascii.Error，
-    # 避免畸形 base64（如 'aGVsbG8=%%%%')被静默截断后落盘成损坏文件。
     try:
         return base64.b64decode(encoded, validate=True)
     except (binascii.Error, ValueError) as exc:
@@ -145,17 +44,16 @@ def decode_upload(item: dict[str, Any]) -> bytes:
 
 
 def safe_filename(name: str) -> str:
-    # \u663e\u5f0f\u767d\u540d\u5355: ASCII \u5b57\u6bcd\u6570\u5b57\u3001\u5e38\u89c1\u5206\u9694\u7b26\u3001CJK \u6c49\u5b57; \u5176\u4f59\u66ff\u6362\u4e3a\u4e0b\u5212\u7ebf
-    import re as _re
+    """把原始文件名清洗为安全文件名（保留 ASCII / CJK，其他替换为 _）。"""
     stem = Path(name).name
-    cleaned = _re.sub(r"[^A-Za-z0-9._\- \u4e00-\u9fff]", "_", stem)
-    # \u62d2\u7edd\u4ee5 . \u5f00\u5934\u6216\u5168\u662f . \u7684\u6587\u4ef6\u540d\uff08\u9632\u6b62\u9690\u85cf\u6587\u4ef6/\u76f8\u5bf9\u8def\u5f84\u7a7f\u8d8a\uff09
-    if not _re.search(r"[A-Za-z0-9\u4e00-\u9fff]", cleaned):
+    cleaned = _re.sub(r"[^A-Za-z0-9._\- 一-鿿]", "_", stem)
+    if not _re.search(r"[A-Za-z0-9一-鿿]", cleaned):
         cleaned = "untitled"
     return cleaned or "file.bin"
 
 
 def unique_path(path: Path) -> Path:
+    """若 path 已存在则加数字后缀找可用路径。"""
     if not path.exists():
         return path
     for index in range(2, 1000):
@@ -165,14 +63,189 @@ def unique_path(path: Path) -> Path:
     raise ValueError("无法分配文件名")
 
 
-def kind_for(mime: str, suffix: str) -> str:
-    suffix = suffix.lower()
-    if mime.startswith("image/"):
-        return "image"
-    if mime.startswith("video/"):
-        return "video"
-    if suffix in {".zip", ".rar", ".7z", ".tar", ".gz"}:
-        return "archive"
-    if suffix in {".md", ".txt", ".pdf", ".doc", ".docx", ".csv", ".json"}:
-        return "document"
-    return "file"
+# ---------------------------------------------------------------------------
+# 读：列表
+# ---------------------------------------------------------------------------
+
+def list_assets(
+    user_id: int,
+    kind: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> dict[str, Any]:
+    """列出 user_id 的资产，返回 {ok, items, total_count_hint}。"""
+    from . import assets_registry as _reg  # lazy import
+
+    items = _reg.list_user_assets(user_id, kind=kind, limit=limit, offset=offset)
+    return {
+        "ok": True,
+        "items": items,
+        "kind_filter": kind,
+        "limit": limit,
+        "offset": offset,
+    }
+
+
+def list_dir(user_id: int, path: str = "", limit: int | None = None, cursor: str | None = None) -> dict:
+    """兼容 shim：_deps.platform_for 调用此函数；重定向到 list_assets。
+
+    path/cursor 参数已无实际含义（无目录树），直接忽略。
+    """
+    return list_assets(user_id, kind=None, limit=int(limit) if limit else 50, offset=0)
+
+
+# ---------------------------------------------------------------------------
+# 读：单个
+# ---------------------------------------------------------------------------
+
+def get_asset(user_id: int, asset_id: int) -> dict | None:
+    """查单个资产，owner 校验（不属于 user_id 返回 None）。"""
+    from . import assets_registry as _reg  # lazy import
+
+    return _reg.get_asset(user_id, asset_id)
+
+
+# ---------------------------------------------------------------------------
+# 下载：解析物理路径
+# ---------------------------------------------------------------------------
+
+def asset_download_path(user_id: int, asset_id: int):
+    """返回 (asset_dict, Path)。资产不存在/不属于该用户 → ValueError。"""
+    from . import assets_registry as _reg  # lazy import
+    from . import storage as _storage      # lazy import
+
+    asset = _reg.get_asset(user_id, asset_id)
+    if asset is None:
+        raise ValueError("not_found")
+    storage_key = asset.get("storage_key") or ""
+    if not storage_key:
+        raise ValueError("no_storage_key")
+    path = _storage.resolve_path(storage_key)
+    if not path.exists() or not path.is_file():
+        raise ValueError("file_missing")
+    return asset, path
+
+
+# ---------------------------------------------------------------------------
+# 删除关联：置空引用字段
+# ---------------------------------------------------------------------------
+
+def nullify_references(user_id: int, url: str, references: list[dict]) -> None:
+    """按 find_references 返回的 reference 列表，逐条置空对应业务字段。
+
+    ownership 防越权策略（每条 SQL 都带 owner/user_id 条件）：
+      - users.avatar_url         → WHERE id = %s AND id = user_id（只能清自己）
+      - scripts.cover_image_url  → WHERE id = %s AND owner_id = user_id
+      - character_cards.avatar_path → via script_id: subquery scripts.owner_id = user_id
+      - card_persona_images       → DELETE WHERE id = %s AND card_id IN
+                                     (cc.id FROM character_cards cc
+                                      JOIN scripts s ON s.id=cc.script_id
+                                      WHERE s.owner_id = user_id)
+    """
+    if not references:
+        return
+
+    from .db import connect  # lazy import
+
+    with connect() as db:
+        for ref in references:
+            kind = ref.get("kind")
+            ref_id = ref.get("id")
+            if ref_id is None:
+                continue
+
+            if kind == "avatar":
+                # users.avatar_url — 只能清自己的
+                db.execute(
+                    "update users set avatar_url = NULL where id = %s and id = %s",
+                    (ref_id, user_id),
+                )
+
+            elif kind == "cover":
+                # scripts.cover_image_url — owner_id 防越权
+                db.execute(
+                    "update scripts set cover_image_url = '' where id = %s and owner_id = %s",
+                    (ref_id, user_id),
+                )
+
+            elif kind == "card_avatar":
+                # character_cards.avatar_path — 两类卡都要覆盖防越权：
+                #   用户 pc/persona 卡 = character_cards.user_id 直挂(script_id 为 null)；
+                #   剧本 NPC 卡 = 通过 script_id → scripts.owner_id。
+                db.execute(
+                    """
+                    update character_cards
+                       set avatar_path = ''
+                     where id = %s
+                       and (
+                           user_id = %s
+                           or script_id in (select id from scripts where owner_id = %s)
+                       )
+                    """,
+                    (ref_id, user_id, user_id),
+                )
+
+            elif kind == "persona_image":
+                # card_persona_images — DELETE 行（纯引用记录，无内容价值）
+                # 通过 card_id → character_cards(user_id 直挂 或 script owner)防越权
+                db.execute(
+                    """
+                    delete from card_persona_images
+                     where id = %s
+                       and card_id in (
+                           select cc.id from character_cards cc
+                            where cc.user_id = %s
+                               or cc.script_id in (select id from scripts where owner_id = %s)
+                       )
+                    """,
+                    (ref_id, user_id, user_id),
+                )
+            # 其余未知 kind 静默跳过，不中断整体流程
+
+
+# ---------------------------------------------------------------------------
+# 删除：完整流程（引用检查 → 置空 → force 删）
+# ---------------------------------------------------------------------------
+
+def delete_asset_with_refs(
+    user_id: int,
+    asset_id: int,
+    confirm: bool = False,
+) -> dict[str, Any]:
+    """S5 删除端点的核心逻辑。
+
+    流程：
+    1. find_asset_references 拿引用列表（同时做 owner 校验）。
+    2. 若有引用且 confirm=False → 返回 {ok:False, needs_confirm:True, references:[...]}。
+    3. 若无引用，或有引用但 confirm=True：
+       a. nullify_references 置空所有引用字段（带 owner 条件）。
+       b. delete_asset(force=True) 删 user_assets 行 + 物理文件。
+       c. 返回 {ok:True, deleted:True}。
+    4. 资产不存在/不属于该用户 → {ok:False, error:'not_found'}。
+    """
+    from . import assets_registry as _reg  # lazy import
+
+    ref_result = _reg.find_asset_references(user_id, asset_id)
+    if not ref_result.get("ok"):
+        return {"ok": False, "error": ref_result.get("error", "not_found")}
+
+    references = ref_result.get("references") or []
+    asset = ref_result.get("asset") or {}
+
+    # 有引用 + 未确认 → 要求前端二次确认
+    if references and not confirm:
+        return {
+            "ok": False,
+            "needs_confirm": True,
+            "references": references,
+            "asset": asset,
+        }
+
+    # 置空所有引用字段（有引用且 confirm=True，或本来就无引用）
+    url = asset.get("url") or ""
+    if references and url:
+        nullify_references(user_id, url, references)
+
+    # 物理删除（force=True：引用已处理）
+    result = _reg.delete_asset(user_id, asset_id, force=True)
+    return result

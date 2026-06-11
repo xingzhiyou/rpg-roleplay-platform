@@ -2,13 +2,28 @@
 from __future__ import annotations
 
 import asyncio
+import secrets
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, File, Request, UploadFile
 from psycopg.types.json import Jsonb
 
 from ..db import connect
 from ..security import public_user
 from ._deps import SESSION_COOKIE, json_response, require_user
+
+_MAX_IMAGE_BYTES = 8 * 1024 * 1024  # 8 MB
+
+
+def _detect_image_mime(data: bytes) -> tuple[str, str]:
+    """读 data[:12] 魔数，返回 (mime, ext)。不合法抛 ValueError。"""
+    head = data[:12]
+    if head[:8] == b"\x89PNG\r\n\x1a\n":
+        return "image/png", "png"
+    if head[:2] == b"\xff\xd8":
+        return "image/jpeg", "jpg"
+    if head[:4] == b"RIFF" and head[8:12] == b"WEBP":
+        return "image/webp", "webp"
+    raise ValueError("仅支持 PNG / JPEG / WebP 图片（魔数校验失败）")
 
 router = APIRouter()
 
@@ -669,7 +684,20 @@ async def api_set_auto_image_sync(request: Request, card_id: int, user=Depends(r
 @router.post("/api/me/character-cards/{card_id}/generate-persona-image")
 async def api_generate_persona_image(request: Request, card_id: int, user=Depends(require_user)):
     """手动触发为指定角色卡生成人设图。Body: {prompt?: str}（prompt 留空则 worker 端自动构建）。"""
+    from fastapi import HTTPException as _HTTPException
     from .. import image_jobs
+    from ..db import connect as _connect
+
+    # S3: 入队前校验 card 归属（card_type in pc/persona，不存在→404）
+    with _connect() as db:
+        owned = db.execute(
+            "select 1 from character_cards where id = %s and user_id = %s"
+            " and card_type in ('pc', 'persona')",
+            (card_id, user["id"]),
+        ).fetchone()
+    if not owned:
+        raise _HTTPException(status_code=404, detail="角色卡不存在或无权访问")
+
     body = await request.json()
     prompt = (body.get("prompt") or "").strip()
     result = image_jobs.enqueue_image_generation(
@@ -704,6 +732,139 @@ async def api_set_current_persona_image(card_id: int, image_id: int, user=Depend
         return json_response(image_jobs.set_current_persona_image(user["id"], card_id, image_id))
     except ValueError as exc:
         return json_response({"ok": False, "error": str(exc)}, status_code=400)
+
+
+@router.post("/api/me/character-cards/{card_id}/avatar")
+async def api_upload_card_avatar(card_id: int, file: UploadFile = File(...), user=Depends(require_user)):
+    """手动上传角色卡头像（替换 avatar_path）。
+
+    鉴权：character_cards WHERE id=card_id AND user_id=user[id]。
+    MIME 魔数白名单：PNG / JPEG / WebP。大小上限 8 MB。
+    """
+    user_id = int(user["id"])
+
+    # 1. ownership 校验
+    with connect() as db:
+        owned = db.execute(
+            "select 1 from character_cards where id = %s and user_id = %s",
+            (card_id, user_id),
+        ).fetchone()
+    if not owned:
+        return json_response({"ok": False, "error": "角色卡不存在或无权访问"}, status_code=403)
+
+    # 2. 读取文件
+    data = await file.read()
+    if len(data) > _MAX_IMAGE_BYTES:
+        return json_response({"ok": False, "error": f"文件过大（上限 {_MAX_IMAGE_BYTES // 1024 // 1024} MB）"}, status_code=400)
+
+    # 3. MIME 魔数校验
+    try:
+        mime, ext = _detect_image_mime(data)
+    except ValueError as exc:
+        return json_response({"ok": False, "error": str(exc)}, status_code=400)
+
+    # 4. 存储
+    from .. import storage as _storage
+    token = secrets.token_hex(12)
+    filename = f"upload_{user_id}_{token}.{ext}"
+    storage_key, url = _storage.store_bytes(data, kind="ai_images", filename=filename)
+
+    # 5. 更新 character_cards.avatar_path
+    with connect() as db:
+        db.execute(
+            "update character_cards set avatar_path = %s where id = %s and user_id = %s",
+            (url, card_id, user_id),
+        )
+
+    # 6. 登记资产
+    from .. import assets_registry as _reg
+    _reg.register_asset(
+        user_id=user_id,
+        kind="card_image",
+        storage_key=storage_key,
+        url=url,
+        source="manual_upload",
+        ref_kind="card",
+        ref_id=card_id,
+        mime=mime,
+        size=len(data),
+    )
+
+    return json_response({"ok": True, "url": url})
+
+
+@router.post("/api/me/character-cards/{card_id}/persona-images/upload")
+async def api_upload_persona_image(card_id: int, file: UploadFile = File(...), user=Depends(require_user)):
+    """手动上传人设图，插入 card_persona_images 并设为当前图（翻 is_current）。
+
+    鉴权：character_cards WHERE id=card_id AND user_id=user[id]。
+    MIME 魔数白名单：PNG / JPEG / WebP。大小上限 8 MB。
+    """
+    user_id = int(user["id"])
+
+    # 1. ownership 校验
+    with connect() as db:
+        owned = db.execute(
+            "select 1 from character_cards where id = %s and user_id = %s",
+            (card_id, user_id),
+        ).fetchone()
+    if not owned:
+        return json_response({"ok": False, "error": "角色卡不存在或无权访问"}, status_code=403)
+
+    # 2. 读取文件
+    data = await file.read()
+    if len(data) > _MAX_IMAGE_BYTES:
+        return json_response({"ok": False, "error": f"文件过大（上限 {_MAX_IMAGE_BYTES // 1024 // 1024} MB）"}, status_code=400)
+
+    # 3. MIME 魔数校验
+    try:
+        mime, ext = _detect_image_mime(data)
+    except ValueError as exc:
+        return json_response({"ok": False, "error": str(exc)}, status_code=400)
+
+    # 4. 存储
+    from .. import storage as _storage
+    token = secrets.token_hex(12)
+    filename = f"upload_{user_id}_{token}.{ext}"
+    storage_key, url = _storage.store_bytes(data, kind="ai_images", filename=filename)
+
+    # 5. 落库 card_persona_images：翻 is_current + 插新行 + 更新 avatar_path
+    with connect() as db:
+        # 先把该卡已有 is_current 行清掉
+        db.execute(
+            "update card_persona_images set is_current = false where card_id = %s",
+            (card_id,),
+        )
+        # 插入新行
+        db.execute(
+            """
+            insert into card_persona_images
+                (card_id, image_url, source, status, is_current)
+            values (%s, %s, 'manual', 'done', true)
+            """,
+            (card_id, url),
+        )
+        # 同步更新角色卡头像
+        db.execute(
+            "update character_cards set avatar_path = %s where id = %s and user_id = %s",
+            (url, card_id, user_id),
+        )
+
+    # 6. 登记资产
+    from .. import assets_registry as _reg
+    _reg.register_asset(
+        user_id=user_id,
+        kind="card_image",
+        storage_key=storage_key,
+        url=url,
+        source="manual_upload",
+        ref_kind="card",
+        ref_id=card_id,
+        mime=mime,
+        size=len(data),
+    )
+
+    return json_response({"ok": True, "url": url})
 
 
 # ── 酒馆聊天记录导入 ──────────────────────────────────────────────────

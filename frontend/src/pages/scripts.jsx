@@ -524,6 +524,9 @@ function ScriptDetailPanel({ script: s, savesCount, scriptSaves = [], embedStatu
   // 生成封面
   const [genCoverOpen, setGenCoverOpen] = useStatePL(false);
   const [coverUrl, setCoverUrl] = useStatePL(s.cover_image_url || null);
+  // W3-C1: 手动上传封面
+  const [uploadCoverBusy, setUploadCoverBusy] = useStatePL(false);
+  const coverInputRef = React.useRef(null);
 
   useEffectPL(() => {
     setWb(null); setNpc(null); setTl(null); setOv(null);
@@ -532,6 +535,22 @@ function ScriptDetailPanel({ script: s, savesCount, scriptSaves = [], embedStatu
   }, [s.id]);
 
   const isOwner = currentUserId && s.owner_id === currentUserId;
+
+  // W3-C1: 上传封面(仅 owner)
+  const doUploadCover = async (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    e.target.value = '';
+    setUploadCoverBusy(true);
+    window.__apiToast?.('正在上传封面…', { kind: 'info', duration: 2000 });
+    try {
+      const res = await window.api.scripts.uploadCover(s.id, file);
+      if (res && res.url) setCoverUrl(res.url);
+      window.__apiToast?.('封面已更新', { kind: 'ok', duration: 2000 });
+    } catch (e2) {
+      window.__apiToast?.('上传失败', { kind: 'danger', detail: e2?.message });
+    } finally { setUploadCoverBusy(false); }
+  };
 
   // 手动把某 NPC 卡设为主角(AI canon importance 误判时纠正)。设完重拉列表刷新「主角」徽标。
   const [protagBusy, setProtagBusy] = useStatePL(null); // 正在设置的 card id
@@ -676,11 +695,25 @@ function ScriptDetailPanel({ script: s, savesCount, scriptSaves = [], embedStatu
         onClose={() => setHistoryOpen(false)}
       />
     )}
+    {/* W3-C1: 隐藏 file input — 封面上传(仅 owner 渲染) */}
+    {isOwner && (
+      <input
+        ref={coverInputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp"
+        style={{ display: 'none' }}
+        onChange={doUploadCover}
+      />
+    )}
     <CSContainer header={
       <CSHeader variant="h2"
         actions={
           <CSSpaceBetween direction="horizontal" size="xs">
             <CSButton iconName="gen-ai" onClick={() => setGenCoverOpen(true)}>生成封面</CSButton>
+            {isOwner && (
+              <CSButton iconName="upload" loading={uploadCoverBusy} disabled={uploadCoverBusy}
+                onClick={() => coverInputRef.current && coverInputRef.current.click()}>上传封面</CSButton>
+            )}
             {/* 反馈#3:开始游戏改下拉——可选继续某个存档 / 开新游戏,不再有存档就直接进后台 */}
             <CSButtonDropdown variant="primary" expandToViewport disabled={!!playBlock}
               items={[

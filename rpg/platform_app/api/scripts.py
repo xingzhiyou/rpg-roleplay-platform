@@ -1,14 +1,29 @@
 """platform_app.api.scripts — /api/scripts*, /api/uploads/* 路由。"""
 from __future__ import annotations
 
+import secrets
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse, Response
 
 from .. import knowledge, script_import
 from ..db import connect
 from ._deps import json_response, require_user
+
+_MAX_COVER_BYTES = 8 * 1024 * 1024  # 8 MB
+
+
+def _detect_cover_mime(data: bytes) -> tuple[str, str]:
+    """读 data[:12] 魔数，返回 (mime, ext)。不合法抛 ValueError。"""
+    head = data[:12]
+    if head[:8] == b"\x89PNG\r\n\x1a\n":
+        return "image/png", "png"
+    if head[:2] == b"\xff\xd8":
+        return "image/jpeg", "jpg"
+    if head[:4] == b"RIFF" and head[8:12] == b"WEBP":
+        return "image/webp", "webp"
+    raise ValueError("仅支持 PNG / JPEG / WebP 图片（魔数校验失败）")
 
 router = APIRouter()
 
@@ -701,6 +716,68 @@ async def api_script_unsubscribe(script_id: int, user=Depends(require_user)):
             return json_response({"ok": False, "error": "未订阅该剧本"}, status_code=404)
         db.commit()
     return json_response({"ok": True, "unsubscribed": True, "script_id": script_id})
+
+
+@router.post("/api/scripts/{script_id}/cover")
+async def api_upload_script_cover(script_id: int, file: UploadFile = File(...), user=Depends(require_user)):
+    """手动上传剧本封面图（替换 cover_image_url）。
+
+    鉴权：scripts WHERE id=script_id AND owner_id=user[id]（仅 owner）。
+    MIME 魔数白名单：PNG / JPEG / WebP。大小上限 8 MB。
+    """
+    user_id = int(user["id"])
+
+    # 1. ownership 校验（只有 owner 能改封面，订阅者不行）
+    with connect() as db:
+        owned = db.execute(
+            "select 1 from scripts where id = %s and owner_id = %s",
+            (script_id, user_id),
+        ).fetchone()
+    if not owned:
+        return json_response({"ok": False, "error": "无权操作该剧本"}, status_code=403)
+
+    # 2. 读取文件
+    data = await file.read()
+    if len(data) > _MAX_COVER_BYTES:
+        return json_response(
+            {"ok": False, "error": f"文件过大（上限 {_MAX_COVER_BYTES // 1024 // 1024} MB）"},
+            status_code=400,
+        )
+
+    # 3. MIME 魔数校验
+    try:
+        mime, ext = _detect_cover_mime(data)
+    except ValueError as exc:
+        return json_response({"ok": False, "error": str(exc)}, status_code=400)
+
+    # 4. 存储
+    from .. import storage as _storage
+    token = secrets.token_hex(12)
+    filename = f"upload_{user_id}_{token}.{ext}"
+    storage_key, url = _storage.store_bytes(data, kind="ai_images", filename=filename)
+
+    # 5. 更新 scripts.cover_image_url
+    with connect() as db:
+        db.execute(
+            "update scripts set cover_image_url = %s where id = %s and owner_id = %s",
+            (url, script_id, user_id),
+        )
+
+    # 6. 登记资产
+    from .. import assets_registry as _reg
+    _reg.register_asset(
+        user_id=user_id,
+        kind="cover",
+        storage_key=storage_key,
+        url=url,
+        source="manual_upload",
+        ref_kind="script",
+        ref_id=script_id,
+        mime=mime,
+        size=len(data),
+    )
+
+    return json_response({"ok": True, "url": url})
 
 
 @router.post("/api/scripts/{script_id}/delete")

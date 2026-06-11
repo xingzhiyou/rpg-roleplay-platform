@@ -12,8 +12,9 @@ from .db import connect, expose, init_db, limit_value, page_payload
 from .library import decode_upload, safe_filename, unique_path
 
 BASE = Path(__file__).resolve().parents[1]
-SCRIPT_ROOT = BASE / "platform_data" / "scripts"
-UPLOAD_CHUNK_ROOT = BASE / "platform_data" / "upload_chunks"
+# 统一根来自 storage 模块（S1 基座），消除本地 parents[N] 硬编码
+from .storage import SCRIPTS_DIR as SCRIPT_ROOT
+from .storage import UPLOAD_CHUNKS_DIR as UPLOAD_CHUNK_ROOT
 from core.config import (
     script_upload_max_bytes as _script_upload_max_bytes,
 )
@@ -193,6 +194,31 @@ def import_script(
                     for index, chapter in enumerate(chapters, start=1)
                 ],
             )
+
+    # 登记 user_assets（失败只 log，不影响导入主流程）
+    try:
+        from platform_app.assets_registry import register_asset  # lazy import
+        from platform_app.storage import PLATFORM_DATA_ROOT as _PDATA_ROOT
+        # storage_key = "scripts/{relative_from_PLATFORM_DATA_ROOT}"
+        # target_path 在 SCRIPT_ROOT/user_{id}/filename = PLATFORM_DATA_ROOT/scripts/user_{id}/filename
+        _script_rel = str(target_path.relative_to(_PDATA_ROOT))  # e.g. scripts/user_1/foo.txt
+        register_asset(
+            user_id=int(user_id),
+            kind="script_txt",
+            storage_key=_script_rel,
+            url="/api/storage/" + _script_rel,
+            source="script_import",
+            ref_kind="script",
+            ref_id=int(script["id"]),
+            mime="text/plain",
+            size=len(raw),
+            meta={"name": original_name},
+        )
+    except Exception as _reg_exc:
+        logger.warning(
+            "[script_import] register_asset failed script_id=%s: %s",
+            script["id"], _reg_exc,
+        )
 
     # phase_backend: 不再起 kind='knowledge_sync' 旧任务。
     # 上传完成就直接 schedule_full_import (kind='full_pipeline'),前端订阅 SSE 看真进度。

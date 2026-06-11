@@ -244,6 +244,43 @@ async def handle_image_gen(payload: dict[str, Any]) -> None:
     except Exception as exc:
         log.warning("[image_jobs] update done failed image_id=%s: %s", image_id, exc)
 
+    # 5b. 登记 user_assets（失败只 log，不影响生图结果）
+    try:
+        from platform_app.assets_registry import register_asset  # lazy import
+        # storage_key = "ai_images/{filename}"，从 url 末段解析文件名
+        _img_filename = url.rstrip("/").rsplit("/", 1)[-1]
+        _storage_key = "ai_images/" + _img_filename
+        # ref_kind / ref_id 根据 attach 目标决定
+        _ref_kind: str | None = None
+        _ref_id: int | None = None
+        if attach:
+            _atype = str(attach.get("type") or "")
+            if _atype == "card_avatar":
+                _ref_kind = "card"
+                _ref_id = int(attach.get("id") or attach.get("card_id") or 0) or None
+            elif _atype == "script_cover":
+                _ref_kind = "script"
+                _ref_id = int(attach.get("id") or attach.get("script_id") or 0) or None
+            elif _atype == "persona_image":
+                _ref_kind = "card"
+                _ref_id = int(attach.get("id") or attach.get("card_id") or 0) or None
+            elif _atype == "user_avatar":
+                _ref_kind = "user"
+                _ref_id = int(user_id)
+        register_asset(
+            user_id=int(user_id),
+            kind="ai_image",
+            storage_key=_storage_key,
+            url=url,
+            source="image_gen",
+            ref_kind=_ref_kind,
+            ref_id=_ref_id,
+            mime="image/png",
+            meta={"prompt": prompt, "model": model or ""},
+        )
+    except Exception as _reg_exc:
+        log.warning("[image_jobs] register_asset failed image_id=%s: %s", image_id, _reg_exc)
+
     # 6. SSE push
     _notify_image_ready(user_id=user_id, image_id=image_id, url=url, kind=kind)
     log.info("[image_jobs] done image_id=%s user=%s url=%s", image_id, user_id, url)

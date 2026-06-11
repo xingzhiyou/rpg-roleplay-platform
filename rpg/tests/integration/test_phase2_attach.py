@@ -113,11 +113,15 @@ def _enqueue_and_handle(user_id: int, attach: dict) -> str:
         ).fetchone()
     url = row["url"] if row else ""
 
-    # 清理测试文件（如有）
-    if url and url.startswith("/api/images/file/"):
-        from platform_app.api.images import _IMAGE_ROOT
-        filename = url.split("/api/images/file/")[-1]
-        (_IMAGE_ROOT / filename).unlink(missing_ok=True)
+    # 清理测试文件（如有）—— W1 后 URL 格式为 /api/storage/ai_images/...
+    if url:
+        from platform_app import storage as _storage
+        if url.startswith("/api/storage/ai_images/"):
+            filename = url[len("/api/storage/ai_images/"):]
+            _storage.delete_file("ai_images/" + filename)
+        elif url.startswith("/api/images/file/"):
+            filename = url.split("/api/images/file/")[-1]
+            _storage.delete_file("ai_images/" + filename)
 
     return url
 
@@ -144,8 +148,10 @@ class TestAttachUserAvatar(unittest.TestCase):
 
     def test_user_avatar_attached(self):
         url = _enqueue_and_handle(self.uid, {"type": "user_avatar"})
-        self.assertTrue(url.startswith("/api/images/file/"),
-                        f"handle 后 url 应非空，实际={url!r}")
+        self.assertTrue(
+            url.startswith("/api/storage/ai_images/") or url.startswith("/api/images/file/"),
+            f"handle 后 url 应非空，实际={url!r}",
+        )
 
         from platform_app.db import connect
         with connect() as db:
@@ -184,8 +190,10 @@ class TestAttachCardAvatarOwner(unittest.TestCase):
             self.uid,
             {"type": "card_avatar", "card_id": self.card_id},
         )
-        self.assertTrue(url.startswith("/api/images/file/"),
-                        f"handle 后 url 应非空，实际={url!r}")
+        self.assertTrue(
+            url.startswith("/api/storage/ai_images/") or url.startswith("/api/images/file/"),
+            f"handle 后 url 应非空，实际={url!r}",
+        )
 
         from platform_app.db import connect
         with connect() as db:
@@ -264,8 +272,10 @@ class TestAttachScriptCoverOwner(unittest.TestCase):
             self.uid,
             {"type": "script_cover", "id": self.script_id},
         )
-        self.assertTrue(url.startswith("/api/images/file/"),
-                        f"handle 后 url 应非空，实际={url!r}")
+        self.assertTrue(
+            url.startswith("/api/storage/ai_images/") or url.startswith("/api/images/file/"),
+            f"handle 后 url 应非空，实际={url!r}",
+        )
 
         from platform_app.db import connect
         with connect() as db:
@@ -362,8 +372,10 @@ class TestAttachIdKeyAlignment(unittest.TestCase):
             self.uid,
             {"type": "card_avatar", "id": self.card_id},  # 注意：id 不是 card_id
         )
-        self.assertTrue(url.startswith("/api/images/file/"),
-                        f"handle 后 url 应非空，实际={url!r}")
+        self.assertTrue(
+            url.startswith("/api/storage/ai_images/") or url.startswith("/api/images/file/"),
+            f"handle 后 url 应非空，实际={url!r}",
+        )
 
         from platform_app.db import connect
         with connect() as db:
@@ -386,8 +398,10 @@ class TestAttachIdKeyAlignment(unittest.TestCase):
             self.uid,
             {"type": "script_cover", "id": script_id},
         )
-        self.assertTrue(url.startswith("/api/images/file/"),
-                        f"handle 后 url 应非空，实际={url!r}")
+        self.assertTrue(
+            url.startswith("/api/storage/ai_images/") or url.startswith("/api/images/file/"),
+            f"handle 后 url 应非空，实际={url!r}",
+        )
 
         with connect() as db:
             row = db.execute(

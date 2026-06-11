@@ -14,9 +14,7 @@ Phase 3 增量：
 """
 from __future__ import annotations
 
-import os
 import secrets
-from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
@@ -27,44 +25,28 @@ from ..db import connect, init_db
 
 router = APIRouter()
 
-# ── 路径常量 ──────────────────────────────────────────────────────────
-# platform_data/ 在项目根（rpg/ 的上一级）——与头像路径 `parent.parent / "platform_data"` 一致。
-_IMAGE_ROOT: Path = Path(__file__).resolve().parents[3] / "platform_data" / "ai_images"
-
 # 白名单：允许存储/服务的图片扩展名
 _ALLOWED_EXTS: frozenset[str] = frozenset({"png", "jpg", "jpeg", "webp"})
 
 
 # ══════════════════════════════════════════════════════════════════════
-#  存储抽象
+#  存储抽象（委托给 platform_app.storage）
 # ══════════════════════════════════════════════════════════════════════
 
-def _write_image_bytes(dest: Path, data: bytes) -> None:
-    """把字节写入磁盘。
-    OSS 替换点：将此函数体改为上传到对象存储即可；调用方 store_image 零改动。
-    """
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    dest.write_bytes(data)
-
-
 def store_image(data: bytes, *, user_id: int, kind: str, ext: str = "png") -> str:
-    """写图片到 platform_data/ai_images/ 并返回相对 URL。
+    """写图片到统一存储并返回相对 URL。
 
     文件名格式：ai_{user_id}_{random_hex}.{ext}
-    返回值：/api/images/file/{filename}
-
-    OSS 替换点在 _write_image_bytes。换成对象存储时：
-      1. 将 _write_image_bytes 改为上传调用，返回外部 URL；
-      2. store_image 改为直接返回该外部 URL（跳过本地落盘）；
-      3. 调用方（image_jobs worker）零改动。
+    返回值：/api/images/file/{filename}（保持旧 URL 形式兼容，OSS 时改此处）
     """
+    from platform_app import storage  # lazy import，避免循环
+
     ext_clean = ext.lstrip(".").lower()
     if ext_clean not in _ALLOWED_EXTS:
         ext_clean = "png"
     filename = f"ai_{int(user_id)}_{secrets.token_hex(12)}.{ext_clean}"
-    dest = _IMAGE_ROOT / filename
-    _write_image_bytes(dest, data)
-    return f"/api/images/file/{filename}"
+    _key, url = storage.store_bytes(data, kind="ai_images", filename=filename)
+    return url
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -183,14 +165,16 @@ def list_user_images(
 
 @router.get("/api/images/file/{filename}")
 async def api_image_file(filename: str) -> FileResponse:
-    """服务 platform_data/ai_images/ 下的图片文件。
+    """服务 platform_data/ai_images/ 下的图片文件（旧 URL 保留兼容）。
 
     安全防护：
       1. 路径穿越：文件名不得含 / \\ .. 或以 . 开头。
       2. 扩展名白名单：只允许 png / jpg / jpeg / webp。
-      3. 实际路径必须在 _IMAGE_ROOT 下（resolve() 比较）。
+      3. 实际路径由 storage.resolve_path 做根限定（防穿越/symlink 逃逸）。
     """
-    # 1. 路径穿越检查（严于 avatar 路由，直接拒绝任何非纯文件名字符）
+    from platform_app import storage  # lazy import
+
+    # 1. 路径穿越检查（直接拒绝任何非纯文件名字符）
     if (
         "/" in filename
         or "\\" in filename
@@ -204,9 +188,10 @@ async def api_image_file(filename: str) -> FileResponse:
     if ext not in _ALLOWED_EXTS:
         raise HTTPException(status_code=400, detail="不支持的文件类型")
 
-    # 3. 路径限定（防御 symlink 逃逸）
-    target = (_IMAGE_ROOT / filename).resolve()
-    if not str(target).startswith(str(_IMAGE_ROOT.resolve())):
+    # 3. 通过 storage 解析真实路径（内部做路径穿越防护）
+    try:
+        target = storage.resolve_path("ai_images/" + filename)
+    except ValueError:
         raise HTTPException(status_code=400, detail="非法路径")
 
     if not target.exists():
@@ -254,7 +239,7 @@ async def api_generate_image(request: Request):
     attach: dict | None = body.get("attach") or None
     save_id: str | None = str(body.get("save_id") or "").strip() or None
 
-    # 校验 attach 结构（仅做基本格式检查，ownership 校验在 worker 侧）
+    # 校验 attach 结构 + 入队前归属鉴权
     if attach is not None:
         attach_type = attach.get("type") or ""
         if attach_type not in ("user_avatar", "card_avatar", "script_cover"):
@@ -262,6 +247,32 @@ async def api_generate_image(request: Request):
                 status_code=400,
                 detail=f"attach.type 无效: {attach_type!r}，合法值：user_avatar / card_avatar / script_cover",
             )
+        # S3: 入队前校验归属，防耗配额/信息泄露
+        if attach_type == "card_avatar":
+            card_id = attach.get("card_id") or attach.get("id")
+            if not card_id:
+                raise HTTPException(status_code=400, detail="attach.card_id 不能为空")
+            init_db()
+            with connect() as db:
+                row = db.execute(
+                    "select 1 from character_cards where id = %s and user_id = %s",
+                    (int(card_id), user_id),
+                ).fetchone()
+            if not row:
+                raise HTTPException(status_code=403, detail="无权为该角色卡生图：卡不存在或不属于当前用户")
+        elif attach_type == "script_cover":
+            script_id = attach.get("script_id") or attach.get("id")
+            if not script_id:
+                raise HTTPException(status_code=400, detail="attach.script_id 不能为空")
+            init_db()
+            with connect() as db:
+                row = db.execute(
+                    "select 1 from scripts where id = %s and owner_id = %s",
+                    (int(script_id), user_id),
+                ).fetchone()
+            if not row:
+                raise HTTPException(status_code=403, detail="无权为该剧本生图：剧本不存在或不属于当前用户")
+        # user_avatar: 始终放行（只能给自己生）
 
     from platform_app.image_jobs import enqueue_image_generation  # type: ignore[import]
 
@@ -393,6 +404,7 @@ def cleanup_old_chat_images(days: int = 14) -> int:
         )
 
     # 尝试删本地文件（失败逐条忽略，不影响已删 DB 行）
+    from platform_app import storage as _storage  # lazy import
     deleted_files = 0
     for r in rows:
         url: str = r["url"] or ""
@@ -401,9 +413,8 @@ def cleanup_old_chat_images(days: int = 14) -> int:
             filename = url[len("/api/images/file/"):]
             # 安全检查：只允许纯文件名
             if filename and "/" not in filename and "\\" not in filename and not filename.startswith("."):
-                target = _IMAGE_ROOT / filename
                 try:
-                    target.unlink(missing_ok=True)
+                    _storage.delete_file("ai_images/" + filename)
                     deleted_files += 1
                 except Exception as exc:
                     _log.debug("[cleanup_old_chat_images] unlink failed %s: %s", filename, exc)

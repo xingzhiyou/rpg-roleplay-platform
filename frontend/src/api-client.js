@@ -516,6 +516,11 @@
         // 别名: rebuild jobs 跟 import-jobs 同一张表 / 同一 SSE 路由
         return this.streamImport(jobId, handlers);
       },
+      // W3-C1: 手动上传剧本封面 → POST multipart /api/scripts/{id}/cover → {ok, url}
+      uploadCover: (id, file) => {
+        const fd = new FormData(); fd.append("file", file);
+        return _send(`/api/scripts/` + id + "/cover", { method: "POST", body: fd });
+      },
       // v44: Git 模式版本控制 / fork / 共享剧本同步
       fork: (sid, body) => POST(`${API_PREFIX}/scripts/` + sid + "/fork", body || {}),
       commits: (sid, q) => GET(`${API_PREFIX}/scripts/` + sid + "/commits", q),
@@ -635,6 +640,16 @@
       personaImages: (id) => GET(`${API_PREFIX}/me/character-cards/` + id + "/persona-images"),
       // POST /api/me/character-cards/{id}/persona-images/{image_id}/set-current  → {ok}
       personaSetCurrent: (id, imageId) => POST(`${API_PREFIX}/me/character-cards/` + id + "/persona-images/" + imageId + "/set-current", {}),
+      // W3-C1: 手动上传头像 → POST multipart /api/me/character-cards/{id}/avatar → {ok, url}
+      uploadAvatar: (id, file) => {
+        const fd = new FormData(); fd.append("file", file);
+        return _send(`${API_PREFIX}/me/character-cards/` + id + "/avatar", { method: "POST", body: fd });
+      },
+      // W3-C1: 手动上传人设图 → POST multipart /api/me/character-cards/{id}/persona-images/upload → {ok, url}
+      uploadPersonaImage: (id, file) => {
+        const fd = new FormData(); fd.append("file", file);
+        return _send(`${API_PREFIX}/me/character-cards/` + id + "/persona-images/upload", { method: "POST", body: fd });
+      },
     },
 
     // ---------- Chat history (SillyTavern JSONL import) ----------
@@ -692,17 +707,29 @@
     },
 
     // ---------- Library / files ----------
+    // W3-C1: S5 文件库在线服务化(只读管理,不支持手动上传)。
+    // GET /api/library?kind=X → {items:[{id,kind,url,source,ref_kind,ref_id,size,created_at,...}]}
+    // GET /api/library/asset/{id} → 单个资产(owner 校验)
+    // GET /api/library/asset/{id}/download → 带 Content-Disposition 的下载
+    // POST /api/library/asset/{id}/delete {confirm:true} → 删除(关联检查由后端做)
     library: {
-      list: (q) => GET(`${API_PREFIX}/library`, q),
-      upload: (file, path) => {
+      list: (kind) => GET(`/api/library`, kind ? { kind } : undefined),
+      get: (id) => GET(`/api/library/asset/` + encodeURIComponent(id)),
+      downloadUrl: (id) => BASE + `/api/library/asset/` + encodeURIComponent(id) + `/download`,
+      deleteAsset: (id, confirm) => {
+        const fd_body = { confirm: confirm === undefined ? true : !!confirm };
+        return _send(`/api/library/asset/` + encodeURIComponent(id) + `/delete`, { method: "POST", body: fd_body });
+      },
+      // 旧接口保留(内部用,别再从 UI 调)
+      _legacyUpload: (file, path) => {
         const fd = new FormData();
         fd.append("file", file);
         if (path) fd.append("path", path);
         return _send(`${API_PREFIX}/library/upload`, { method: "POST", body: fd });
       },
-      mkdir: (body) => POST(`${API_PREFIX}/library/mkdir`, body),
-      delete: (body) => POST(`${API_PREFIX}/library/delete`, body),
-      downloadUrl: (path) => BASE + `${API_PREFIX}/library/download?path=` + encodeURIComponent(path),
+      _legacyMkdir: (body) => POST(`${API_PREFIX}/library/mkdir`, body),
+      _legacyDelete: (body) => POST(`${API_PREFIX}/library/delete`, body),
+      _legacyDownloadUrl: (path) => BASE + `${API_PREFIX}/library/download?path=` + encodeURIComponent(path),
     },
 
     // ---------- Uploads (chunked) ----------

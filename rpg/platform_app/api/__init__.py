@@ -21,6 +21,7 @@ from .feedback import router as _feedback_router
 from .policy import router as _policy_router
 from .federation import router as _federation_router
 from .images import router as _images_router
+from .storage_routes import router as _storage_router
 
 router.include_router(_auth_router)
 router.include_router(_platform_router)
@@ -38,6 +39,7 @@ router.include_router(_feedback_router)
 router.include_router(_policy_router)
 router.include_router(_federation_router)
 router.include_router(_images_router)
+router.include_router(_storage_router)
 
 # re-export 跨模块用的符号 (让外部 `from platform_app.api import ...` 仍然工作)
 from ..security import public_user

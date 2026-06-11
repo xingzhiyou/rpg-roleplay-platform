@@ -228,13 +228,19 @@ class TestWorkerHandlerMock(unittest.TestCase):
         self.assertEqual(row["status"], "done",
                          f"status 应为 done，实际={row['status']!r}")
         url: str = row["url"]
-        self.assertTrue(url.startswith("/api/images/file/"),
-                        f"URL 应形如 /api/images/file/...，实际={url!r}")
+        # W1 后 URL 格式统一为 /api/storage/ai_images/...（旧别名 /api/images/file/ 仍保留兼容）
+        self.assertTrue(
+            url.startswith("/api/storage/ai_images/") or url.startswith("/api/images/file/"),
+            f"URL 应形如 /api/storage/ai_images/... 或 /api/images/file/...，实际={url!r}",
+        )
 
         # 验证文件真正落盘
-        from platform_app.api.images import _IMAGE_ROOT
-        filename = url.split("/api/images/file/")[-1]
-        fpath = _IMAGE_ROOT / filename
+        from platform_app import storage as _storage
+        if url.startswith("/api/storage/ai_images/"):
+            filename = url[len("/api/storage/ai_images/"):]
+        else:
+            filename = url.split("/api/images/file/")[-1]
+        fpath = _storage.resolve_path("ai_images/" + filename)
         self.assertTrue(fpath.exists(), f"磁盘文件不存在: {fpath}")
         self.assertEqual(fpath.read_bytes(), FAKE_PNG, "磁盘文件内容不符")
 

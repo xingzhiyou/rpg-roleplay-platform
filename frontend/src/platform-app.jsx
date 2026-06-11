@@ -33,6 +33,7 @@ import { FeedbackQuickModal } from './components/FeedbackQuickModal.jsx';
 import HelpDrawerRoot from './components/HelpDrawer.jsx';
 import AvatarImg from './components/AvatarImg.jsx';
 import GenerateImageModal from './components/GenerateImageModal.jsx';
+import FileLibrary from './components/FileLibrary.jsx';
 // Cloudscape shell(AWS 控制台架构 + 暖色主题)
 import CSTopNavigation from '@cloudscape-design/components/top-navigation';
 import CSAppLayout from '@cloudscape-design/components/app-layout';
@@ -68,9 +69,8 @@ const getPLNav = (t) => [
   { id: "saves",    label: t('platform.nav.saves'),    icon: "play" },
   { id: "cards",    label: t('platform.nav.cards'),    icon: "cards" },
   { id: "cards-online", label: t('platform.nav.cards_online', { defaultValue: '在线角色卡库' }), icon: "cards" },
-  // task 141: 测试期禁用文件库入口 — 资产库目前无 mime 白名单可绕过 → 安全风险。
-  // 整页保留代码但导航不暴露;后端 library.py 同步加 403 短路。
-  // { id: "library",  label: t('platform.nav.library'),  icon: "folder" },
+  // W3-C2: 文件库(只读管理,不支持手动上传,安全风险已消除)
+  { id: "library",  label: t('platform.nav.library'),  icon: "folder" },
   { section: t('platform.nav.section_config') },
   { id: "settings", label: t('platform.nav.settings'), icon: "settings" },
   { id: "usage",    label: t('platform.nav.usage'),    icon: "usage" },
@@ -693,8 +693,8 @@ function UnifiedSearch({ open, onClose, setPage }) {
     { id: "cards-npc", label: tSearch('platform.nav.cards_npc_full'), kind: "page", icon: "cards",   keywords: "npc characters" },
     { id: "saves",    label: tSearch('platform.nav.saves'),           kind: "page", icon: "play",     keywords: "saves continue" },
     { id: "saves-branches", label: tSearch('platform.nav.saves_branches_full'), kind: "page", icon: "branch", keywords: "branches tree fork" },
-    // task 141: 文件库测试期禁用,不显示在搜索
-    // { id: "library",  label: tSearch('platform.nav.library'),         kind: "page", icon: "folder",   keywords: "library files assets" },
+    // W3-C2: 文件库开放
+    { id: "library",  label: tSearch('platform.nav.library'),         kind: "page", icon: "folder",   keywords: "library files assets 文件库" },
     { id: "settings", label: tSearch('platform.nav.settings'),        kind: "page", icon: "settings", keywords: "settings preferences" },
     { id: "usage",    label: tSearch('platform.nav.usage'),           kind: "page", icon: "usage",    keywords: "usage tokens cost" },
     { id: "plugins",  label: tSearch('platform.nav.plugins'),         kind: "page", icon: "plug",     keywords: "plugins extensions" },
@@ -2469,21 +2469,8 @@ const LIB_ICON = { folder: "folder", image: "image", archive: "folder", markdown
 /* ---------------------------- LIBRARY (cont) -------------------- */
 
 function LibraryPage() {
-  // task 141: 测试期资产库禁用 — 后端无 mime 白名单,可上传任意文件,安全风险。
-  // 显示禁用提示页,不渲染原 list / upload UI。等通用文件白名单 + 病毒扫描接入后再开。
-  return (
-    <div style={{ padding: 32, textAlign: 'center', color: 'var(--muted, #968f85)' }}>
-      <div style={{ fontSize: 48, marginBottom: 16, opacity: 0.4 }}>🗂️</div>
-      <h2 style={{ color: 'var(--text, #ebe7df)', marginBottom: 12 }}>文件库 · 测试期暂停</h2>
-      <p style={{ fontSize: 13, lineHeight: 1.7, maxWidth: 520, margin: '0 auto' }}>
-        测试阶段我们只允许上传剧本文件 (.txt / .md) 用于「导入剧本」。
-        其他附件 / 资产上传暂时关闭,等接入文件类型白名单 + 病毒扫描后再开放。
-      </p>
-      <p style={{ fontSize: 12, marginTop: 16, opacity: 0.6 }}>
-        如需上传剧本: 前往「剧本」页面 → 「导入剧本」按钮。
-      </p>
-    </div>
-  );
+  // W3-C2: 文件库 — 只读管理(列表/查看/下载/删除带关联警告)
+  return <FileLibrary />;
 }
 
 function LibraryPage_DISABLED_BACKUP() {

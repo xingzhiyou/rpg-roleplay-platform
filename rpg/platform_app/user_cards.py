@@ -47,6 +47,23 @@ def compute_persona_hash(card: dict) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 _SLUG_RE = re.compile(r"[^0-9A-Za-z_一-鿿]+")
+
+# ── avatar_path 前缀白名单（防外部 URL 注入）──────────────────────────
+_AVATAR_PATH_PREFIXES: tuple[str, ...] = (
+    "/api/storage/",
+    "/api/images/file/",
+    "/api/profile/avatar/file/",
+)
+
+
+def _safe_avatar_path(v: object) -> str:
+    """只允许空串或以白名单前缀开头的 avatar_path；否则置空（丢弃外部 URL）。"""
+    s = str(v or "").strip()
+    if not s:
+        return ""
+    if any(s.startswith(prefix) for prefix in _AVATAR_PATH_PREFIXES):
+        return s
+    return ""
 _VALID_SCOPES = {"private", "global", "public"}
 
 
@@ -115,7 +132,7 @@ def upsert_persona(user_id: int, payload: dict[str, Any]) -> dict[str, Any]:
         "background": (payload.get("background") or "").strip(),
         "appearance": (payload.get("appearance") or "").strip(),
         "personality": (payload.get("personality") or "").strip(),
-        "avatar_path": (payload.get("avatar_path") or "").strip(),
+        "avatar_path": _safe_avatar_path(payload.get("avatar_path")),
         "tags": Jsonb(_normalize_list(payload.get("tags"))),
         "metadata": Jsonb(payload.get("metadata") or {}),
         "is_default": is_default,
@@ -362,6 +379,7 @@ def upsert_user_card(user_id: int, payload: dict[str, Any]) -> dict[str, Any]:
         "importance": int(payload.get("importance") or 100),  # PC 默认 100,前端高级页可调
         "enabled": bool(payload.get("enabled", True)),
         "scope": _normalize_scope(payload.get("scope")),
+        "avatar_path": _safe_avatar_path(payload.get("avatar_path")),
     }
 
     # SEC(M-13): metadata JSONB 限长(character_book 经 JSON body 路径可达 nginx 50MB),防存储放大。
@@ -388,6 +406,7 @@ def upsert_user_card(user_id: int, payload: dict[str, Any]) -> dict[str, Any]:
                   tags=%(tags)s, metadata=%(metadata)s,
                   token_budget=%(token_budget)s, priority=%(priority)s,
                   importance=%(importance)s, enabled=%(enabled)s, scope=%(scope)s,
+                  avatar_path=%(avatar_path)s,
                   row_version = row_version + 1, updated_at = now()
                 where id = %(id)s and user_id = %(user_id)s and card_type = 'pc'
                 """,
@@ -404,14 +423,16 @@ def upsert_user_card(user_id: int, payload: dict[str, Any]) -> dict[str, Any]:
                   user_id, slug, card_type, source, first_revealed_chapter,
                   name, full_name, aliases, identity, background, appearance, personality,
                   speech_style, current_status, secrets, sample_dialogue,
-                  tags, metadata, token_budget, priority, importance, enabled, scope
+                  tags, metadata, token_budget, priority, importance, enabled, scope,
+                  avatar_path
                 ) values (
                   %(user_id)s, %(slug)s, 'pc', 'user', 1,
                   %(name)s, %(full_name)s, %(aliases)s, %(identity)s, %(background)s,
                   %(appearance)s, %(personality)s,
                   %(speech_style)s, %(current_status)s, %(secrets)s, %(sample_dialogue)s,
                   %(tags)s, %(metadata)s, %(token_budget)s, %(priority)s,
-                  %(importance)s, %(enabled)s, %(scope)s
+                  %(importance)s, %(enabled)s, %(scope)s,
+                  %(avatar_path)s
                 )
                 on conflict(user_id, slug, card_type) where card_type in ('pc','persona')
                 do update set
@@ -423,6 +444,7 @@ def upsert_user_card(user_id: int, payload: dict[str, Any]) -> dict[str, Any]:
                   tags=excluded.tags, metadata=excluded.metadata,
                   token_budget=excluded.token_budget, priority=excluded.priority,
                   importance=excluded.importance, enabled=excluded.enabled, scope=excluded.scope,
+                  avatar_path=excluded.avatar_path,
                   row_version = character_cards.row_version + 1, updated_at = now()
                 returning *
                 """,

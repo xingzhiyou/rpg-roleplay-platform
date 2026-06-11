@@ -2481,6 +2481,7 @@ function ModuleModelsSection() {
     { id: "black_swan",    label: "黑天鹅事件代理",         shape: "flat", apiKey: "black_swan_agent.api_id",        modelKey: "black_swan_agent.model_real_name",       tip: "主动触发世界突发事件的子代理;空 = 系统默认。" },
     { id: "agent",         label: "通用子代理兜底",         shape: "flat", apiKey: "agent.api_id",                   modelKey: "agent.model_real_name",                  tip: "未单独配置模型的其它子代理统一兜底用它;空 = 跟主 GM / 系统默认。" },
     { id: "embedder",      label: "向量嵌入 (RAG)",         shape: "flat", apiKey: "embed.api_id",                  modelKey: "embed.model_real_name",                  capsFilter: ["embedding"], allowInherit: false, defaultApiId: "vertex_ai", defaultModelId: "text-embedding-004", credentialApiId: "AgentPlatform", tip: "向量嵌入模型，用于 RAG 召回 + 拆书后的语义检索。系统默认 Vertex text-embedding-004，需要在「API 密钥」配 Vertex SA JSON 才能用。可改成其他 embedding 模型。" },
+    { id: "image_gen",     label: "图像生成模型",           shape: "flat", apiKey: "image_gen.api_id",              modelKey: "image_gen.model_real_name",              capsFilter: ["image_gen"], allowInherit: false, tip: "生图功能(聊天内 AI 生图 / 角色卡头像 / 剧本封面 / 人设图)默认使用的 provider 和模型;聊天里 GM 自主调用生图工具也走它。需在「API 密钥」配置对应 BYOK key 才能生成(未配会提示去配)。与生图弹窗里的模型选择同步。" },
   ];
 
   const [prefs, setPrefs] = useStatePL({});

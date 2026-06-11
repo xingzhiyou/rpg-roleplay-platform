@@ -105,6 +105,62 @@ def _t_delete_character_card(user_id: int, args: dict) -> str:
         return f"失败: {type(exc).__name__}: {exc}"
 
 
+def _t_clone_npc_to_user_card(user_id: int, args: dict) -> str:
+    """把(自有或已订阅共享的)剧本里的 NPC 角色卡完整复制成当前用户的角色卡。
+
+    **独立副本,非指针**:full_name/背景/外貌/性格/语气/范例对白/头像全带上;站内头像
+    URL 直接复用(物理不重存,同源鉴权链接放行)。镜像前端 promoteNpcToUserCard。
+    鉴权:读 NPC 走 knowledge.get_character_card(owner 或订阅者均可——共享剧本无编辑权限
+    也能读);写进当前用户自己的角色卡空间(upsert_user_card)。因此对「订阅了别人公开
+    剧本、想把里面 NPC 收藏成自己可编辑的角色卡」这一流程是顺的。
+    """
+    sid = args.get("script_id")
+    card_id = args.get("card_id")
+    if not sid:
+        return "失败: script_id 必填"
+    if not card_id:
+        return "失败: card_id 必填(先用 list_script_npcs 拿到 NPC 角色卡 id)"
+    try:
+        from platform_app import knowledge as _know
+        from platform_app.user_cards import upsert_user_card
+        npc = _know.get_character_card(user_id, int(sid), int(card_id))  # owner-or-subscriber 鉴权
+        if not npc:
+            return f"失败: 剧本 #{int(sid)} 内找不到 NPC 角色卡 #{int(card_id)}"
+        name = (npc.get("name") or npc.get("full_name") or "").strip() or "未命名角色"
+        tags = list(npc.get("tags") or [])
+        if "源自 NPC" not in tags:
+            tags.append("源自 NPC")
+        payload = {
+            "name": name,
+            "full_name": npc.get("full_name") or "",
+            "aliases": npc.get("aliases") or [],
+            "identity": npc.get("identity") or "",
+            "background": npc.get("background") or "",
+            "appearance": npc.get("appearance") or "",
+            "personality": npc.get("personality") or "",
+            "speech_style": npc.get("speech_style") or "",
+            "current_status": npc.get("current_status") or "",
+            "secrets": npc.get("secrets") or "",
+            "sample_dialogue": npc.get("sample_dialogue") or [],
+            # 复制头像 URL(站内资产物理不重存);转换=完整复制一份独立用户卡,非指针。
+            "avatar_path": npc.get("avatar_path") or "",
+            "tags": tags,
+            "metadata": {
+                "source": "npc_promote",
+                "source_script_id": int(sid),
+                "source_npc_id": int(card_id),
+            },
+            "enabled": True,
+        }
+        row = upsert_user_card(user_id, payload)
+        return (f"已克隆为用户角色卡: id={row.get('id')} name={name} "
+                f"slug={row.get('slug')}(独立副本,可在「角色卡」页编辑/换头像)")
+    except ValueError as exc:
+        return f"失败 (权限): {exc}"
+    except Exception as exc:
+        return f"失败: {type(exc).__name__}: {exc}"
+
+
 def register_persona_tools() -> None:
     registry = get_registry()
 
@@ -147,6 +203,17 @@ def register_persona_tools() -> None:
         ("delete_character_card", "永久删除角色卡",
          {"type": "object", "properties": {"card_id": {"type": "integer"}}, "required": ["card_id"]},
          _t_delete_character_card, _USER_DEST, True),
+        ("clone_npc_to_user_card",
+         "把(自有或已订阅共享的)剧本里的 NPC 角色卡完整复制成当前用户的角色卡(独立副本,"
+         "含全名/背景/外貌/性格/语气/范例对白/头像)。共享剧本无编辑权限也能克隆。"
+         "先用 list_scripts 拿 script_id、list_script_npcs 拿 card_id。",
+         {"type": "object",
+          "properties": {
+              "script_id": {"type": "integer", "description": "NPC 所在剧本 id"},
+              "card_id": {"type": "integer", "description": "NPC 角色卡 id(来自 list_script_npcs)"},
+          },
+          "required": ["script_id", "card_id"]},
+         _t_clone_npc_to_user_card, _USER_MUTATE, False),  # 跨 save 持久资源,与 create_character_card 同策略:console_assistant 可,自由叙事 llm_chat 禁
     ]
     for name, desc, schema, exec_, origins, destructive in user_specs:
         if not registry.has(name):

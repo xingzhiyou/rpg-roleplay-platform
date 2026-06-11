@@ -271,7 +271,10 @@ class _OpenAICompatBackend:
 
         sep = "__"
         from core.config import tiered_tools_enabled as _tiered_enabled
-        _WINDOW = 64  # 直接进 tools 数组的窗口大小(provider 工具数上限的保守值)
+        from core.config import tool_window_size as _tool_window
+        # 窗口外工具进 load_tools 目录按需加载(见 _tiered.py)。默认 16(原硬编码 64 → 91 个
+        # 工具里 64 个仍每轮全发 ≈ 6.7k token,阶梯化形同虚设;收到 16 后每轮工具 token 大降)。
+        _WINDOW = _tool_window()
 
         def _mk_openai_tool(t):
             """unified tool → OpenAI function 定义;无效(缺 sid/name)返回 None。"""

@@ -55,6 +55,19 @@ def tiered_tools_enabled() -> bool:
     默认开;RPG_TIERED_TOOLS=0 关闭 → 退回旧的「前 N 个直接发、其余丢弃」截断行为。"""
     return os.getenv("RPG_TIERED_TOOLS", "1") != "0"
 
+def tool_window_size() -> int:
+    """每轮直接塞进 LLM tools 数组的「完整 schema」工具数(窗口)。窗口外的进 load_tools 目录。
+
+    窗口越小,每轮工具 token 越省(91 个全发约 9.5k token);但窗口外工具要多一次 load 往返。
+    chat_tool_router 已按 _rank 排序(酒馆自管理 set_tavern_*/tavern_* 排最前 → 永远在窗口内),
+    所以默认 16 足以让酒馆核心工具与常用读取工具常驻、其余(建卡/生图/anchor 等)按需加载。
+    RPG_TOOL_WINDOW 覆盖。"""
+    try:
+        n = int(os.getenv("RPG_TOOL_WINDOW", "16"))
+    except (TypeError, ValueError):
+        n = 16
+    return max(1, n)
+
 # ── 网络 ─────────────────────────────────────────────────────────────────
 def cors_origins() -> str | None:
     return os.getenv("RPG_CORS_ORIGINS")

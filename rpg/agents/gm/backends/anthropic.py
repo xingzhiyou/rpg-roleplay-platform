@@ -293,13 +293,16 @@ class _AnthropicBackend:
         - assistant + tool_result 消息装回历史的具体形态
         """
         sep = "__"  # server_id 与 tool_name 分隔符
-        # MCP → Anthropic tools
-        anthropic_tools = []
-        for t in mcp_tools[:40]:
+        from core.config import tiered_tools_enabled as _tiered_enabled
+        from core.config import tool_window_size as _tool_window
+        from agents.gm.backends import _tiered
+
+        def _mk(t):
+            """unified tool → Anthropic tool 定义;缺 sid/name 返回 None。"""
             sid = str(t.get("server_id", ""))
             tname = str(t.get("name", ""))
             if not sid or not tname:
-                continue
+                return None
             safe_sid = re.sub(r"[^A-Za-z0-9_-]", "_", sid)
             safe_tname = re.sub(r"[^A-Za-z0-9_-]", "_", tname)
             full_name = f"{safe_sid}{sep}{safe_tname}"[:64]
@@ -308,13 +311,30 @@ class _AnthropicBackend:
                 schema = {"type": "object", "properties": {}}
             if schema.get("type") != "object":
                 schema = {"type": "object", "properties": schema.get("properties", {})}
-            anthropic_tools.append({
+            return {
                 "name": full_name,
                 "description": (t.get("description") or "")[:512],
                 "input_schema": schema,
+            }
+
+        # 阶梯化:窗口内完整 schema 直发,窗口外进 load_tools 目录(原 [:40] 硬截断会**丢弃**
+        # 第 41+ 个工具 → 模型够不到,只能幻觉式叙述「已调用」)。append-only 不破坏前缀缓存。
+        window_tools, overflow_index, catalog_lines = _tiered.split_window(
+            mcp_tools, _tool_window(), _tiered_enabled())
+        loaded_overflow: set[str] = set()
+        anthropic_tools = []
+        for t in window_tools:
+            m = _mk(t)
+            if m:
+                anthropic_tools.append(m)
+        if catalog_lines:
+            anthropic_tools.append({
+                "name": _tiered.LOAD_TOOLS_FULL_NAME,
+                "description": _tiered.load_tools_description(catalog_lines),
+                "input_schema": _tiered.LOAD_TOOLS_PARAMS,
             })
         # 给 tools 数组末尾加 cache_control breakpoint → 把 system+tools 整段稳定前缀纳入缓存
-        # (tools 定义每轮一致;Anthropic 最多 4 个 breakpoint,这里 system(1)+tools(1),仍有余量)。
+        # (窗口+目录每轮一致;load 后新 append 的工具在 breakpoint 之后,不影响前缀命中)。
         if anthropic_tools:
             anthropic_tools[-1] = {**anthropic_tools[-1], "cache_control": {"type": "ephemeral"}}
         if not anthropic_tools:
@@ -366,6 +386,20 @@ class _AnthropicBackend:
             messages.append({"role": "assistant", "content": assistant_content})
             tool_result_blocks: list[dict[str, Any]] = []
             for use in pending_uses:
+                # 阶梯化:load_tools 不路由 dispatcher,把目录里的工具 schema append 进
+                # anthropic_tools(只增不重排)→ 下一轮迭代该工具即可直接调用。
+                if _tiered.is_load_tools(use["server_id"], use["tool_name"]):
+                    newly, ack = _tiered.resolve_load(use["arguments"], overflow_index, loaded_overflow)
+                    for t in newly:
+                        m = _mk(t)
+                        if m:
+                            anthropic_tools.append(m)
+                    yield {"type": "tool_result", "ok": True, "result": ack, "error": None}
+                    tool_result_blocks.append({
+                        "type": "tool_result", "tool_use_id": use["id"],
+                        "content": ack, "is_error": False,
+                    })
+                    continue
                 try:
                     result = mcp_call(use["server_id"], use["tool_name"], use["arguments"])
                 except Exception as exc:

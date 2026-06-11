@@ -335,12 +335,16 @@ class _VertexBackend:
         # 截断上限:Gemini 2.5/3.x 实测支持 ≥64 个 FunctionDeclaration,40 太保守把
         # KB 查询工具(lookup_/search_canon)砍出去了。提到 64 + chat_tool_router 已
         # 按优先级排序,KB 查询永远在前面,即使再截也不丢。
-        fn_decls = []
-        for t in mcp_tools[:64]:
+        from core.config import tiered_tools_enabled as _tiered_enabled
+        from core.config import tool_window_size as _tool_window
+        from agents.gm.backends import _tiered
+
+        def _mk(t):
+            """unified tool → Gemini FunctionDeclaration;缺 sid/name 返回 None。"""
             sid = str(t.get("server_id", ""))
             tname = str(t.get("name", ""))
             if not sid or not tname:
-                continue
+                return None
             safe_sid = re.sub(r"[^A-Za-z0-9_-]", "_", sid)
             safe_tname = re.sub(r"[^A-Za-z0-9_-]", "_", tname)
             full_name = f"{safe_sid}{sep}{safe_tname}"[:64]
@@ -350,17 +354,35 @@ class _VertexBackend:
             schema_clean = _sanitize_schema(schema_raw)
             try:
                 # Gemini 接受 OpenAPI 风格 schema dict 作为 parameters
-                fn_decls.append(types.FunctionDeclaration(
+                return types.FunctionDeclaration(
                     name=full_name,
                     description=(t.get("description") or "")[:512],
                     parameters=schema_clean if schema_clean.get("type") == "object" else {"type": "object", "properties": {}},
-                ))
+                )
             except Exception:
                 # 个别字段不兼容时降级到无 schema 的工具
+                return types.FunctionDeclaration(
+                    name=full_name, description=(t.get("description") or "")[:512])
+
+        # 阶梯化(原 [:64] 硬截断会**丢弃**第 65+ 个工具 → 模型够不到)。窗口内直发,窗口外进
+        # load_tools 目录;load 后追加工具会重建 tools_param + 停用显式缓存(见下方 dispatch)。
+        window_tools, overflow_index, catalog_lines = _tiered.split_window(
+            mcp_tools, _tool_window(), _tiered_enabled())
+        loaded_overflow: set[str] = set()
+        fn_decls = []
+        for t in window_tools:
+            fd = _mk(t)
+            if fd is not None:
+                fn_decls.append(fd)
+        if catalog_lines:
+            try:
                 fn_decls.append(types.FunctionDeclaration(
-                    name=full_name,
-                    description=(t.get("description") or "")[:512],
+                    name=_tiered.LOAD_TOOLS_FULL_NAME,
+                    description=_tiered.load_tools_description(catalog_lines),
+                    parameters=_sanitize_schema(_tiered.LOAD_TOOLS_PARAMS),
                 ))
+            except Exception:
+                pass
 
         if not fn_decls:
             for chunk in self.stream(system, messages, max_tokens=max_tokens):
@@ -461,6 +483,23 @@ class _VertexBackend:
             # 顺序 dispatch，把每个 function_response part 收成 user role 一次性 append
             result_parts: list[Any] = []
             for pc in pending_calls:
+                # 阶梯化:load_tools 不路由 dispatcher。追加 fn_decls + 重建 tools_param,并把
+                # _cache_name 置空 —— Gemini 命中显式缓存时 request 不带 tools,新加载的工具就发不
+                # 出去;故 load 后该轮余下迭代改走 inline tools 路径。
+                if _tiered.is_load_tools(pc["server_id"], pc["tool_name"]):
+                    newly, ack = _tiered.resolve_load(pc["arguments"], overflow_index, loaded_overflow)
+                    for t in newly:
+                        fd = _mk(t)
+                        if fd is not None:
+                            fn_decls.append(fd)
+                    if newly:
+                        tools_param = [types.Tool(function_declarations=fn_decls)]
+                        _cache_name = None
+                    yield {"type": "tool_result", "ok": True, "result": ack, "error": None}
+                    result_parts.append(types.Part.from_function_response(
+                        name=pc["name"], response={"result": ack},
+                    ))
+                    continue
                 try:
                     result = mcp_call(pc["server_id"], pc["tool_name"], pc["arguments"])
                 except Exception as exc:

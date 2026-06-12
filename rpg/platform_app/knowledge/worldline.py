@@ -5,6 +5,7 @@ from typing import Any
 from psycopg.types.json import Jsonb
 
 from platform_app.db import connect, expose, init_db
+from platform_app.knowledge._session_repo import _PRESERVE_SETTINGS_SQL
 from platform_app.knowledge._utils import _clean_text
 from platform_app.knowledge._worldline_repo import _db_select_worldline_variables
 from platform_app.knowledge.session import _state_from_save, ensure_game_session
@@ -36,7 +37,11 @@ def set_worldline_variable(user_id: int, save_id: int, key: str, value: str, sou
         variables = worldline.setdefault("user_variables", {})
         variables[key] = {"value": value, "source": source, "locked": True}
         db.execute(
-            "update game_sessions set state = %s, worldline = %s, updated_at = now(), row_version = row_version + 1 where id = %s",
+            # worldline 整列写入时叠加保留玩家设置键(见 _session_repo._PRESERVE_SETTINGS_SQL),
+            # 否则设/删世界线变量会顺手抹掉 steering_strength 等设置。
+            "update game_sessions set state = %s, "
+            "worldline = %s || " + _PRESERVE_SETTINGS_SQL + ", "
+            "updated_at = now(), row_version = row_version + 1 where id = %s",
             (Jsonb(state), Jsonb(worldline), session["id"]),
         )
     return expose(row)  # type: ignore[return-value]
@@ -54,7 +59,11 @@ def remove_worldline_variable(user_id: int, save_id: int, key: str) -> dict[str,
         variables = worldline.setdefault("user_variables", {})
         variables.pop(key, None)
         db.execute(
-            "update game_sessions set state = %s, worldline = %s, updated_at = now(), row_version = row_version + 1 where id = %s",
+            # worldline 整列写入时叠加保留玩家设置键(见 _session_repo._PRESERVE_SETTINGS_SQL),
+            # 否则设/删世界线变量会顺手抹掉 steering_strength 等设置。
+            "update game_sessions set state = %s, "
+            "worldline = %s || " + _PRESERVE_SETTINGS_SQL + ", "
+            "updated_at = now(), row_version = row_version + 1 where id = %s",
             (Jsonb(state), Jsonb(worldline), session["id"]),
         )
     return {"removed": key}

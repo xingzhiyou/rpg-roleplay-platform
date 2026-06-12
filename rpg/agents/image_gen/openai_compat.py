@@ -25,6 +25,27 @@ from agents.image_gen.base import ImageGenError, decode_b64, download_url
 _CONNECT_TIMEOUT = 10.0
 _READ_TIMEOUT = 180.0  # 生图比聊天慢,给足时间
 
+# 这些 provider 的图像 API 是 chat/completions 图像模态,**没有** /images/generations 端点
+# (OpenRouter 的 google/gemini-*-image、openai/gpt-*-image 等)。直接走 chat 模态,免得先
+# 打一发不存在的 /images/generations 拿到误导性的 401/404。
+_CHAT_MODALITY_IMAGE_PROVIDERS = {"openrouter"}
+
+
+def _raise_http(resp, api_id: str, label: str) -> None:
+    """非 200 → 抛 ImageGenError。401/403 给「Key 无效」的可行动文案(而非裸 HTTP 401)。"""
+    code = resp.status_code
+    if code in (401, 403):
+        hint = "(OpenRouter 的 key 形如 sk-or-v1-…)" if api_id == "openrouter" else ""
+        raise ImageGenError(
+            f"{api_id} 鉴权失败(HTTP {code}): provider 拒绝了你的 API Key。请到「设置 → API 凭证」"
+            f"检查 {api_id} 的 Key 是否正确、有效{hint}"
+        )
+    try:
+        detail = resp.json()
+    except Exception:
+        detail = resp.text[:300]
+    raise ImageGenError(f"openai_compat: {label} HTTP {code}: {detail}")
+
 
 def _resolve_base_url(api_id: str, base_url: str | None) -> str:
     """凭证里的 base_url_override 优先;内置 provider(openai/openrouter/guiji…)回退 catalog。"""
@@ -74,7 +95,7 @@ def _strip_data_uri(s: str) -> str:
 
 
 def _try_images_api(
-    base: str, headers: dict[str, str], prompt: str, model: str, params: dict
+    base: str, headers: dict[str, str], prompt: str, model: str, params: dict, api_id: str
 ) -> list[bytes]:
     """标准 OpenAI Images API。返回 [] 表示「应回退到 chat 模态」(端点不存在)。"""
     endpoint = f"{base}/images/generations"
@@ -100,11 +121,7 @@ def _try_images_api(
     if resp.status_code in (404, 405):
         return []
     if resp.status_code != 200:
-        try:
-            detail = resp.json()
-        except Exception:
-            detail = resp.text[:500]
-        raise ImageGenError(f"openai_compat: images/generations HTTP {resp.status_code}: {detail}")
+        _raise_http(resp, api_id, "images/generations")
 
     try:
         payload = resp.json()
@@ -147,7 +164,7 @@ def _collect_chat_images(message: dict[str, Any]) -> list[bytes]:
 
 
 def _try_chat_modality(
-    base: str, headers: dict[str, str], prompt: str, model: str
+    base: str, headers: dict[str, str], prompt: str, model: str, api_id: str
 ) -> list[bytes]:
     """OpenRouter 等:chat/completions + modalities=["image","text"],图在 message 里。"""
     endpoint = f"{base}/chat/completions"
@@ -168,11 +185,7 @@ def _try_chat_modality(
         raise ImageGenError(f"openai_compat: 网络错误 ({exc})") from exc
 
     if resp.status_code != 200:
-        try:
-            detail = resp.json()
-        except Exception:
-            detail = resp.text[:500]
-        raise ImageGenError(f"openai_compat: chat 图像模态 HTTP {resp.status_code}: {detail}")
+        _raise_http(resp, api_id, "chat 图像模态")
 
     try:
         payload = resp.json()
@@ -205,8 +218,12 @@ def generate(
     base = _resolve_base_url(api_id, base_url)
     headers = _headers(api_key)
 
-    images = _try_images_api(base, headers, prompt, model, params or {})
+    # OpenRouter 等只有 chat 图像模态(无 /images/generations)→ 直接走,免打误导性 401。
+    if api_id in _CHAT_MODALITY_IMAGE_PROVIDERS:
+        return _try_chat_modality(base, headers, prompt, model, api_id)
+
+    images = _try_images_api(base, headers, prompt, model, params or {}, api_id)
     if images:
         return images
-    # /images/generations 不存在(404/405)→ 回退 chat 图像模态(OpenRouter 等)
-    return _try_chat_modality(base, headers, prompt, model)
+    # /images/generations 不存在(404/405)→ 回退 chat 图像模态
+    return _try_chat_modality(base, headers, prompt, model, api_id)

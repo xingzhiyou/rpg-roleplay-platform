@@ -455,7 +455,11 @@ function ModelsSection() {
         id: catalogId,
         credential_id: credentialId,
         name: api.display_name || api.name || catalogId,
-        base_url: api.base_url || "",
+        // 用户自己的 base_url_override(指向中转站)优先:它来自 list_credentials,不被
+        // _redact_catalog 抹掉;而 api.base_url 对非 admin 已被后端 redact 成空。用 override
+        // 兜底让 ① 详情/编辑弹窗显示真实中转站地址 ② 重新保存 key 时不会因表单空值把 override
+        // 清掉(与生成/同步实际所用一致)③ 同步模型时 body 也带上正确地址。
+        base_url: cred.base_url_override || api.base_url || "",
         key_set: !!cred.has_key,
         key_hint: cred.key_hint || t('settings.models.key_set_hint'),
         status: cred.enabled === false ? "disabled" : "configured",

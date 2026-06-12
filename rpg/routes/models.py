@@ -397,7 +397,12 @@ async def api_models_remote_sync(
     api = find_api(catalog, api_id) or {}
     default_api = default_api_for(api_id) or {}
     meta_api = {**default_api, **api}
-    base_url = (body or {}).get("base_url") or meta_api.get("base_url", "")
+    # 用户凭证里的 base_url_override 是「把内置 provider(如 OpenAI)指向自建中转站」的权威意图,
+    # 必须**优先**于 body / catalog 默认。否则:普通用户的 base_url 被 _redact_catalog 抹成空、
+    # 前端 body 传空 → 这里回退到 catalog 官方端点(api.openai.com),拿用户中转站的 key 打官方
+    # → 永远「不可访问」,拉到的也不是中转站的真实模型(用户反馈:拉取的模型不对)。
+    # 与生成路径一致(openai_compat.py 早已 base_url_override 优先)。base_url_override 在
+    # set_credential 落库时已做 SSRF 校验(强制公网 https),这里再校验一次也会通过。
     cred_base = ""
     try:
         from platform_app.user_credentials import get_credential
@@ -405,8 +410,7 @@ async def api_models_remote_sync(
         cred_base = (_cred or {}).get("base_url_override") or ""
     except Exception:
         cred_base = ""
-    if not base_url:
-        base_url = cred_base
+    base_url = cred_base or (body or {}).get("base_url") or meta_api.get("base_url", "")
     # SEC(H-2): body.base_url 由请求方控制,过去直接进 OpenAI client → SSRF 打内网/云元数据。
     # 解析 host→IP 校验,拒私网/保留地址(catalog/已存凭证的公网 base_url 会正常通过)。
     if base_url:

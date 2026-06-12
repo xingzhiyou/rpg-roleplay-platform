@@ -1696,7 +1696,7 @@ function ModelsSection({ nav, onBack }) {
     const credMap = {};
     for (const c of (creds?.items || creds?.credentials || [])) {
       const cid = normId(c.api_id || c.id);
-      credMap[cid] = { has_key: !!(c.has_credential||c.has_key||c.key_hint), key_hint: c.key_hint||'', enabled: c.enabled!==false };
+      credMap[cid] = { has_key: !!(c.has_credential||c.has_key||c.key_hint), key_hint: c.key_hint||'', enabled: c.enabled!==false, base_url_override: c.base_url_override||'' };
     }
     const list = data?.models?.apis || data?.apis || [];
     const rows = Array.isArray(list) ? list.map(api => {
@@ -1706,7 +1706,8 @@ function ModelsSection({ nav, onBack }) {
       return {
         id: cataId, credential_id: criId,
         name: api.display_name || api.name || cataId,
-        base_url: api.base_url || '',
+        // 用户自己的 base_url_override(中转站)优先;非 admin 的 api.base_url 已被后端 redact 成空。
+        base_url: cred.base_url_override || api.base_url || '',
         key_set: !!cred.has_key, key_hint: cred.key_hint || '—',
         connectivity: { status:'untested' },
         enabled: cred.enabled !== false, proxy: api.proxy || 'direct',

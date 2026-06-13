@@ -800,6 +800,7 @@ def resplit_script(
 
     total_words = sum(len(c.get("content") or "") for c in chapters)
     with connect() as db:
+        _lock_chapter_struct(db, script_id)  # 与 split/merge 共用锁,避免重切与逐章编辑并发互撞
         db.execute("SAVEPOINT resplit_save")
         try:
             db.execute("delete from script_chapters where script_id = %s", (script_id,))
@@ -1052,11 +1053,43 @@ def update_chapter(user_id: int, script_id: int, chapter_index: int, *,
     return {"ok": True, "chapter": expose(row)}
 
 
+# 章节结构变更(split / merge / resplit)按 script 串行化。两类历史 bug:
+# ① 并发双击 → 两个事务同时 shift+insert,撞 (script_id, chapter_index) 唯一约束;
+# ② 单条 `chapter_index = chapter_index ± 1` 自增/自减,非 deferrable 唯一约束逐行即时校验,
+#    Postgres 按非确定顺序处理时会瞬时撞键(生产 500 UniqueViolation 的真因)。
+# 本锁是事务级 advisory lock,提交即释放,解决 ①;②由下方「负区两段式」位移解决。
+_CHAPTER_STRUCT_LOCK_NS = 0x53435054  # 'SCPT'
+
+
+def _lock_chapter_struct(db, script_id: int) -> None:
+    db.execute("select pg_advisory_xact_lock(%s, %s)", (_CHAPTER_STRUCT_LOCK_NS, int(script_id)))
+
+
+def _shift_to_negative(db, script_id: int, gt_index: int) -> None:
+    """把 chapter_index > gt_index 的行整体挪到负区(o → -1-o):负数互不冲突、也不与正数冲突,
+    给后续 insert / 重排腾出干净空间,避免单条 UPDATE 自增时瞬时撞唯一键。"""
+    db.execute(
+        "update script_chapters set chapter_index = -1 - chapter_index, updated_at = now() "
+        "where script_id = %s and chapter_index > %s",
+        (script_id, gt_index),
+    )
+
+
+def _restore_from_negative(db, script_id: int, delta: int) -> None:
+    """把负区行翻正并整体平移 delta:原值 o = -1-x,目标 = o + delta = -1 - x + delta。"""
+    db.execute(
+        "update script_chapters set chapter_index = -1 - chapter_index + %s, updated_at = now() "
+        "where script_id = %s and chapter_index < 0",
+        (int(delta), script_id),
+    )
+
+
 def merge_chapters(user_id: int, script_id: int, first_index: int,
                    *, separator: str = "\n\n") -> dict[str, Any]:
     """合并 first_index 和 first_index+1 两章。后面所有章节 index 减 1。"""
     init_db()
     with connect() as db:
+        _lock_chapter_struct(db, script_id)
         owned = db.execute(
             "select 1 from scripts where id = %s and owner_id = %s", (script_id, user_id),
         ).fetchone()
@@ -1084,12 +1117,9 @@ def merge_chapters(user_id: int, script_id: int, first_index: int,
             (merged_content, len(merged_content), a["id"]),
         )
         db.execute("delete from script_chapters where id = %s", (b["id"],))
-        # 后续章节 index 全部 -1
-        db.execute(
-            "update script_chapters set chapter_index = chapter_index - 1, updated_at = now() "
-            "where script_id = %s and chapter_index > %s",
-            (script_id, first_index + 1),
-        )
+        # 后续章节 index 全部 -1(负区两段式,避免单条自减瞬时撞唯一键)
+        _shift_to_negative(db, script_id, first_index + 1)
+        _restore_from_negative(db, script_id, -1)
         # 更新 scripts.chapter_count
         cnt = db.execute(
             "select count(*) as n, coalesce(sum(word_count),0) as w from script_chapters where script_id = %s",
@@ -1109,6 +1139,7 @@ def split_chapter(user_id: int, script_id: int, chapter_index: int,
     if split_at <= 0:
         raise ValueError("split_at 必须 > 0")
     with connect() as db:
+        _lock_chapter_struct(db, script_id)
         owned = db.execute(
             "select 1 from scripts where id = %s and owner_id = %s", (script_id, user_id),
         ).fetchone()
@@ -1125,18 +1156,15 @@ def split_chapter(user_id: int, script_id: int, chapter_index: int,
             raise ValueError(f"split_at ({split_at}) 超过章节长度 ({len(content)})")
         left_text = content[:split_at]
         right_text = content[split_at:]
-        # 后续章节 index 全部 +1（腾位置）
-        db.execute(
-            "update script_chapters set chapter_index = chapter_index + 1, updated_at = now() "
-            "where script_id = %s and chapter_index > %s",
-            (script_id, chapter_index),
-        )
+        # 后续章节 index 全部 +1 腾位置(负区两段式:先挪负区,插入后再翻正,
+        # 避免单条自增时瞬时撞 (script_id, chapter_index) 唯一键 → 生产 500 真因)
+        _shift_to_negative(db, script_id, chapter_index)
         # 改原章为左半部分
         db.execute(
             "update script_chapters set content = %s, word_count = %s, updated_at = now() where id = %s",
             (left_text, len(left_text), ch["id"]),
         )
-        # 插入右半为新章
+        # 插入右半为新章(此时 chapter_index+1 已空出)
         db.execute(
             """
             insert into script_chapters(
@@ -1150,6 +1178,8 @@ def split_chapter(user_id: int, script_id: int, chapter_index: int,
              ch.get("volume_title") or "", "manual_split",
              float(ch.get("confidence") or 0)),
         )
+        # 负区行翻正并整体 +1(落到 chapter_index+2 起,与新插入的 chapter_index+1 不冲突)
+        _restore_from_negative(db, script_id, 1)
         cnt = db.execute(
             "select count(*) as n from script_chapters where script_id = %s",
             (script_id,),

@@ -1133,6 +1133,7 @@ function ScriptDetailPanel({ script: s, savesCount, scriptSaves = [], embedStatu
           isNew={npcEdit.isNew}
           kind="npc"
           onClose={() => setNpcEdit(null)}
+          onPromote={async (c) => { await onPromoteNpc(c || npcEdit.card); }}
           onSave={async (payload) => {
             try {
               await window.api.cards.scriptUpsert(s.id, payload);

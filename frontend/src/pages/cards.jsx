@@ -1719,10 +1719,11 @@ function NpcCardsView() {
    覆盖 user_character_cards 全部角色相关列:name / identity / aliases / tags /
    appearance / personality / speech_style / current_status / secrets /
    sample_dialogue / token_budget / priority / enabled / scope。 */
-function CardEditModal({ card, isNew, kind, onClose, onSave, targetScriptOptions = [], targetScriptId = "", onTargetScriptChange }) {
+function CardEditModal({ card, isNew, kind, onClose, onSave, onPromote, targetScriptOptions = [], targetScriptId = "", onTargetScriptChange }) {
   const { t } = useTranslation();
   const [form, setForm] = useStatePL(() => cardFormInit(card));
   const [submitting, setSubmitting] = useStatePL(false);
+  const [promoting, setPromoting] = useStatePL(false);
   const [avatarUrl, setAvatarUrl] = useStatePL(card?._raw?.avatar_path || card?.avatar_path || null);
   const u = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const nameOk = !!form.name.trim();
@@ -1806,6 +1807,14 @@ function CardEditModal({ card, isNew, kind, onClose, onSave, targetScriptOptions
                   <CSButton variant="primary" disabled={!nameOk || submitting} loading={submitting} onClick={doSave}>
                     {isNew ? t('cards.editor.btn_create') : t('cards.editor.btn_save')}
                   </CSButton>
+                  {/* NPC 卡:编辑页内直接「转为用户角色卡」(复制到自己名下,不改原剧本)。
+                      仅已存在的 NPC 卡 + 调用方传了 onPromote 时显示。 */}
+                  {kind === 'npc' && !isNew && onPromote && (
+                    <CSButton iconName="add-plus" disabled={promoting} loading={promoting}
+                      onClick={async () => { setPromoting(true); try { await onPromote(card); } finally { setPromoting(false); } }}>
+                      {t('cards.editor.btn_promote_npc', { defaultValue: '转为用户角色卡' })}
+                    </CSButton>
+                  )}
                   <CSButton variant="link" onClick={onClose}>{t('cards.editor.btn_cancel')}</CSButton>
                 </div>
               </CSSpaceBetween>

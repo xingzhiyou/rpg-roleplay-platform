@@ -634,9 +634,13 @@ export function WorldbookEditorView({ script }) {
     <CSSpaceBetween size="m">
       {readonlyBanner}
 
-      <div style={{ display: 'flex', gap: 16, minHeight: 0 }}>
+      {/* width:100% + minWidth:0 给 flex 行一个**确定宽度**:否则容器随内容收缩,内联编辑某格时
+          那格变窄输入框 → 表格 intrinsic 内容宽变小 → flex:1 1 0 的表格区被压回 minWidth(560)
+          = 用户反馈「激活编辑时 UI 宽度异常缩小」。确定宽度后 flex:1 始终撑满,不随内容抖动。 */}
+      <div style={{ display: 'flex', gap: 16, minHeight: 0, width: '100%', minWidth: 0 }}>
         {/* ── 主表格区 ── */}
-        {/* minWidth: 560 防止右侧面板展开时列宽被挤压到无法阅读 */}
+        {/* minWidth: 560 防止右侧面板展开时列宽被挤压到无法阅读(行已有确定 width:100%,不再随
+            内容收缩,故 minWidth 不会再被内联编辑触发误压) */}
         <div style={{ flex: '1 1 0', minWidth: 560, overflow: 'auto' }}>
           <CSTable
             variant="container"

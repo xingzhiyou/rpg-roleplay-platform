@@ -1521,6 +1521,10 @@ function IdentityStep({ scriptId, birthpoint, pickedCard, allRoleOptions, identi
 
   const pickedRole = allRoleOptions ? allRoleOptions.find(o => o.key === pickedCard) : null;
   const pickedName = pickedRole?.name || t('saves.identity.no_card_selected');
+  // 选「本剧本 NPC」开局 = 你就是这个 NPC 本人 → 出身强制锁「本世界人」(native):
+  // 穿越类出身(灵魂/整体/双魂)与「我就是原著这个角色」语义矛盾,这里直接锁死,
+  // 非 native 卡片不可点(实际 native 的强制由 NewGameModal 的 effect 落地)。
+  const npcLocked = pickedRole?.kind === 'script_card';
 
   const fetchAiRecs = React.useCallback(async () => {
     if (!scriptId) {
@@ -1688,9 +1692,14 @@ function IdentityStep({ scriptId, birthpoint, pickedCard, allRoleOptions, identi
 
   const originCard = ({ value, icon, labelKey, essenceKey, mappingKey, hintKey, accentColor, accentBg, accentBorder }) => {
     const selected = playerOrigin === value;
+    // 选了本剧本 NPC → 锁定 native;其余出身禁用(不可点、变灰)。
+    const locked = npcLocked && value !== 'native';
     return (
-      <button key={value} type="button" role="radio" aria-checked={selected} onClick={() => setPlayerOrigin(value)}
-        style={{ textAlign: 'left', padding: '11px 13px', cursor: 'pointer',
+      <button key={value} type="button" role="radio" aria-checked={selected} disabled={locked}
+        onClick={() => { if (!locked) setPlayerOrigin(value); }}
+        title={locked ? t('saves.identity.origin_locked_npc', { defaultValue: '已选择扮演本剧本 NPC,出身锁定为「本世界人」' }) : undefined}
+        style={{ textAlign: 'left', padding: '11px 13px', cursor: locked ? 'not-allowed' : 'pointer',
+          opacity: locked ? 0.4 : 1,
           border: selected ? `1px solid ${accentBorder}` : '1px solid var(--line-soft, #2a2724)',
           borderRadius: 10, background: selected ? accentBg : 'var(--panel, #211f1d)',
           display: 'grid', gap: 6, transition: 'border-color .12s, background .12s', outline: 'none' }}
@@ -1732,6 +1741,14 @@ function IdentityStep({ scriptId, birthpoint, pickedCard, allRoleOptions, identi
           <span style={{ ...labelEyebrow }}>{t('saves.identity.step1')} · {t('saves.identity.origin_section_label')}</span>
           <span style={{ fontSize: 12, color: 'var(--muted, #968f85)', lineHeight: 1.55 }}>{t('saves.identity.origin_section_hint')}</span>
         </div>
+        {npcLocked && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 11px', borderRadius: 8,
+            background: 'rgba(150,143,133,.14)', border: '1px solid rgba(150,143,133,.32)',
+            fontSize: 12, color: 'var(--text-quiet, #c8c2b7)', lineHeight: 1.5 }}>
+            <span style={{ fontFamily: 'var(--font-serif)', fontSize: 15, color: '#b8b0a5', flexShrink: 0 }}>◎</span>
+            <span>{t('saves.identity.origin_locked_banner', { name: pickedName, defaultValue: `已选择扮演本剧本 NPC「${pickedName}」—— 出身锁定为「本世界人」(你就是这个角色本人,GM 严格守世界观)。` })}</span>
+          </div>
+        )}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }} role="radiogroup" aria-label={t('saves.identity.origin_section_label')}>
           {ORIGINS.map(originCard)}
         </div>
@@ -2032,6 +2049,22 @@ function NewGameModal({ open, onClose, onConfirm, defaultScriptId = null }) {
       }));
     } catch (_) {}
   }, [open, title, scriptId, roleMode, pickedCard, newCardForm, birthpoint, identity, playerOrigin, identityKnown, storyIntent]);
+
+  // 用户反馈闭环:选「本剧本 NPC」角色卡(key 前缀 npc:)= 你就是这个 NPC 本人 →
+  // 出身自动强制锁「本世界人」(native),不再需要/允许手动选穿越类出身。
+  // 切回普通卡时把被强制的 native 还原成默认 soul。必须放在 `if (!open) return null` 之前(Hooks 规则)。
+  const isNpcPicked = typeof pickedCard === 'string' && pickedCard.startsWith('npc:');
+  const prevNpcPickedRef = React.useRef(isNpcPicked);
+  React.useEffect(() => {
+    const prev = prevNpcPickedRef.current;
+    prevNpcPickedRef.current = isNpcPicked;
+    if (isNpcPicked) {
+      if (playerOrigin !== 'native') setPlayerOrigin('native');
+    } else if (prev && playerOrigin === 'native') {
+      setPlayerOrigin('soul');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isNpcPicked]);
 
   if (!open) return null;
 

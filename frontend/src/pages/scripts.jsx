@@ -2062,7 +2062,9 @@ function ChaptersModal({ script, onClose, onChanged }) {
 const IMPORT_STAGES = [
   { id: "split",    labelKey: "scripts.import.stage_split",    hintKey: "scripts.import.stage_split_hint",    tok_per_chap: 0 },
   { id: "save",     labelKey: "scripts.import.stage_save",     hintKey: "scripts.import.stage_save_hint",     tok_per_chap: 0 },
-  { id: "extract",  labelKey: "scripts.import.stage_extract",  hintKey: "scripts.import.stage_extract_hint",  tok_per_chap: 120 },
+  // extract(知识库人物 arc 抽取)按 arc 算法真实标定:后端 extract/budget.py arc ≈ 1.16M/507章
+  // ≈ 2280 tok/章(in+out)。原值 120 严重低估 ~18 倍(群反馈:400万字只预估十几万 token)。
+  { id: "extract",  labelKey: "scripts.import.stage_extract",  hintKey: "scripts.import.stage_extract_hint",  tok_per_chap: 2280 },
   { id: "card",     labelKey: "scripts.import.stage_card",     hintKey: "scripts.import.stage_card_hint",     tok_per_chap: 60 },
   { id: "world",    labelKey: "scripts.import.stage_world",    hintKey: "scripts.import.stage_world_hint",    tok_per_chap: 90 },
   { id: "timeline", labelKey: "scripts.import.stage_timeline", hintKey: "scripts.import.stage_timeline_hint", tok_per_chap: 40 },

@@ -2423,14 +2423,21 @@ def estimate_module_rebuild(
             #   worldbook-llm = 按 canon 规模的若干次抽取调用。
             est_in = est_out = 0
             if module == "canon":
-                with connect() as db:
-                    _chars = _scalar(
-                        db,
-                        "select coalesce(sum(length(text)),0) as c "
-                        "from document_chunks where script_id = %s",
-                    )
-                est_in = int(_chars / 2)            # CJK 粗估 ~2 字/token
-                est_out = int(chunks_total * 200)   # 每块结构化产出
+                # canon 全量重抽走 arc 算法。真实用量用 **arc 感知**的 extract.budget.estimate
+                # (与 wizard /llm-extract/estimate 同一权威源,~1.16M 与实测 838k@63% 对得上),
+                # 而不是按「整本全文都喂 LLM」估的 chars/2(高估~2x);且原 `length(text)` 列名是
+                # 错的(实际列名 content),会直接抛错让估算 500。统一口径,消除三套估算打架。
+                try:
+                    from extract.budget import estimate as _budget_estimate
+                    with connect() as db:
+                        _b = _budget_estimate(
+                            db, script_id, algorithm="arc",
+                            model=(llm_model or "deepseek-v4-flash"),
+                        )
+                    est_in = int(_b.get("est_input_tokens") or 0)
+                    est_out = int(_b.get("est_output_tokens") or 0)
+                except Exception:
+                    est_in = est_out = 0
             elif module == "worldbook":             # 必是 source=='llm'(否则 needs_llm=False)
                 _base = max(canon_total, 20)
                 est_in = _base * 1500
@@ -2557,15 +2564,37 @@ def _run_module_rebuild(
             else:
                 # full LLM: 走 schedule_llm_extraction 同款 (但这里直接调底层)
                 from platform_app.knowledge.llm_extract import run_llm_extraction
-                before = _count(db, "kb_canon_entities", script_id)
+                # db 复用修复:上面写 started_at 的 with connect() 已退出、连接已还池,这里不能再用
+                # 那个 db(workers≥2 时可能已被别的 worker 取走 = 未定义行为)。各取独立连接。
+                with connect() as _dbc:
+                    before = _count(_dbc, "kb_canon_entities", script_id)
+                # 进度回传:arc 每弧完成 → 更新 overall 进度。否则整段 ~100 弧提取期 overall_progress
+                # 恒 0、stage 卡在 canon,用户以为卡死(实则后台在烧)。arc_extract 是主阶段,映射到
+                # overall;done/total 由 as_completed 串行回调,无并发竞争。终态会把 overall_total
+                # 重置回 1(见下方写终态),避免 done 时显示 1/弧数。
+                def _canon_progress(stage: str, info: dict) -> None:
+                    try:
+                        total = int(info.get("total") or 0)
+                        done = int(info.get("done") or 0)
+                        if stage == "arc_extract" and total:
+                            ctl.update(stage="arc_extract", stage_progress=done,
+                                       stage_total=total, overall_progress=done,
+                                       overall_total=max(total, 1))
+                        elif stage in ("seed", "per_chapter", "resolve", "embed"):
+                            ctl.update(stage=stage, stage_progress=done,
+                                       stage_total=max(total, 1))
+                    except Exception:
+                        pass
                 r = run_llm_extraction(
                     user_id, script_id,
                     algorithm=str(body.get("algorithm") or "arc"),
                     model=str(body.get("model") or "deepseek-v4-flash"),
                     api_id=str(body.get("api_id") or "deepseek"),
                     confirmed=True,
+                    progress_cb=_canon_progress,
                 )
-                after = _count(db, "kb_canon_entities", script_id) if r.get("ok") else before
+                with connect() as _dbc:
+                    after = _count(_dbc, "kb_canon_entities", script_id) if r.get("ok") else before
                 result = {
                     "ok": bool(r.get("ok")),
                     "source": "llm_extract",
@@ -2672,6 +2701,7 @@ def _run_module_rebuild(
             status=final_status,
             stage="done",
             overall_progress=1,
+            overall_total=1,   # 重置:canon 进度回传期间把 overall_total 改成弧数,终态要还原成 1/1=100%
             stage_progress=1,
             stage_total=1,
             source=str(result.get("source") or ""),

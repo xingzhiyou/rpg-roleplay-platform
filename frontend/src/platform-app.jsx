@@ -3626,6 +3626,8 @@ function CapCard({ id, name, desc, tag, on, status, kind, onChanged, _raw }) {
   const [logOpen, setLogOpen] = useStatePL(false);
   const [logText, setLogText] = useStatePL("");
   const [logBusy, setLogBusy] = useStatePL(false);
+  const [confirmDel, setConfirmDel] = useStatePL(false);
+  const [delBusy, setDelBusy] = useStatePL(false);
   React.useEffect(() => { setV(!!on); }, [on]);
   // task 50：toggle 之前只改本地 state，没动后端 → 重新拉数据后状态被冲掉。
   // 现在 MCP/Skill 切换走真后端：MCP /api/mcp/server/enabled，Skill 暂没专用 toggle
@@ -3655,6 +3657,24 @@ function CapCard({ id, name, desc, tag, on, status, kind, onChanged, _raw }) {
       setV(true);
     }
   };
+  // 删除 MCP 服务器
+  const handleDelete = async () => {
+    if (kind !== "mcp") {
+      window.__apiToast?.("暂不支持删除该类型", { kind: "warn", duration: 2000 });
+      setConfirmDel(false);
+      return;
+    }
+    setDelBusy(true);
+    try {
+      await window.api.mcp.remove({ id, server_id: id });
+      window.__apiToast?.(`已删除 ${name}`, { kind: "ok", duration: 1500 });
+      setConfirmDel(false);
+      onChanged && onChanged();
+    } catch (e) {
+      window.__apiToast?.("删除失败", { kind: "danger", detail: e?.message });
+    }
+    setDelBusy(false);
+  };
   // task 50：查看日志 → 拉真后端运行时（admin 看到 stderr）。导出 → 下载文本。
   const loadLog = async () => {
     setLogBusy(true);
@@ -3679,13 +3699,22 @@ function CapCard({ id, name, desc, tag, on, status, kind, onChanged, _raw }) {
     setLogBusy(false);
   };
   React.useEffect(() => { if (logOpen) loadLog(); }, [logOpen]);
-  const editFields = kind === "mcp" ? [
-    { key: "name", label: "名称", required: true, default: name },
-    { key: "transport", label: "传输", type: "select", default: tag === "stdio" ? "stdio" : "http",
-      options: [{ value: "stdio", label: "stdio · 本地命令" }, { value: "http", label: "http · 远程 HTTP" }] },
-    { key: "command", label: "命令 / URL", required: true, mono: true, default: tag === "stdio" ? "uvx my-mcp" : "https://localhost:7300" },
-    { key: "env", label: "环境变量 / Headers", type: "textarea", placeholder: "KEY=VALUE", rows: 3 },
-  ] : kind === "skills" ? [
+  const editFields = kind === "mcp" ? (() => {
+    const rawTransport = (_raw || {}).transport || tag || "stdio";
+    const rawCommand = (_raw || {}).command || "";
+    const rawEnv = (() => { const e = (_raw || {}).env || {}; return Object.keys(e).length ? Object.entries(e).map(([k,v]) => `${k}=${v}`).join("\n") : ""; })();
+    const rawUrl = (_raw || {}).url || "";
+    const rawHeaders = (() => { const h = (_raw || {}).headers || {}; return Object.keys(h).length ? JSON.stringify(h, null, 2) : ""; })();
+    return [
+      { key: "name", label: "名称", required: true, default: name },
+      { key: "transport", label: "传输", type: "select", default: rawTransport,
+        options: [{ value: "stdio", label: "stdio · 本地命令" }, { value: "http", label: "http · 远程 HTTP" }] },
+      { key: "url", label: "URL", mono: true, default: rawUrl, placeholder: "https://example.com/mcp" },
+      { key: "command", label: "命令", mono: true, default: rawCommand, placeholder: "uvx my-mcp" },
+      { key: "headers", label: "Headers (JSON)", type: "textarea", rows: 3, default: rawHeaders, placeholder: '{"Authorization":"Bearer xxx"}' },
+      { key: "env", label: "环境变量", type: "textarea", placeholder: "KEY=VALUE", rows: 3, default: rawEnv },
+    ];
+  })() : kind === "skills" ? [
     { key: "name", label: "显示名", required: true, default: name },
     { key: "version", label: "版本", default: tag },
     { key: "manifest", label: "manifest 配置", type: "textarea", rows: 4,
@@ -3715,6 +3744,7 @@ function CapCard({ id, name, desc, tag, on, status, kind, onChanged, _raw }) {
         <div style={{display: "flex", gap: 4}}>
           <button className="iconbtn" data-tip="编辑" onClick={() => setEditOpen(true)}><Icon name="edit" size={12} /></button>
           <button className="iconbtn" data-tip="查看日志" onClick={() => setLogOpen(true)}><Icon name="debug" size={12} /></button>
+          {kind === "mcp" && <button className="iconbtn" data-tip="删除" onClick={() => setConfirmDel(true)}><Icon name="trash" size={12} /></button>}
         </div>
       </div>
       <PromptModal
@@ -3736,8 +3766,14 @@ function CapCard({ id, name, desc, tag, on, status, kind, onChanged, _raw }) {
                 if (m) envObj[m[1].trim()] = m[2];
               }
               const body = { id, server_id: id, name: vals.name || name, transport: vals.transport || tag, enabled: v };
-              if ((vals.transport || tag) === "http") body.url = vals.command;
-              else body.command = vals.command;
+              if ((vals.transport || tag) === "http") {
+                body.url = vals.url || "";
+                body.command = "";
+                try { body.headers = vals.headers ? JSON.parse(vals.headers) : {}; } catch (_) { body.headers = {}; }
+              } else {
+                body.command = vals.command || "";
+                body.url = "";
+              }
               if (Object.keys(envObj).length) body.env = envObj;
               await window.api.mcp.upsert(body);
               window.__apiToast?.("已保存", { kind: "ok", duration: 1500 });
@@ -3792,10 +3828,34 @@ function CapCard({ id, name, desc, tag, on, status, kind, onChanged, _raw }) {
           </div>
         </div>
       )}
+      {confirmDel && (
+        <div className="pl-modal-backdrop" onClick={() => !delBusy && setConfirmDel(false)}>
+          <div className="pl-modal" onClick={(e) => e.stopPropagation()} style={{width: "min(420px, 100%)"}}>
+            <header className="pl-modal-head">
+              <div>
+                <div className="pl-modal-eyebrow">删除确认</div>
+                <h2 className="pl-modal-title">删除 MCP 服务器</h2>
+              </div>
+              <button className="iconbtn" onClick={() => setConfirmDel(false)} data-tip="关闭" disabled={delBusy}><Icon name="close" size={14} /></button>
+            </header>
+            <div style={{padding: "0 16px 16px", fontSize: 13.5, lineHeight: 1.7}}>
+              确定要删除 <strong>{name}</strong> 吗？此操作不可撤销。
+            </div>
+            <footer className="pl-modal-foot">
+              <span />
+              <div style={{display: "flex", gap: 8}}>
+                <button className="btn ghost" onClick={() => setConfirmDel(false)} disabled={delBusy}>取消</button>
+                <button className="btn danger" onClick={handleDelete} disabled={delBusy}>
+                  {delBusy ? "删除中…" : <><Icon name="trash" size={12} /> 删除</>}
+                </button>
+              </div>
+            </footer>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
-
 const API_ROWS = [
   { m: "GET",  p: "/",                              d: "文字 RPG 主游戏界面",                       group: "主页" },
   { m: "GET",  p: "/app",                           d: "多用户平台 / 创作平台界面",                   group: "主页" },

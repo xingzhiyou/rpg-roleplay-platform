@@ -80,15 +80,15 @@ def load_mcp_catalog() -> dict[str, Any]:
             if file_catalog.get("servers"):
                 save_mcp_catalog(file_catalog)
                 return file_catalog
-        _mirror_mcp_catalog_file(db_catalog)
         return db_catalog
     return _load_mcp_catalog_from_file()
 
 
 def _load_mcp_catalog_from_file() -> dict[str, Any]:
-    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    # 只读 seed:仓库内 config/mcp_servers.json 仅作默认种子,运行时绝不写它(见 save_mcp_catalog)。
+    # 缺失时直接用内置默认,不落盘 → 不污染 git 工作树。
     if not MCP_CONFIG_FILE.exists():
-        save_mcp_catalog(copy.deepcopy(DEFAULT_MCP_CATALOG))
+        return copy.deepcopy(DEFAULT_MCP_CATALOG)
     try:
         with open(MCP_CONFIG_FILE, encoding="utf-8") as f:
             data = json.load(f)
@@ -98,17 +98,11 @@ def _load_mcp_catalog_from_file() -> dict[str, Any]:
 
 
 def save_mcp_catalog(catalog: dict[str, Any]) -> None:
-    # 注意：_save_mcp_catalog_to_db 和 _mirror_mcp_catalog_file 内部会调用 _migrate_mcp_catalog
+    # 权威存储是 DB(mcp_servers 表):多 worker 读同一真相源、写走 server_id 行级 upsert。
+    # **不再写 config/mcp_servers.json** —— 运行时写它会造成 git churn(用户反馈:创建 MCP server
+    # 后该文件进 git 改动列表)+ 部署互相覆盖 + 多 worker 文件不一致。该 JSON 退化为只读 seed
+    # (DB 为空 / 无 DB 时兜底,见 load_mcp_catalog)。与 model_registry.save_model_catalog 同策略。
     _save_mcp_catalog_to_db(catalog)
-    _mirror_mcp_catalog_file(catalog)
-
-
-def _mirror_mcp_catalog_file(catalog: dict[str, Any]) -> None:
-    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-    tmp_file = MCP_CONFIG_FILE.with_suffix(".json.tmp")
-    with open(tmp_file, "w", encoding="utf-8") as f:
-        json.dump(_migrate_mcp_catalog(catalog, validate=False), f, ensure_ascii=False, indent=2)
-    tmp_file.replace(MCP_CONFIG_FILE)
 
 
 def upsert_mcp_server(server: dict[str, Any]) -> dict[str, Any]:

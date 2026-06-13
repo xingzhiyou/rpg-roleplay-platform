@@ -136,11 +136,12 @@ function ConfirmStrip({ pendingWrites, pendingQuestions, onApprove, onReject, on
                   双向兼容（question/text 取一，options/choices 取一）。 */}
               <span className="gc-confirm-text serif">{it.data.question || it.data.text || t('game.confirm.question_empty')}</span>
             </div>
-            <div className="gc-confirm-actions">
+            <div className="gc-confirm-actions gc-confirm-choices">
               {((it.data.options || it.data.choices) || []).map((c, ci) => (
                 // c 本身可能重复 / null，复合 (key, ci, c) 保证唯一；
                 // 即便 backend 给两个相同 "继续" 也不会撞 key。
-                <button key={`${it.key}:${ci}:${c}`} className="gc-chip-btn"
+                // gc-chip-choice:选项可能是长叙事句,需纵向全宽 + 可换行(不能用固定高横向 chip,否则叠在一起)。
+                <button key={`${it.key}:${ci}:${c}`} className="gc-chip-btn gc-chip-choice"
                   onClick={() => onAnswer(handleId(it), c)}>{c}</button>
               ))}
             </div>

@@ -1160,6 +1160,18 @@
   background: var(--panel-2);
 }
 .gc-chip-btn:hover { color: var(--text); background: var(--panel-3); border-color: var(--line-strong); }
+/* GM 询问选项可能是长叙事句:固定高 22px 横向 chip 会让多行文字溢出、互相叠在一起(用户反馈)。
+   询问选项改成纵向全宽、可换行、左对齐、随内容长高的选项行。 */
+.gc-confirm-choices { flex-direction: column; align-items: stretch; }
+.gc-chip-choice {
+  height: auto; min-height: 26px;
+  width: 100%;
+  align-items: flex-start;
+  white-space: normal;
+  text-align: left;
+  line-height: 1.5;
+  padding: 6px 10px;
+}
 .gc-chip-primary { background: var(--accent); border-color: var(--accent); color: #fff8f3; }
 .gc-chip-primary:hover { background: #b85838; border-color: #b85838; color: #fff8f3; }
 

@@ -12,6 +12,7 @@ import { MODELS_DATA } from './pages/settings.jsx';
 // platform-app 之前留了返回 null 的 stub 遮蔽它们 → "继续游戏"/"新建存档" 全失效。
 // PlatformShell(本文件)直接渲染这两个组件,必须从真实现 import,不能用 stub。
 import { ContinuePicker, NewGameModal } from './pages/saves.jsx';
+import { Composer } from './game-composer.jsx';
 import {
   AdminUsersPage,
   AdminGlobalUsagePage,
@@ -2172,7 +2173,10 @@ function ProfilePage() {
   // 真实值/null，但这里再做一层兜底，避免设计预览模式 (offline) 残留的 mock 12 漏到 UI。
   const fmtN = (n) => (n == null ? "—" : (typeof n === "number" ? n.toLocaleString() : String(n)));
   const realScripts = Array.isArray(scripts) ? scripts : [];
-  const realSaves = Array.isArray(saves) ? saves : [];
+  // 首页「继续《》」+「最近游玩」只列游戏存档;酒馆对话从 #tavern 页(或下方空态输入框)进入,
+  // 不混进游戏存档列表(否则点「继续」会离奇进游戏台)。
+  const realSaves = (Array.isArray(saves) ? saves : [])
+    .filter(s => (s?.save_kind || s?._raw?.save_kind || 'game') !== 'tavern');
   const wordTotal = realScripts.reduce((a, s) => a + (Number(s && s.word_count) || 0), 0);
   const wordWan = wordTotal > 0 ? (wordTotal / 10000).toFixed(0) : "—";
   const branchAgg = realSaves.reduce((a, s) => a + (Number(s && s.branch_count) || 0), 0) || (stats?.branches ?? null);
@@ -2181,6 +2185,31 @@ function ProfilePage() {
   const hour = (() => { try { return new Date().getHours(); } catch (_) { return 12; } })();
   const greeting = hour < 5 ? "夜深了" : hour < 11 ? "早上好" : hour < 14 ? "中午好" : hour < 18 ? "下午好" : "晚上好";
   const lastScript = lastSave ? realScripts.find(sc => sc && sc.id === lastSave.script_id) : null;
+
+  // 没有游戏存档时,「最近游玩」空态显示一个酒馆风输入框:提交即新建酒馆对话并自动发出第一句。
+  const [tavernText, setTavernText] = useStatePL("");
+  const [tavernBusy, setTavernBusy] = useStatePL(false);
+  const onTavernSend = async () => {
+    const first = tavernText.trim();
+    if (!first || tavernBusy) return;
+    setTavernBusy(true);
+    try {
+      const r = await window.api.tavern.create({});
+      const saveId = r && r.save && r.save.id;
+      if (!saveId) throw new Error(r?.error || r?.detail || "未返回对话 id");
+      // 把首句交给酒馆页:openChat 命中同一 save 时自动发送(失败兜底=预填到输入框)。
+      try {
+        sessionStorage.setItem('rpg_tavern_pending_first', JSON.stringify({ save_id: saveId, text: first }));
+      } catch (_) {}
+      setTavernText("");
+      plNavigate('tavern');
+    } catch (e) {
+      window.__apiToast?.('新建对话失败', { kind: 'danger', detail: e?.message });
+    } finally {
+      setTavernBusy(false);
+    }
+  };
+
   return (
     <CSSpaceBetween size="l">
       {/* 欢迎 Hero + 快速操作 */}
@@ -2215,66 +2244,6 @@ function ProfilePage() {
         </CSSpaceBetween>
       </div>
 
-      {/* 平台资源概览 */}
-      <CSContainer header={<CSHeader variant="h2">平台资源</CSHeader>}>
-        <div className="pl-resources-grid">
-          <div>
-            <CSBox variant="awsui-key-label">剧本</CSBox>
-            <CSBox fontSize="display-l" fontWeight="bold">{realScripts.length}</CSBox>
-            <CSBox color="text-body-secondary" fontSize="body-s">{wordTotal > 0 ? `共 ${wordWan} 万字` : "未导入剧本"}</CSBox>
-          </div>
-          <div>
-            <CSBox variant="awsui-key-label">存档</CSBox>
-            <CSBox fontSize="display-l" fontWeight="bold">{realSaves.length}</CSBox>
-            <CSBox color="text-body-secondary" fontSize="body-s">{realSaves[0]?.updated_at ? `最近：${realSaves[0].updated_at}` : "尚未创建存档"}</CSBox>
-          </div>
-          <div>
-            <CSBox variant="awsui-key-label">分支节点</CSBox>
-            <CSBox fontSize="display-l" fontWeight="bold">{fmtN(branchAgg)}</CSBox>
-            <CSBox color="text-body-secondary" fontSize="body-s">{realSaves.length ? `来自 ${realSaves.length} 个存档` : "—"}</CSBox>
-          </div>
-          <div>
-            <CSBox variant="awsui-key-label">库资产</CSBox>
-            <CSBox fontSize="display-l" fontWeight="bold">{fmtN(stats?.assets)}</CSBox>
-            <CSBox color="text-body-secondary" fontSize="body-s">用量详见 <a href="/usage" onClick={(e) => { e.preventDefault(); plNavigate('usage'); }} style={{borderBottom: "1px dotted var(--muted-2)"}}>用量页</a></CSBox>
-          </div>
-        </div>
-      </CSContainer>
-
-      {/* 系统状态(身份资料见「个人主页」,此处不重复) */}
-      <CSContainer header={<CSHeader variant="h2">系统状态</CSHeader>}>
-        <CSKeyValuePairs
-          columns={3}
-          items={[
-            {
-              label: "数据库",
-              value: (
-                <CSBox>
-                  <span className="mono">{database.driver || "—"}</span>
-                  <CSStatusIndicator type={database.ok ? "success" : "error"} style={{marginLeft: 8}}>
-                    {database.ok ? "online" : "offline"}
-                  </CSStatusIndicator>
-                </CSBox>
-              ),
-            },
-            {
-              label: "API 版本",
-              value: <span className="mono">v1 · stable</span>,
-            },
-            {
-              label: "账号",
-              value: (
-                <CSBox>
-                  @{user.username || "—"} · {user.role || "user"}
-                  {" · "}
-                  <a href="/me" onClick={(e) => { e.preventDefault(); plNavigate('me'); }} style={{ color: "var(--accent,#c96442)", borderBottom: "1px dotted var(--muted-2)" }}>个人主页 →</a>
-                </CSBox>
-              ),
-            },
-          ]}
-        />
-      </CSContainer>
-
       {/* 最近游玩 */}
       <CSContainer header={
         <CSHeader variant="h2" actions={<CSButton onClick={() => plNavigate('saves')} iconName="caret-right-filled">全部存档</CSButton>}>
@@ -2282,13 +2251,21 @@ function ProfilePage() {
         </CSHeader>
       }>
         {realSaves.length === 0 ? (
-          <CSBox textAlign="center" color="text-body-secondary" padding="l">
-            <CSSpaceBetween size="s">
-              <CSBox>还没有任何存档</CSBox>
-              <CSBox fontSize="body-s">去「剧本」页选一本剧本开始新游戏，存档会自动出现在这里。</CSBox>
-              <CSButton onClick={() => plNavigate('scripts')} iconName="file">去剧本页</CSButton>
-            </CSSpaceBetween>
-          </CSBox>
+          <CSSpaceBetween size="s">
+            <CSBox color="text-body-secondary" fontSize="body-s">
+              还没有存档?直接说一句话,马上开始一段酒馆对话。
+            </CSBox>
+            <Composer
+              text={tavernText} setText={setTavernText}
+              onSend={onTavernSend} onStop={() => {}} running={tavernBusy}
+              composerMode="writing"
+              placeholder="想和谁聊聊?输入第一句话,直接开始一段对话…"
+              hideSlash hidePermission hideContinue hideAttach hideImageGen
+              showSlash={false} showPlus={false} showModel={false} showPerm={false}
+              toggleSlash={() => {}} togglePlus={() => {}} toggleModel={() => {}} togglePerm={() => {}}
+              attachments={[]} removeAttachment={() => {}}
+            />
+          </CSSpaceBetween>
         ) : (
           <CSTable
             columnDefinitions={[
@@ -4314,6 +4291,19 @@ function PlatformShellCS({ page, setPage, children, assistant, assistantOpen, on
       const target = save || platform.saves[0];
       const targetSaveId = target?.id;
       if (!targetSaveId) { window.__apiToast?.("没有可进入的存档", { kind: "warn", duration: 2400 }); return; }
+      // 酒馆存档:不开游戏台(Game Console),改为激活后在平台内跳到 #tavern 页。
+      // 之前不分流 → 酒馆存档点「继续」也走 Game Console,离奇进了游戏台。
+      const kind = target?.save_kind || target?._raw?.save_kind || 'game';
+      if (kind === 'tavern') {
+        try {
+          await window.api.tavern.activate(targetSaveId);
+        } catch (e) {
+          window.__apiToast?.("切换对话失败", { kind: "danger", detail: e?.message, duration: 3000 });
+          return;
+        }
+        plNavigate('tavern');
+        return;
+      }
       // 用户手势内先开空白标签,绕过弹窗拦截
       const gameWin = window.open("about:blank", "_blank");
       // G1: activate 期间写 loading 骨架,避免黑屏

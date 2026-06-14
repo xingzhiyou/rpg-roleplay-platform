@@ -246,6 +246,9 @@ function normalizeSave(s) {
     last_played_ts: s.last_played_at || s.updated_at || null,  // 原始时间戳,供排序
     created_ts: s.created_at || null,
     current: !!s.current,
+    // save_kind 透传到顶层:酒馆存档(save_kind==='tavern')与游戏存档区分,
+    // __openContinue / ProfilePage 据此分流(酒馆走 #tavern,不进游戏台)。
+    save_kind: s.save_kind || 'game',
     _raw: s,
   };
 }

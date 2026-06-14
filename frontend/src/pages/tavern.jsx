@@ -203,6 +203,11 @@ export default function TavernPage() {
     }
   }, []);
 
+  // 平台首页空态输入框新建对话后,把首句暂存在 sessionStorage(rpg_tavern_pending_first);
+  // 打开命中同一 save 时自动发出。openChat 在激活完成后把首句记进 pendingFirstRef 并 bump
+  // pendingFirstTick → 下方 effect 触发 startRun(显式带 saveId,绕开 activeId 闭包旧值)。
+  const pendingFirstRef = useRef(null);
+  const [pendingFirstTick, setPendingFirstTick] = useState(0);
   /* ── 打开一个对话:激活 → 读 state(含 first_mes seed 的 history)────── */
   const openChat = useCallback(async (chat) => {
     if (!chat || !chat.id) return;
@@ -215,6 +220,18 @@ export default function TavernPage() {
       await window.api.tavern.activate(chat.id);
       const data = await window.api.game.state();
       applyState(data);
+      // 首页空态输入框转交的首句:命中本 save → 记下 + bump tick,交给下方 effect 自动发送。
+      try {
+        const raw = sessionStorage.getItem('rpg_tavern_pending_first');
+        if (raw) {
+          const p = JSON.parse(raw);
+          if (p && String(p.save_id) === String(chat.id) && (p.text || '').trim()) {
+            sessionStorage.removeItem('rpg_tavern_pending_first');
+            pendingFirstRef.current = { saveId: chat.id, text: String(p.text).trim() };
+            setPendingFirstTick((n) => n + 1);
+          }
+        }
+      } catch (_) {}
     } catch (e) {
       window.__apiToast?.('打开对话失败', { kind: 'danger', detail: e?.message });
     }
@@ -222,10 +239,22 @@ export default function TavernPage() {
 
   useEffect(() => { reloadList(); }, [reloadList]);
 
-  // 首次进入:自动打开最近的活跃对话(如果有)
+  // 首次进入:自动打开最近的活跃对话(如果有)。
+  // 若首页空态输入框刚转交了一个 pending save(rpg_tavern_pending_first),优先打开它,
+  // 让首句能在那个对话里自动发出(而非默认 chats[0])。
   useEffect(() => {
     if (activeId != null) return;
     if (loadingList) return;
+    let pendingSaveId = null;
+    try {
+      const raw = sessionStorage.getItem('rpg_tavern_pending_first');
+      if (raw) { const p = JSON.parse(raw); if (p && p.save_id != null) pendingSaveId = p.save_id; }
+    } catch (_) {}
+    if (pendingSaveId != null) {
+      const hit = chats.find((c) => String(c.id) === String(pendingSaveId));
+      openChat(hit || { id: pendingSaveId, title: '新对话', character_name: '' });
+      return;
+    }
     if (chats.length > 0) { openChat(chats[0]); }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadingList, chats]);
@@ -324,7 +353,8 @@ export default function TavernPage() {
   const startRun = useCallback(async (playerText, opts = {}) => {
     const sentAttachments = Array.isArray(opts.attachments) ? opts.attachments : [];
     const sentCommand = opts.command || null;
-    const saveId = activeId;
+    // opts.saveId:显式指定目标 save(自动发首句时用,绕开 activeId 闭包可能还是旧值的问题)。
+    const saveId = (opts.saveId != null) ? opts.saveId : activeId;
     if (saveId == null) { window.__apiToast?.('请先选择或新建一个对话', { kind: 'warn', duration: 2400 }); return; }
     const rc = runRef.current;
     if (rc.sse) { rc.runId = (rc.runId || 0) + 1; try { rc.sse.stop('superseded'); } catch (_) {} rc.sse = null; try { window.api.game.stop(); } catch (_) {} }
@@ -559,6 +589,20 @@ export default function TavernPage() {
     if (!t2 || running) return;
     startRun(t2);
   }, [running, startRun]);
+
+  // 首页空态输入框转交的首句自动发送:openChat 激活完成后 bump pendingFirstTick 触发本 effect,
+  // 直接带显式 saveId 调 startRun(不依赖 activeId 闭包)。失败兜底:预填到输入框让用户手发。
+  useEffect(() => {
+    const p = pendingFirstRef.current;
+    if (!p || running) return;
+    pendingFirstRef.current = null;
+    try {
+      startRun(p.text, { saveId: p.saveId });
+    } catch (_) {
+      setText(p.text);  // 兜底:自动发送失败则预填,用户手动点发送
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingFirstTick]);
 
   // F#2 弹出式选择:ask_player_choice 工具写 pending_questions → ConfirmStrip 渲染。
   // 玩家点选 → 清掉该 pending(后端+乐观)→ 把选择作为下一条消息发回角色。

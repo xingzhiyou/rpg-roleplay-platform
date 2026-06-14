@@ -6,26 +6,28 @@ import CSButton from '@cloudscape-design/components/button';
 
 /* GlobalTaskFloater — 右下角全局「后台任务」浮窗。
    数据源:GET /api/me/tasks/active(导入 / 各模块重建 / 生图 统一聚合)。
-   交互(按用户要求):
-     · 有活跃任务时默认只显示一个小「⋯」圆点(不累赘);
-     · 鼠标悬停圆点 → 自动展开任务列表;移开未点击 → 自动收回圆点;
-     · 点击展开区域任意处 → 暂时固定(pin),不再自动收回;
-     · 点击浮窗外的任意处 → 取消固定并收回小圆点。
+   交互(按用户要求):用 Cloudscape Flashbar stackItems 的「堆叠卡片」动画;默认收起成
+   堆叠(顶卡 + 后面卡片露边);鼠标经过浮窗 → 展开成完整列表(悬停展开,移开收回);
+   通知条改成暖色(不要默认那块蓝色面板)。
    如实状态:import 类有真实 overall_progress 进度条;生图只给 spinner + 已用时间。
-   每个任务带「取消」按钮——取消只能由此显式触发,关闭生图弹窗/页面绝不取消队列。
-   用 Cloudscape Flashbar(现成组件)+ 全局暖色主题改色,卡片不自重设计。
+   每任务带「取消」按钮——取消只能显式触发,关闭弹窗/页面绝不取消队列。
 */
 
 const POLL_ACTIVE_MS = 3000;
 const POLL_IDLE_MS = 7000;
-const POLL_BACKOFF_MS = 60000;   // 401 / 网络错时退避(登出页/掉线不刷屏)
+const POLL_BACKOFF_MS = 60000;
 
-// 暖色板(对齐全站主题)。loading=true 的项渲染成 info 态,故覆盖 info 颜色。
+// 暖色板。loading=true 的项渲染成 info 态,故覆盖 info 颜色;notificationBar 改暖色(去蓝)。
 const FLASHBAR_STYLE = {
   item: { root: {
     background: { info: '#2a2620' },
     color: { info: '#ebe7df' },
     borderColor: { info: '#46413a' },
+  } },
+  notificationBar: { root: {
+    background: { default: '#2a2620', hover: '#352f27', active: '#352f27' },
+    color: { default: '#ebe7df', hover: '#ffffff', active: '#ffffff' },
+    borderColor: { default: '#46413a', hover: '#5a5249', active: '#5a5249' },
   } },
 };
 const PROGRESS_STYLE = {
@@ -44,25 +46,47 @@ function fmtElapsed(sec) {
 
 const ACTIVE_ST = { queued: 1, running: 1 };
 
+// 隐藏 stackItems 通知条里那串按类型计数(0 0 0 0 3)——累赘,留下「N 个后台任务」+ 展开钮即可。
+if (typeof document !== 'undefined' && !document.getElementById('rpg-task-dock-style')) {
+  const st = document.createElement('style');
+  st.id = 'rpg-task-dock-style';
+  st.textContent = '.rpg-task-dock [class*="item-count"]{display:none !important;}';
+  document.head.appendChild(st);
+}
+
+// 找 Flashbar stackItems 的折叠/展开开关按钮(通知条上的那个 toggle)
+function findStackToggle(root) {
+  if (!root) return null;
+  const sel = [
+    '[class*="notification-bar"] button',
+    '[class*="notificationBar"] button',
+    'button[class*="toggle"]',
+  ];
+  for (const s of sel) {
+    const el = root.querySelector(s);
+    if (el) return el;
+  }
+  // 兜底:通知条容器本身可点
+  return root.querySelector('[class*="notification-bar"], [class*="notificationBar"]');
+}
+
 export default function GlobalTaskFloater() {
   const { useState, useEffect, useRef } = React;
   const [tasks, setTasks] = useState([]);
   const [fetchedAt, setFetchedAt] = useState(0);
-  const [hovering, setHovering] = useState(false);
-  const [pinned, setPinned] = useState(false);
-  const [, tick] = useState(0);               // 每秒重渲染刷新"已用时间"
+  const [, tick] = useState(0);
   const mounted = useRef(true);
   const prevActive = useRef(new Set());
   const toasted = useRef(new Set());
-  const rootRef = useRef(null);
+  const dockRef = useRef(null);
+  const expandedRef = useRef(false);   // 跟踪 stackItems 当前是否已展开(避免重复 toggle)
 
-  // ── 轮询(自调度 setTimeout 循环;隐藏标签页退避;事件可即时唤醒)──
+  // ── 轮询 ──
   useEffect(() => {
     mounted.current = true;
     let timer = null;
     const api = (typeof window !== 'undefined' && window.api) || null;
     const schedule = (ms) => { if (timer) clearTimeout(timer); timer = setTimeout(run, ms); };
-
     const run = async () => {
       if (!mounted.current) return;
       if (!api || !api.tasks || !api.tasks.active) return schedule(POLL_BACKOFF_MS);
@@ -74,7 +98,6 @@ export default function GlobalTaskFloater() {
         const byId = {};
         list.forEach((t) => { byId[t.id] = t; });
         const curActive = new Set(list.filter((t) => ACTIVE_ST[t.status]).map((t) => t.id));
-        // 上轮活跃、本轮不再活跃 → 用现有 toast 给一次性"完成/失败/取消"提示
         prevActive.current.forEach((id) => {
           if (curActive.has(id) || toasted.current.has(id)) return;
           const t = byId[id];
@@ -88,9 +111,7 @@ export default function GlobalTaskFloater() {
           else if (t.status === 'cancelled') toast(t.title + ' 已取消', { kind: 'info', duration: 3000 });
         });
         prevActive.current = curActive;
-        if (toasted.current.size > 80) {
-          toasted.current = new Set([...toasted.current].filter((id) => byId[id]));
-        }
+        if (toasted.current.size > 80) toasted.current = new Set([...toasted.current].filter((id) => byId[id]));
         setTasks(list);
         setFetchedAt(Date.now());
         schedule(curActive.size > 0 ? POLL_ACTIVE_MS : POLL_IDLE_MS);
@@ -99,7 +120,6 @@ export default function GlobalTaskFloater() {
         schedule((e && e.status) === 401 ? POLL_BACKOFF_MS : POLL_IDLE_MS);
       }
     };
-
     const kick = () => { if (timer) clearTimeout(timer); run(); };
     const onVis = () => { if (!document.hidden) kick(); };
     run();
@@ -117,31 +137,15 @@ export default function GlobalTaskFloater() {
 
   const active = tasks.filter((t) => ACTIVE_ST[t.status]);
 
-  // 每秒刷新"已用时间"(仅在有活跃任务时)
   useEffect(() => {
     if (active.length === 0) return undefined;
     const id = setInterval(() => { if (mounted.current) tick((x) => x + 1); }, 1000);
     return () => clearInterval(id);
   }, [active.length]);
 
-  // 固定态下:点击浮窗外任意处 → 取消固定并收回
-  useEffect(() => {
-    if (!pinned) return undefined;
-    const onDown = (e) => {
-      if (rootRef.current && !rootRef.current.contains(e.target)) {
-        setPinned(false);
-        setHovering(false);
-      }
-    };
-    document.addEventListener('mousedown', onDown, true);
-    return () => document.removeEventListener('mousedown', onDown, true);
-  }, [pinned]);
-
-  if (active.length === 0) return null;       // 只在有进行中任务时出现
+  if (active.length === 0) return null;
   const portalTarget = typeof document !== 'undefined' ? document.body : null;
   if (!portalTarget) return null;
-
-  const expanded = pinned || hovering;
 
   const cancelTask = async (t) => {
     const api = (typeof window !== 'undefined' && window.api) || null;
@@ -155,6 +159,18 @@ export default function GlobalTaskFloater() {
       if (toast) toast('取消失败', { kind: 'danger', detail: e && e.message });
     }
   };
+
+  // 悬停 → 展开堆叠;移开 → 收回。靠模拟点击 stackItems 通知条的 toggle(Cloudscape 无受控 API)。
+  const setStackExpanded = (want) => {
+    if (active.length < 2) return;       // 单任务无堆叠,不需要 toggle
+    if (expandedRef.current === want) return;
+    const btn = findStackToggle(dockRef.current);
+    if (!btn) return;
+    btn.click();
+    expandedRef.current = want;
+  };
+  const onEnter = () => setStackExpanded(true);
+  const onLeave = () => setStackExpanded(false);
 
   const nowMs = Date.now();
   const items = active.map((t) => {
@@ -186,16 +202,18 @@ export default function GlobalTaskFloater() {
     };
   });
 
-  const content = expanded ? (
-    <div className="rpg-task-dock"
-      style={{ width: 360, maxWidth: 'calc(100vw - 32px)' }}
-      onClickCapture={() => setPinned(true)}>
+  const dock = (
+    <div ref={dockRef} className="rpg-task-dock"
+      style={{ position: 'fixed', right: 16, bottom: 16, width: 380, maxWidth: 'calc(100vw - 32px)', zIndex: 1500 }}
+      onMouseEnter={onEnter} onMouseLeave={onLeave}>
       <CSFlashbar
         items={items}
-        stackItems={false}
+        stackItems
         style={FLASHBAR_STYLE}
         i18nStrings={{
           ariaLabel: '后台任务',
+          notificationBarText: active.length + ' 个后台任务',
+          notificationBarAriaLabel: '展开 / 收起后台任务',
           infoIconAriaLabel: '进行中',
           inProgressIconAriaLabel: '进行中',
           errorIconAriaLabel: '错误',
@@ -204,32 +222,6 @@ export default function GlobalTaskFloater() {
         }}
       />
     </div>
-  ) : (
-    <button
-      type="button"
-      aria-label={active.length + ' 个后台任务'}
-      title={active.length + ' 个后台任务进行中(悬停展开)'}
-      onClick={() => setPinned(true)}
-      style={{
-        width: 46, height: 46, borderRadius: '50%', cursor: 'pointer',
-        background: '#2a2620', color: '#ebe7df',
-        border: '1px solid rgba(201,100,66,0.55)',
-        boxShadow: '0 4px 16px rgba(0,0,0,0.45)',
-        fontSize: 22, lineHeight: '1', letterSpacing: 1,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }}
-    >⋯</button>
   );
-
-  const wrap = (
-    <div
-      ref={rootRef}
-      style={{ position: 'fixed', right: 16, bottom: 16, zIndex: 1500, display: 'flex', justifyContent: 'flex-end' }}
-      onMouseEnter={() => setHovering(true)}
-      onMouseLeave={() => setHovering(false)}
-    >
-      {content}
-    </div>
-  );
-  return createPortal(wrap, portalTarget);
+  return createPortal(dock, portalTarget);
 }

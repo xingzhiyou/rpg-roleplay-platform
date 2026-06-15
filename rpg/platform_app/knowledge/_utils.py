@@ -23,15 +23,12 @@ def _require_script(db, user_id: int, script_id: int) -> dict[str, Any]:
 
     公开剧本订阅者可读 worldbook / character_cards / chapter_facts 等。
     **编辑类调用方必须用 _require_script_owner 而不是这个**(订阅者只读)。
+
+    SQL 收敛到 perms.script_readable(唯一来源);保留 ValueError 契约 + 原文案 +
+    返回整行 + 本模块历史的 (db, user_id, script_id) 参数顺序。
     """
-    row = db.execute(
-        """select s.* from scripts s
-        where s.id = %s and (
-          s.owner_id = %s
-          or s.id in (select script_id from user_script_subscriptions where user_id = %s)
-        )""",
-        (script_id, user_id, user_id),
-    ).fetchone()
+    from platform_app.perms import script_readable
+    row = script_readable(db, script_id, user_id)
     if not row:
         raise ValueError("无权访问该剧本")
     return row
@@ -42,11 +39,12 @@ def _require_script_owner(db, user_id: int, script_id: int) -> dict[str, Any]:
 
     所有改 character_cards / worldbook / canon / overrides / 章节内容 的入口必须用这个。
     订阅者要改剧本须先 fork(走 /api/scripts/public/{id}/fork 物理复制成自己的副本)。
+
+    SQL 收敛到 perms.script_owned(唯一来源);保留 ValueError 契约 + 原文案 +
+    返回整行 + 本模块历史的 (db, user_id, script_id) 参数顺序。
     """
-    row = db.execute(
-        "select * from scripts where id = %s and owner_id = %s",
-        (script_id, user_id),
-    ).fetchone()
+    from platform_app.perms import script_owned
+    row = script_owned(db, script_id, user_id)
     if not row:
         raise ValueError("仅原作者可编辑该剧本。订阅剧本只读;如需改动请先「另存为可编辑副本」(fork)。")
     return row

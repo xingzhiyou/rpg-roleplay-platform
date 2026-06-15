@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import HTTPException, Request
+from fastapi import Depends, HTTPException, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse as BaseJSONResponse
 
@@ -184,16 +184,30 @@ def require_user(request: Request) -> dict:
     return user
 
 
+def is_admin(user: dict | None) -> bool:
+    """纯 admin 管理权谓词(role == 'admin')。
+
+    注意:这与「平台兜底资格」(role ∈ {admin, vip_user},见
+    knowledge.embedding.has_platform_fallback_role)是不同职责,资格集合不同,绝不跨用。
+    """
+    return bool(user and user.get("role") == "admin")
+
+
+def require_admin(user=Depends(require_user)) -> dict:
+    """FastAPI Depends:要求当前用户是 admin,否则 403。"""
+    if not is_admin(user):
+        raise HTTPException(status_code=403, detail="需要管理员权限")
+    return user
+
+
 def _resolve_save_id(user_id: int, body: dict) -> int:
     raw = body.get("save_id")
     if raw:
         sid = int(raw)
         # P1 fix: 显式校验 save 属于本人，不依赖下游兜底
+        from ..perms import owns_save
         with connect() as db:
-            cur = db.cursor()
-            cur.execute("select id from game_saves where id=%s and user_id=%s", (sid, user_id))
-            row = cur.fetchone()
-            if not row:
+            if not owns_save(db, sid, user_id):
                 raise HTTPException(status_code=403, detail="无权访问该存档")
         return sid
     with connect() as db:

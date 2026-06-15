@@ -56,7 +56,9 @@ _last_openai_embed_error: str = ""
 EMBED_MODEL = DEFAULT_EMBED_MODEL
 
 
-_PLATFORM_FALLBACK_ROLES = ("admin", "vip_user")
+# 平台兜底资格角色(享受平台共享 embedder / Vertex SA 兜底)。
+# 单一来源:与「纯 admin 管理权」(role == 'admin',见 api._deps.is_admin)是不同职责,资格集合不同,绝不跨用。
+_PLATFORM_FALLBACK_ROLES = {"admin", "vip_user"}
 _VERTEX_API_IDS = {"vertex", "google", "vertex_ai"}
 _OPENAI_API_IDS = {"openai", "openai_compat"}
 _GEMINI_API_IDS = {"gemini", "google_gemini"}
@@ -94,19 +96,36 @@ def _normalize_platform_embed_config(
     return api_id, model, api_key, base_url
 
 
-def _is_admin(user_id: int | None) -> bool:
-    """检查 user_id 是否为 admin 或 vip_user — 享受平台 embedder 兜底。
+def has_platform_fallback_role(user_or_id) -> bool:
+    """是否拥有「平台兜底资格」(role ∈ _PLATFORM_FALLBACK_ROLES = {admin, vip_user})。
+
+    单一谓词,消除散落的硬编码角色集。接受两种入参以省去多余 DB 往返:
+      - user dict(已加载,含 'role')→ 直接读 role,不查库。
+      - user_id(int / 可转 int)    → 查 users.role。
     其他用户(默认 role='user' / '')不享受,防白嫖付费 Gemini key。
+
+    注意:这是「资格」(admin + vip_user),与「纯 admin 管理权」(role == 'admin',
+    见 api._deps.is_admin)是不同职责,资格集合不同,绝不跨用。
     """
-    if not user_id:
+    if isinstance(user_or_id, dict):
+        return (user_or_id.get("role") or "").lower() in _PLATFORM_FALLBACK_ROLES
+    if not user_or_id:
         return False
     try:
         from platform_app.db import connect
         with connect() as db:
-            row = db.execute("select role from users where id = %s", (int(user_id),)).fetchone()
+            row = db.execute("select role from users where id = %s", (int(user_or_id),)).fetchone()
         return bool(row and (row.get("role") or "").lower() in _PLATFORM_FALLBACK_ROLES)
     except Exception:
         return False
+
+
+def _is_admin(user_id: int | None) -> bool:
+    """检查 user_id 是否享受平台 embedder 兜底(admin 或 vip_user)。
+
+    内部 = has_platform_fallback_role(单一来源);函数名保留向后兼容本模块多处调用。
+    """
+    return has_platform_fallback_role(user_id)
 
 
 def _resolve_embed_config(user_id: int | None) -> tuple[str, str, str, str]:

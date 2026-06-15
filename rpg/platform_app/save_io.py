@@ -20,6 +20,7 @@ from typing import Any
 from psycopg.types.json import Jsonb
 
 from .db import connect, expose, init_db
+from .perms import owns_save, script_owned
 
 EXPORT_VERSION = 2  # task 69: v1 (commits+messages+memories only) → v2 (+ 8 状态表)
 
@@ -66,12 +67,13 @@ def export_save(user_id: int, save_id: int) -> dict[str, Any]:
     """打包整份存档为 JSON。task 69: 加入 9 张状态表。"""
     init_db()
     with connect() as db:
-        save = db.execute(
-            "select * from game_saves where id = %s and user_id = %s",
-            (save_id, user_id),
-        ).fetchone()
-        if not save:
+        # 归属判定收敛到 perms.owns_save;通过后再取整行(导出用)。
+        if not owns_save(db, save_id, user_id):
             raise ValueError("无权访问该存档")
+        save = db.execute(
+            "select * from game_saves where id = %s",
+            (save_id,),
+        ).fetchone()
         commits = db.execute(
             "select * from branch_commits where save_id = %s order by id",
             (save_id,),
@@ -227,11 +229,7 @@ def import_save(user_id: int, payload: dict[str, Any]) -> dict[str, Any]:
                     tavern_character_card_id = None
         else:
             if script_id_raw:
-                owned = db.execute(
-                    "select 1 from scripts where id = %s and owner_id = %s",
-                    (int(script_id_raw), user_id),
-                ).fetchone()
-                if owned:
+                if script_owned(db, int(script_id_raw), user_id):
                     script_id = int(script_id_raw)
             if script_id is None:
                 row = db.execute(

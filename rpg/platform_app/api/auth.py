@@ -16,7 +16,7 @@ from ._deps import (
     current_user,
     json_response,
     platform_for,
-    require_user,
+    require_admin,
 )
 
 router = APIRouter()
@@ -269,10 +269,8 @@ async def api_passwordless_verify(request: Request):
         return json_response({"ok": False, "error": str(exc)}, status_code=400)
 
 
-def _require_admin(user=Depends(require_user)):
-    if not user or user.get("role") != "admin":
-        raise HTTPException(status_code=403, detail="需要管理员权限")
-    return user
+# admin 角色门控收敛到 _deps.require_admin(唯一来源);保留本名供 Depends(_require_admin) 旧引用。
+_require_admin = require_admin
 
 
 @router.post("/api/admin/login/unlock")

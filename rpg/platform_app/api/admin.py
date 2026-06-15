@@ -15,7 +15,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from psycopg.types.json import Jsonb
 
 from platform_app.db import connect
-from platform_app.api._deps import require_user, _client_ip, json_response
+from platform_app.api._deps import require_admin, _client_ip, json_response
 from platform_app.dmca import increment_strike, queue_account_termination
 
 router = APIRouter()
@@ -26,10 +26,8 @@ log = logging.getLogger(__name__)
 # 共享依赖与辅助
 # ──────────────────────────────────────────────────────────────────────────────
 
-def _require_admin(user=Depends(require_user)):
-    if not user or user.get("role") != "admin":
-        raise HTTPException(status_code=403, detail="需要管理员权限")
-    return user
+# admin 角色门控收敛到 _deps.require_admin(唯一来源);保留本名供 Depends(_require_admin) 旧引用。
+_require_admin = require_admin
 
 
 _REGISTRATION_CFG_KEY = "admin.registration_config"

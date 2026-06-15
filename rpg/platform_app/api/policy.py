@@ -19,7 +19,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
 from platform_app.db import connect
-from platform_app.api._deps import current_user, require_user, json_response
+from platform_app.api._deps import current_user, is_admin, require_user, json_response
 from platform_app.policy_notice import (
     POLICY_SLUGS,
     activate_notice,
@@ -37,7 +37,7 @@ log = logging.getLogger(__name__)
 
 def _require_admin(request: Request):
     user = current_user(request)
-    if not user or user.get("role") != "admin":
+    if not is_admin(user):
         raise HTTPException(status_code=403, detail="需要管理员权限")
     return user
 

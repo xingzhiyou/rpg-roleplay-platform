@@ -9,6 +9,7 @@ from platform_app.db import connect, expose, init_db
 from platform_app.knowledge._session_repo import _db_upsert_game_session
 from platform_app.knowledge._sync import _ensure_book
 from platform_app.knowledge._utils import _clean_text
+from platform_app.perms import owns_save
 
 log = get_logger(__name__)
 
@@ -16,12 +17,12 @@ log = get_logger(__name__)
 def _state_from_save(user_id: int, save_id: int) -> dict[str, Any]:
     init_db()
     with connect() as db:
+        if not owns_save(db, save_id, user_id):
+            raise ValueError("无权访问该存档")
         row = db.execute(
-            "select state_snapshot from game_saves where id = %s and user_id = %s",
-            (save_id, user_id),
+            "select state_snapshot from game_saves where id = %s",
+            (save_id,),
         ).fetchone()
-    if not row:
-        raise ValueError("无权访问该存档")
     state = row.get("state_snapshot") if isinstance(row, dict) else {}
     return state if isinstance(state, dict) else {}
 
@@ -132,14 +133,17 @@ def _sync_session_state(db, session: dict[str, Any], book_id: int, user_id: int,
 def ensure_game_session(user_id: int, save_id: int, state: dict[str, Any] | None = None) -> dict[str, Any]:
     init_db()
     with connect() as db:
+        # 归属判定收敛到 perms.owns_save;通过后再取联表数据(script_title/owner_id)。
+        if not owns_save(db, save_id, user_id):
+            raise ValueError("无权访问该存档")
         save = db.execute(
             """
             select game_saves.*, scripts.owner_id, scripts.title as script_title
             from game_saves
             join scripts on scripts.id = game_saves.script_id
-            where game_saves.id = %s and game_saves.user_id = %s
+            where game_saves.id = %s
             """,
-            (save_id, user_id),
+            (save_id,),
         ).fetchone()
         if not save:
             raise ValueError("无权访问该存档")

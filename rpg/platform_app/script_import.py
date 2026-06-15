@@ -10,6 +10,7 @@ from chapter_splitter import chapter_splitter
 
 from .db import connect, expose, init_db, limit_value, page_payload
 from .library import decode_upload, safe_filename, unique_path
+from .perms import script_owned
 
 BASE = Path(__file__).resolve().parents[1]
 # 统一根来自 storage 模块（S1 基座），消除本地 parents[N] 硬编码
@@ -601,7 +602,7 @@ def list_chapters(user_id: int, script_id: int, limit: int | str | None = None, 
     page_limit = limit_value(limit, default=200, maximum=5000)
     before_index = _cursor_index(cursor)
     with connect() as db:
-        script = db.execute("select * from scripts where id = %s and owner_id = %s", (script_id, user_id)).fetchone()
+        script = script_owned(db, script_id, user_id)
         if not script:
             raise ValueError("无权访问该剧本")
         rows = db.execute(
@@ -703,10 +704,7 @@ def delete_script(user_id: int, script_id: int, *, force: bool = False) -> dict[
     """删除剧本。force=False 时拒绝删有 game_save 的剧本（防误删存档丢失）。"""
     init_db()
     with connect() as db:
-        owned = db.execute(
-            "select id, source_path from scripts where id = %s and owner_id = %s",
-            (script_id, user_id),
-        ).fetchone()
+        owned = script_owned(db, script_id, user_id)
         if not owned:
             raise ValueError("无权访问该剧本")
         save_count = int(db.execute(
@@ -767,10 +765,7 @@ def resplit_script(
     """
     init_db()
     with connect() as db:
-        script = db.execute(
-            "select * from scripts where id = %s and owner_id = %s",
-            (script_id, user_id),
-        ).fetchone()
+        script = script_owned(db, script_id, user_id)
         if not script:
             raise ValueError("无权访问该剧本")
         src = (script.get("source_path") or "").strip()
@@ -1012,10 +1007,7 @@ def update_chapter(user_id: int, script_id: int, chapter_index: int, *,
     """编辑单章。title/content/volume_title 任一可传。"""
     init_db()
     with connect() as db:
-        owned = db.execute(
-            "select 1 from scripts where id = %s and owner_id = %s", (script_id, user_id),
-        ).fetchone()
-        if not owned:
+        if not script_owned(db, script_id, user_id):
             raise ValueError("无权访问该剧本")
         sets, params = [], []
         if title is not None:
@@ -1128,10 +1120,7 @@ def merge_chapters(user_id: int, script_id: int, first_index: int,
     init_db()
     with connect() as db:
         _lock_chapter_struct(db, script_id)
-        owned = db.execute(
-            "select 1 from scripts where id = %s and owner_id = %s", (script_id, user_id),
-        ).fetchone()
-        if not owned:
+        if not script_owned(db, script_id, user_id):
             raise ValueError("无权访问该剧本")
         a = db.execute(
             "select * from script_chapters where script_id = %s and chapter_index = %s",
@@ -1187,10 +1176,7 @@ def split_chapter(user_id: int, script_id: int, chapter_index: int,
         raise ValueError("split_at 必须 > 0")
     with connect() as db:
         _lock_chapter_struct(db, script_id)
-        owned = db.execute(
-            "select 1 from scripts where id = %s and owner_id = %s", (script_id, user_id),
-        ).fetchone()
-        if not owned:
+        if not script_owned(db, script_id, user_id):
             raise ValueError("无权访问该剧本")
         ch = db.execute(
             "select * from script_chapters where script_id = %s and chapter_index = %s",

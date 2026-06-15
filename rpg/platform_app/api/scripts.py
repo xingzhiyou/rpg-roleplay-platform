@@ -9,6 +9,7 @@ from fastapi.responses import JSONResponse, Response
 
 from .. import knowledge, script_import
 from ..db import connect
+from ..perms import script_owned
 from ._deps import json_response, require_user
 
 _MAX_COVER_BYTES = 8 * 1024 * 1024  # 8 MB
@@ -782,9 +783,8 @@ async def api_set_script_cover_url(request: Request, script_id: int, user=Depend
 # ── NPC 角色卡头像（剧本所有者管；NPC 卡 user_id=NULL，挂 script_id，故 owner 走 scripts.owner_id）──
 
 def _require_script_owner(db, script_id: int, user_id: int) -> bool:
-    return bool(db.execute(
-        "select 1 from scripts where id = %s and owner_id = %s", (script_id, user_id),
-    ).fetchone())
+    # 严格 owner SQL 收敛到 perms.script_owned(唯一来源,签名统一 db,script_id,user_id)。
+    return bool(script_owned(db, script_id, user_id))
 
 
 @router.post("/api/scripts/{script_id}/character-cards/{card_id}/avatar-url")
@@ -1401,11 +1401,9 @@ async def api_set_script_gm_style(request: Request, script_id: int, user=Depends
 
 # ── Phase E: 可视化复核(只读图 + god 编辑)─────────────────────────────────
 def _owned_script(db, script_id: int, user_id: int):
-    return db.execute(
-        "select id, title, import_report, review_status, reviewed_at "
-        "from scripts where id=%s and owner_id=%s",
-        (script_id, user_id),
-    ).fetchone()
+    # 严格 owner SQL 收敛到 perms.script_owned;返回 select * 整行(含
+    # id/title/import_report/review_status/reviewed_at 等下游用到的列,为原版超集)。
+    return script_owned(db, script_id, user_id)
 
 
 @router.get("/api/scripts/{script_id}/graph")

@@ -12,6 +12,7 @@ from state.core import _extract_secret_sections, _strip_secret_sections
 from . import branches, runtime
 from .db import connect, cursor_id, expose, init_db, limit_value, page_payload
 from .db import status as db_status
+from .perms import script_readable
 from .security import public_user
 
 log = get_logger(__name__)
@@ -150,17 +151,9 @@ def create_save(
     init_db()
     with connect() as db:
         # task 74: 接受 owner OR subscriber(公开剧本订阅)— 存档是 per-user 的活态层,
-        # 不影响剧本本身的 immutability,所以订阅者也能建存档
-        script = db.execute(
-            """
-            select s.* from scripts s
-            where s.id = %s and (
-              s.owner_id = %s
-              or s.id in (select script_id from user_script_subscriptions where user_id = %s)
-            )
-            """,
-            (script_id, user_id, user_id),
-        ).fetchone()
+        # 不影响剧本本身的 immutability,所以订阅者也能建存档。
+        # 读级归属判定收敛到 perms.script_readable(返 select s.* 整行)。
+        script = script_readable(db, script_id, user_id)
         if not script:
             raise ValueError("无权访问该剧本")
         # 复核闸:KB 提取/复核未完成的剧本不允许开局,避免 GM 拿到错章节/未审实体/未消歧别名

@@ -30,7 +30,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 
 from ..db import connect
 from ..moderation import moderate_feedback
-from ._deps import _client_ip, json_response, require_user
+from ._deps import _client_ip, json_response, require_admin, require_user
 
 router = APIRouter()
 log = logging.getLogger(__name__)
@@ -40,10 +40,8 @@ _MAX_PAYLOAD_BYTES = 50 * 1024
 _VALID_DECISIONS = {"ok", "nsfw_terminate", "spam"}
 
 
-def _require_admin(user=Depends(require_user)):
-    if not user or user.get("role") != "admin":
-        raise HTTPException(status_code=403, detail="需要管理员权限")
-    return user
+# admin 角色门控收敛到 _deps.require_admin(唯一来源);保留本名供 Depends(_require_admin) 旧引用。
+_require_admin = require_admin
 
 
 # ──────────────────────────────────────────────────────────────────────────────

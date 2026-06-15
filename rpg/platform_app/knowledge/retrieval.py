@@ -3,6 +3,7 @@ from __future__ import annotations
 from platform_app import runtime
 from platform_app.db import connect, init_db
 from platform_app.knowledge._pin import effective_kb_script_id
+from platform_app.perms import owns_save
 from platform_app.knowledge._search import _search_chunks, _search_entities
 from platform_app.knowledge._utils import _query_tokens
 
@@ -31,13 +32,11 @@ def retrieve_runtime_context(
     if user_id and int(meta.get("user_id") or 0) != int(user_id):
         return ""
     with connect() as db:
-        if user_id:
-            save = db.execute(
-                "select * from game_saves where id = %s and user_id = %s",
-                (save_id, int(user_id)),
-            ).fetchone()
-        else:
-            save = db.execute("select * from game_saves where id = %s", (save_id,)).fetchone()
+        # 归属判定收敛到 perms.owns_save(user_id 给定时严格按 user 校验);
+        # 不属 / 不存在均返 "" —— 沿用原契约(不抛)。
+        if user_id and not owns_save(db, save_id, int(user_id)):
+            return ""
+        save = db.execute("select * from game_saves where id = %s", (save_id,)).fetchone()
         if not save:
             return ""
         return retrieve_script_context(

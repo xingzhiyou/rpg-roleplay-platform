@@ -12,6 +12,7 @@ from platform_app.knowledge._context_runs_repo import (
 )
 from platform_app.knowledge._utils import _cursor_int, _retrieved_chunks_payload
 from platform_app.knowledge.session import ensure_game_session
+from platform_app.perms import owns_save
 
 
 def record_context_run(
@@ -91,8 +92,7 @@ def list_context_runs(user_id: int, save_id: int, limit: int | str | None = None
     page_limit = limit_value(limit)
     before_id = _cursor_int(cursor)
     with connect() as db:
-        save = db.execute("select * from game_saves where id = %s and user_id = %s", (save_id, user_id)).fetchone()
-        if not save:
+        if not owns_save(db, save_id, user_id):
             raise ValueError("无权访问该存档")
         rows = _db_select_context_runs(db, save_id, before_id, page_limit)
     return page_payload(rows, page_limit)

@@ -1334,9 +1334,10 @@ async def api_embedder_status(user=Depends(require_user)):
     """
     import os as _os
     from .. import user_credentials
-    from ..knowledge.embedding import embedding_preflight
-    # task: 享受平台兜底的角色 — admin + vip_user(测试期高级用户)
-    is_admin_user = (user.get("role") or "").lower() in ("admin", "vip_user")
+    from ..knowledge.embedding import embedding_preflight, has_platform_fallback_role
+    # task: 享受平台兜底的角色 — admin + vip_user(测试期高级用户)。
+    # 角色集合收敛到 has_platform_fallback_role(单一来源);传 user dict 不查库。
+    is_admin_user = has_platform_fallback_role(user)
     # 用户自己配了 embedder 任一种 provider?
     # 先认用户在「RAG 模型」里**实际选中**的 embedder provider(embed.api_id)—— dashscope /
     # siliconflow 等 OpenAI 兼容 embedding provider 都支持,不能只认死名单,否则用户配了

@@ -10,6 +10,7 @@ from fastapi.responses import Response
 
 from .. import branches, knowledge, workspace
 from ..db import connect
+from ..perms import owns_save, script_readable
 from ._deps import json_response, require_user
 
 router = APIRouter()
@@ -148,20 +149,10 @@ async def api_create_save(request: Request, user=Depends(require_user)):
         script_id = int(raw_script_id)
     except (TypeError, ValueError):
         return json_response({"ok": False, "error": "script_id 必须为整数"}, status_code=400)
-    # 校验 script 归属(task 74: 接受 owner OR subscriber)
+    # 校验 script 归属(task 74: 接受 owner OR subscriber)— 读级:owner ∪ subscription
     with connect() as db:
-        owned = db.execute(
-            """
-            select 1 from scripts s
-            where s.id = %s and (
-              s.owner_id = %s
-              or s.id in (select script_id from user_script_subscriptions where user_id = %s)
-            )
-            """,
-            (script_id, user["id"], user["id"]),
-        ).fetchone()
-    if not owned:
-        return json_response({"ok": False, "error": "无权访问该剧本"}, status_code=403)
+        if not script_readable(db, script_id, user["id"]):
+            return json_response({"ok": False, "error": "无权访问该剧本"}, status_code=403)
     # task 29：把 UI 填的 new_card / character 传到 create_save，让初始 state_snapshot
     # 真的反映用户输入的姓名/身份/设定，否则 NewGameModal 的角色卡字段就被丢了。
     new_card = body.get("new_card") if isinstance(body.get("new_card"), dict) else None
@@ -213,8 +204,8 @@ async def api_create_save(request: Request, user=Depends(require_user)):
 async def api_branches(save_id: int, limit: int | None = None, cursor: str | None = None, user=Depends(require_user)):
     # 先校验存档归属，避免 tree() 内部抛 raw exception
     with connect() as db:
-        owned = db.execute("select 1 from game_saves where id = %s and user_id = %s", (save_id, user["id"])).fetchone()
-    if not owned:
+        ok = owns_save(db, save_id, user["id"])
+    if not ok:
         return json_response({"ok": False, "error": "无权访问该存档"}, status_code=403)
     return json_response(branches.tree(user["id"], save_id, limit, cursor))
 
@@ -348,11 +339,7 @@ async def api_save_anchors(save_id: int, user=Depends(require_user)):
       }
     """
     with connect() as db:
-        owned = db.execute(
-            "select 1 from game_saves where id = %s and user_id = %s",
-            (save_id, user["id"]),
-        ).fetchone()
-        if not owned:
+        if not owns_save(db, save_id, user["id"]):
             return json_response({"ok": False, "error": "无权访问该存档"}, status_code=403)
     try:
         from agents.anchor_seed_agent import (
@@ -411,11 +398,7 @@ async def api_save_anchors_reseed(request: Request, save_id: int, user=Depends(r
     body 可选: {"keep_satisfied": true|false} 默认 true (保留已发生)。
     """
     with connect() as db:
-        owned = db.execute(
-            "select 1 from game_saves where id = %s and user_id = %s",
-            (save_id, user["id"]),
-        ).fetchone()
-        if not owned:
+        if not owns_save(db, save_id, user["id"]):
             return json_response({"ok": False, "error": "无权访问该存档"}, status_code=403)
     body = {}
     try:
@@ -440,10 +423,7 @@ async def api_save_settings_get(save_id: int, user=Depends(require_user)):
     """读当前存档设置 + 字段 schema(前端向导/设置面板用)。"""
     from gm_serving import settings as _set
     with connect() as db:
-        owned = db.execute(
-            "select 1 from game_saves where id=%s and user_id=%s", (save_id, user["id"]),
-        ).fetchone()
-        if not owned:
+        if not owns_save(db, save_id, user["id"]):
             return json_response({"ok": False, "error": "无权访问该存档"}, status_code=403)
         current = _set.read_settings(db, save_id)
     return json_response({"ok": True, "settings": current, "schema": _set.schema()})
@@ -457,10 +437,7 @@ async def api_save_settings_patch(request: Request, save_id: int, user=Depends(r
     """
     from gm_serving import settings as _set
     with connect() as db:
-        owned = db.execute(
-            "select 1 from game_saves where id=%s and user_id=%s", (save_id, user["id"]),
-        ).fetchone()
-        if not owned:
+        if not owns_save(db, save_id, user["id"]):
             return json_response({"ok": False, "error": "无权访问该存档"}, status_code=403)
         try:
             body = await request.json()

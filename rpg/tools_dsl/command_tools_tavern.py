@@ -298,18 +298,11 @@ def _t_tavern_bind_script(state: Any, args: dict) -> str:
 
     try:
         from platform_app.db import connect, init_db
+        from platform_app.perms import script_readable
         init_db()
         with connect() as db:
-            row = db.execute(
-                """
-                select s.id, s.title from scripts s
-                where s.id = %s and (
-                  s.owner_id = %s
-                  or s.id in (select script_id from user_script_subscriptions where user_id = %s)
-                )
-                """,
-                (script_id, user_id, user_id),
-            ).fetchone()
+            # 读级:owner ∪ subscription —— 收敛到 perms.script_readable(返 select s.* 整行)。
+            row = script_readable(db, script_id, user_id)
     except Exception as exc:
         return f"失败: {type(exc).__name__}: {exc}"
     if not row:

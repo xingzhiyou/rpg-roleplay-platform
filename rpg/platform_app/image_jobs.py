@@ -338,11 +338,8 @@ def _attach_image_to_target(
                 script_id = int(attach.get("script_id") or 0)
                 if script_id:
                     # NPC 卡(user_id=NULL,挂 script_id):owner 走 scripts.owner_id
-                    owns = db.execute(
-                        "select 1 from scripts where id = %s and owner_id = %s",
-                        (script_id, int(user_id)),
-                    ).fetchone()
-                    if not owns:
+                    from platform_app.perms import script_owned
+                    if not script_owned(db, script_id, int(user_id)):
                         log.warning("[image_jobs] attach card_avatar(npc) script owner failed script_id=%s user=%s", script_id, user_id)
                         return
                     result = db.execute(

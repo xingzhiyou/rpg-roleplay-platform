@@ -27,11 +27,9 @@ _ANCHOR_MUTATE_ORIGINS = frozenset({"ui_button", "api_direct", "console_assistan
 
 
 def _own_save(db, save_id: int, user_id: int) -> bool:
-    row = db.execute(
-        "select 1 from game_saves where id = %s and user_id = %s",
-        (save_id, user_id),
-    ).fetchone()
-    return bool(row)
+    # 归属判定收敛到 perms.owns_save(唯一来源);保留本名兼容 11+ 处调用。
+    from platform_app.perms import owns_save
+    return owns_save(db, save_id, user_id)
 
 
 def _t_list_pending_anchors(user_id: int, args: dict) -> str:

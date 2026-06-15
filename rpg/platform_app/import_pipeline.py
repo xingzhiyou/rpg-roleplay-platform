@@ -25,6 +25,7 @@ from typing import Any
 from psycopg.types.json import Jsonb
 
 from .db import connect, expose, init_db
+from .perms import script_owned
 
 # ── 阶段定义 ────────────────────────────────────────────────────────
 # v29 (一站完成): wizard 末尾 chain LLM extract + 嵌入 → 用户上传后所有模块齐备
@@ -732,10 +733,7 @@ def _stage_chunks(ctl: JobController, script_id: int, user_id: int) -> int:
         ).fetchall()
         if not chapters:
             return 0
-        script = db.execute(
-            "select * from scripts where id = %s and owner_id = %s",
-            (script_id, user_id),
-        ).fetchone()
+        script = script_owned(db, script_id, user_id)
         if not script:
             raise ValueError("script not found")
         book = knowledge._ensure_book(db, script)
@@ -766,10 +764,7 @@ def _stage_facts(ctl: JobController, script_id: int, user_id: int) -> int:
     known_concepts = knowledge._known_concepts(world)
 
     with connect() as db:
-        script = db.execute(
-            "select * from scripts where id = %s and owner_id = %s",
-            (script_id, user_id),
-        ).fetchone()
+        script = script_owned(db, script_id, user_id)
         book = knowledge._ensure_book(db, script)
         chapters = db.execute(
             "select * from script_chapters where script_id = %s order by chapter_index",
@@ -2033,10 +2028,7 @@ def rebuild_chunks_from_db(user_id: int, script_id: int) -> dict[str, Any]:
             (script_id,),
         ).fetchone()
         before_count = int(before["c"]) if before else 0
-        script = db.execute(
-            "select * from scripts where id = %s and owner_id = %s",
-            (script_id, user_id),
-        ).fetchone()
+        script = script_owned(db, script_id, user_id)
         if not script:
             return {"ok": False, "error": "无权访问该剧本"}
         book = knowledge._ensure_book(db, script)
@@ -2075,10 +2067,7 @@ def rebuild_facts_from_db(user_id: int, script_id: int) -> dict[str, Any]:
             (script_id,),
         ).fetchone()
         before_count = int(before["c"]) if before else 0
-        script = db.execute(
-            "select * from scripts where id = %s and owner_id = %s",
-            (script_id, user_id),
-        ).fetchone()
+        script = script_owned(db, script_id, user_id)
         if not script:
             return {"ok": False, "error": "无权访问该剧本"}
         book = knowledge._ensure_book(db, script)
@@ -2132,10 +2121,7 @@ def rebuild_cards_from_canon(user_id: int, script_id: int) -> dict[str, Any]:
             (script_id,),
         ).fetchone()
         before_count = int(before["c"]) if before else 0
-        script = db.execute(
-            "select * from scripts where id = %s and owner_id = %s",
-            (script_id, user_id),
-        ).fetchone()
+        script = script_owned(db, script_id, user_id)
         if not script:
             return {"ok": False, "error": "无权访问该剧本"}
         book = knowledge._ensure_book(db, script)
@@ -2196,11 +2182,7 @@ def rebuild_worldbook_with_llm(user_id: int, script_id: int, *,
             (script_id,),
         ).fetchone()
         before_count = int(before["c"]) if before else 0
-        owned = db.execute(
-            "select 1 from scripts where id = %s and owner_id = %s",
-            (script_id, user_id),
-        ).fetchone()
-        if not owned:
+        if not script_owned(db, script_id, user_id):
             return {"ok": False, "error": "无权访问该剧本"}
     if source == "canon":
         with connect() as db:
@@ -2298,10 +2280,7 @@ def estimate_module_rebuild(
         return int(row["c"]) if row else 0
 
     with connect() as db:
-        script = db.execute(
-            "select id, chapter_count from scripts where id = %s and owner_id = %s",
-            (script_id, user_id),
-        ).fetchone()
+        script = script_owned(db, script_id, user_id)
         if not script:
             raise ValueError("无权访问该剧本")
 
@@ -2505,11 +2484,7 @@ def schedule_module_rebuild(
     if needs_llm:
         require_user_llm_credential(user_id)
     with connect() as db:
-        owned = db.execute(
-            "select 1 from scripts where id = %s and owner_id = %s",
-            (script_id, user_id),
-        ).fetchone()
-        if not owned:
+        if not script_owned(db, script_id, user_id):
             raise ValueError("无权访问该剧本")
 
     if module == "embeddings":

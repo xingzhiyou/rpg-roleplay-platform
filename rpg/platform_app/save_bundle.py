@@ -27,6 +27,7 @@ from typing import Any
 from . import save_io
 from .db import connect
 from .knowledge import script_pack
+from .perms import owns_save
 
 BUNDLE_VERSION = 1
 DEFAULT_TIER = "no_vectors"
@@ -40,12 +41,13 @@ _TIER_INCLUDE_CHUNKS: dict[str, bool] = {
 
 def _save_script_id(user_id: int, save_id: int) -> int:
     with connect() as db:
+        # 归属判定收敛到 perms.owns_save;通过后再取 script_id。
+        if not owns_save(db, save_id, user_id):
+            raise ValueError("无权访问该存档")
         row = db.execute(
-            "select script_id from game_saves where id = %s and user_id = %s",
-            (save_id, user_id),
+            "select script_id from game_saves where id = %s",
+            (save_id,),
         ).fetchone()
-    if not row:
-        raise ValueError("无权访问该存档")
     return int(row["script_id"])
 
 

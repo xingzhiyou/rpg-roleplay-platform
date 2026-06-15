@@ -30,7 +30,9 @@ from .api import (
     json_response,
     require_user,
 )
+from .api._deps import is_admin
 from .db import connect, expose, init_db
+from .perms import owns_save
 from .security import hash_password, verify_password
 
 router = APIRouter()
@@ -643,11 +645,7 @@ async def api_save_delete(save_id: int, request: Request):
     user = require_user(request)
     init_db()
     with connect() as db:
-        owned = db.execute(
-            "select 1 from game_saves where id = %s and user_id = %s",
-            (save_id, user["id"]),
-        ).fetchone()
-        if not owned:
+        if not owns_save(db, save_id, user["id"]):
             return _bad("无权操作该存档", 403)
         db.execute("delete from game_saves where id = %s and user_id = %s", (save_id, user["id"]))
     return json_response({"ok": True})
@@ -662,11 +660,7 @@ async def api_save_rename(save_id: int, request: Request):
         return _bad("标题不能为空")
     init_db()
     with connect() as db:
-        owned = db.execute(
-            "select 1 from game_saves where id = %s and user_id = %s",
-            (save_id, user["id"]),
-        ).fetchone()
-        if not owned:
+        if not owns_save(db, save_id, user["id"]):
             return _bad("无权操作该存档", 403)
         db.execute(
             "update game_saves set title = %s, updated_at = now() where id = %s",
@@ -705,9 +699,12 @@ async def api_save_export(save_id: int, request: Request):
     user = require_user(request)
     init_db()
     with connect() as db:
+        # 归属判定收敛到 perms.owns_save;不属返 404(沿用原契约,不暴露存在性)。
+        if not owns_save(db, save_id, user["id"]):
+            raise HTTPException(404)
         row = db.execute(
-            "select id, title, state_snapshot, created_at, updated_at from game_saves where id = %s and user_id = %s",
-            (save_id, user["id"]),
+            "select id, title, state_snapshot, created_at, updated_at from game_saves where id = %s",
+            (save_id,),
         ).fetchone()
     if not row:
         raise HTTPException(404)
@@ -766,7 +763,7 @@ async def api_models_visibility(request: Request):
     """
     # 全局模型目录写操作:与同级 /api/models/* 一致,须管理员(CWE-862)。
     user = require_user(request)
-    if user.get("role") != "admin":
+    if not is_admin(user):
         return _bad("需要管理员权限", status=403)
     body = await request.json() or {}
     api_id = body.get("api_id") or body.get("api")
@@ -1040,7 +1037,7 @@ async def api_admin_smtp_test(request: Request):
     现在 SMTP 配置还存在 user_preferences 待规范化阶段，先给清晰的占位错误。
     """
     user = require_user(request)
-    if user.get("role") != "admin":
+    if not is_admin(user):
         return json_response({"ok": False, "error": "需要管理员权限"}, status_code=403)
     return json_response({
         "ok": False,
@@ -1059,7 +1056,7 @@ _DEPLOY_CFG_KEY = "admin.deployment_config"
 async def api_admin_deployment_config_get(request: Request):
     """读取管理员部署配置（存于 app_config 表）。需要重启才能生效。"""
     user = require_user(request)
-    if user.get("role") != "admin":
+    if not is_admin(user):
         return json_response({"ok": False, "error": "需要管理员权限"}, status_code=403)
     init_db()
     with connect() as db:
@@ -1080,7 +1077,7 @@ async def api_admin_deployment_config_set(request: Request):
     from psycopg.types.json import Jsonb
 
     user = require_user(request)
-    if user.get("role") != "admin":
+    if not is_admin(user):
         return json_response({"ok": False, "error": "需要管理员权限"}, status_code=403)
     body = await request.json() or {}
     if not isinstance(body, dict):

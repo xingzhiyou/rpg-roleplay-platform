@@ -2162,7 +2162,13 @@
       "occurred_stat": " · Occurred ",
       "variant_stat": " · Variant ",
       "superseded_stat": " · Bypassed ",
-      "convergence_label": "Converged {{done}}/{{total}}"
+      "convergence_label": "Converged {{done}}/{{total}}",
+      "satisfy_btn": "Mark Reached",
+      "satisfy_busy": "Marking…",
+      "satisfy_title": "Deterministic advance: mark this canon anchor as having occurred in this save (progress advances)",
+      "satisfy_confirm": "Mark this canon anchor as reached? Your progress advances to its chapter and it will no longer be pending.",
+      "satisfy_ok": "Marked as reached — world-line advanced.",
+      "satisfy_failed": "Mark failed"
     },
     "context": {
       "title": "Context This Round",

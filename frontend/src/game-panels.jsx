@@ -878,19 +878,21 @@ function PanelCharacters({ state }) {
 
 // task 136h: 世界线收束·锚点 子组件 — 嵌入 PanelTimeline 底部
 // 从 /api/saves/:id/anchors 拉取, 跟 timeline 数据互相独立。
-function WorldlineAnchorsSection({ saveId }) {
+function WorldlineAnchorsSection({ saveId, refreshKey = 0, onAnchorSatisfied }) {
   const { t } = useTranslation();
   const { useEffect, useRef } = React;
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [expandedPhase, setExpandedPhase] = useState({});
-  const lastSaveId = useRef(null);
+  const [satisfying, setSatisfying] = useState("");  // 正在标记的 anchor_key(禁用按钮)
+  const lastFetchKey = useRef(null);
 
   useEffect(() => {
     if (!saveId) { setData(null); setError(""); return; }
-    if (saveId === lastSaveId.current && data !== null) return;
-    lastSaveId.current = saveId;
+    const fetchKey = `${saveId}:${refreshKey}`;
+    if (fetchKey === lastFetchKey.current && data !== null) return;
+    lastFetchKey.current = fetchKey;
     let cancelled = false;
     setLoading(true);
     setError("");
@@ -907,7 +909,32 @@ function WorldlineAnchorsSection({ saveId }) {
         if (!cancelled) { setError(String(e?.message || e)); setLoading(false); }
       });
     return () => { cancelled = true; };
-  }, [saveId]);
+  }, [saveId, refreshKey]);
+
+  // FIX2: 玩家确定性推进 — 把一个非 fatal 的 pending 锚点标记为已到达。
+  const markSatisfied = async (anchorKey) => {
+    if (!saveId || !anchorKey || satisfying) return;
+    if (typeof confirm === "function" && !confirm(t('game.timeline.satisfy_confirm'))) return;
+    setSatisfying(anchorKey);
+    try {
+      const base = (typeof window !== "undefined" && window.__API_BASE) || "";
+      const r = await fetch(
+        `${base}/api/saves/${saveId}/anchors/${encodeURIComponent(anchorKey)}/satisfy`,
+        { method: "POST", credentials: "include" },
+      );
+      const json = await r.json().catch(() => ({}));
+      if (!r.ok || !json.ok) {
+        throw new Error(json.error || `HTTP ${r.status}`);
+      }
+      window.__apiToast?.(t('game.timeline.satisfy_ok'), { kind: "ok" });
+      // 触发父级整面板刷新(剧本线高亮 + 本锚点子区都重拉)。
+      if (typeof onAnchorSatisfied === "function") onAnchorSatisfied();
+    } catch (e) {
+      window.__apiToast?.(t('game.timeline.satisfy_failed'), { kind: "danger", detail: e?.message });
+    } finally {
+      setSatisfying("");
+    }
+  };
 
   if (!saveId) return null;
   if (error) {
@@ -1053,8 +1080,23 @@ function WorldlineAnchorsSection({ saveId }) {
                   )}
                   {a.summary || a.anchor_key}
                 </span>
-                <span className="mono" style={{fontSize: 10.5, color: "var(--muted-2)"}}>
-                  imp {a.importance}
+                <span style={{display: "inline-flex", alignItems: "center", gap: 6}}>
+                  {/* FIX2: 非 fatal pending 锚点给「标记已到达」按钮 — 玩家确定性推进。
+                      fatal 锚点须在剧情里由 GM 触发,不给按钮。 */}
+                  {!a.is_fatal && a.anchor_key && (
+                    <button
+                      className="iconbtn"
+                      style={{fontSize: 10.5, padding: "2px 8px", width: "auto"}}
+                      disabled={satisfying === a.anchor_key}
+                      title={t('game.timeline.satisfy_title')}
+                      onClick={() => markSatisfied(a.anchor_key)}
+                    >
+                      {satisfying === a.anchor_key ? t('game.timeline.satisfy_busy') : t('game.timeline.satisfy_btn')}
+                    </button>
+                  )}
+                  <span className="mono" style={{fontSize: 10.5, color: "var(--muted-2)"}}>
+                    imp {a.importance}
+                  </span>
                 </span>
               </li>
             ))}
@@ -1113,12 +1155,15 @@ function PanelTimeline({ state }) {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [expandedPhase, setExpandedPhase] = useState({});  // {phase_index: bool}
-  const lastSaveId = useRef(null);
+  // 玩家「标记已到达」后刷新整个时间线面板(剧本线高亮 + 锚点子区都跟着重拉)。
+  const [refreshKey, setRefreshKey] = useState(0);
+  const lastFetchKey = useRef(null);
 
   useEffect(() => {
     if (!saveId) { setData(null); setError(""); return; }
-    if (saveId === lastSaveId.current && data !== null) return;  // 已加载且 save 没变
-    lastSaveId.current = saveId;
+    const fetchKey = `${saveId}:${refreshKey}`;
+    if (fetchKey === lastFetchKey.current && data !== null) return;  // 已加载且无变化
+    lastFetchKey.current = fetchKey;
     let cancelled = false;
     setLoading(true);
     setError("");
@@ -1136,7 +1181,7 @@ function PanelTimeline({ state }) {
         if (!cancelled) { setError(String(e?.message || e)); setLoading(false); }
       });
     return () => { cancelled = true; };
-  }, [saveId]);
+  }, [saveId, refreshKey]);
 
   if (!saveId) {
     return (
@@ -1178,12 +1223,9 @@ function PanelTimeline({ state }) {
 
   const scriptAnchors = Array.isArray(data.script_anchors) ? data.script_anchors : [];
   const savePhases   = Array.isArray(data.save_phases)    ? data.save_phases    : [];
-  const currentPhaseIndex = data.current_phase_index ?? 0;
-
-  // 判断剧本锚点相对当前 phase 的状态
-  // 用 chapter_min 与实际足迹最大 turn 做简单映射:
-  // 若 save_phases 有记录,取最后一个 phase 的 phase_index 作为"已过" baseline
-  const latestPhase = savePhases.length ? savePhases[savePhases.length - 1].phase_index : -1;
+  const currentPhaseIndex = data.current_phase_index ?? 0;  // 兼容字段,不再用于高亮判定
+  // FIX1: 高亮按真实剧情章节(current_chapter),不再用 active_phase_index(恒卡 0)。
+  const currentChapter = data.current_chapter ?? 1;
 
   return (
     <div className="gp-stack">
@@ -1198,11 +1240,23 @@ function PanelTimeline({ state }) {
         ) : (
           <div className="gp-track">
             {scriptAnchors.map((a, i) => {
-              // 状态判断：chapter_min < (currentPhaseIndex 对应的 chapter) = 已过
-              // 简化方案：按序列位置和 currentPhaseIndex 比较
-              const isDone    = i < currentPhaseIndex;
-              const isCurrent = i === currentPhaseIndex;
-              const isPending = i > currentPhaseIndex;
+              // FIX1: 状态按真实章节区间判定(确定性),不再用序列下标对 active_phase_index。
+              //   chapter_max < currentChapter           → 已度过
+              //   chapter_min <= currentChapter <= max    → 当前
+              //   否则                                    → 待解锁
+              const chMin = a.chapter_min;
+              const chMax = a.chapter_max != null ? a.chapter_max : a.chapter_min;
+              const isDone    = chMax != null && chMax < currentChapter;
+              const isCurrent = chMin != null && chMin <= currentChapter && (chMax == null || currentChapter <= chMax);
+              const isPending = !isDone && !isCurrent;
+              // FIX4: 主标题用 story_time_label(场景/章名);story_phase(开端…)降为弱副标,
+              //   连续同 phase 只在该组首条显示一次。
+              const phase = a.phase_label || "";
+              const prevPhase = i > 0 ? (scriptAnchors[i - 1].phase_label || "") : null;
+              const showPhaseGroup = phase && phase !== prevPhase;
+              const mainTitle = a.story_time_label
+                || a.phase_label
+                || (chMin != null ? t('game.timeline.chapter_label', { chapter: chMin }) : "");
               return (
                 <div
                   key={i}
@@ -1213,19 +1267,23 @@ function PanelTimeline({ state }) {
                     border: isCurrent ? "2px solid var(--accent)" : "2px solid var(--line)",
                   }} />
                   <div className="gp-anchor-body">
+                    {showPhaseGroup && (
+                      <div className="muted-2" style={{fontSize: 10.5, textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 2}}>
+                        {phase}
+                      </div>
+                    )}
                     <div className="gp-anchor-label" style={{
                       color: isPending ? "var(--muted-2)" : undefined,
                       fontWeight: isCurrent ? 600 : undefined,
                     }}>
-                      {a.phase_label || t('game.timeline.chapter_label', { chapter: a.chapter_min })}
+                      {mainTitle}
                       {isCurrent && <span className="pill" style={{marginLeft: 6, fontSize: 10, background: "var(--accent)", color: "#fff"}}>{t('game.timeline.current_pill')}</span>}
                       {isDone && <span className="muted-2" style={{marginLeft: 6, fontSize: 10}}>{t('game.timeline.done_label')}</span>}
                       {isPending && <span className="muted-2" style={{marginLeft: 6, fontSize: 10}}>{t('game.timeline.pending_label')}</span>}
                     </div>
                     <div className="gp-anchor-phase" style={{color: "var(--muted-2)"}}>
-                      {a.story_time_label ? `${a.story_time_label}` : ""}
-                      {a.chapter_min != null
-                        ? ` · ${t('game.timeline.chapter_label', { chapter: a.chapter_min })}${a.chapter_max != null && a.chapter_max !== a.chapter_min ? `–${a.chapter_max}` : ""}`
+                      {chMin != null
+                        ? `${t('game.timeline.chapter_label', { chapter: chMin })}${chMax != null && chMax !== chMin ? `–${chMax}` : ""}`
                         : ""}
                     </div>
                   </div>
@@ -1309,7 +1367,11 @@ function PanelTimeline({ state }) {
       </div>
 
       {/* task 136h: 世界线收束·锚点 */}
-      <WorldlineAnchorsSection saveId={saveId} />
+      <WorldlineAnchorsSection
+        saveId={saveId}
+        refreshKey={refreshKey}
+        onAnchorSatisfied={() => setRefreshKey(k => k + 1)}
+      />
     </div>
   );
 }

@@ -2248,7 +2248,13 @@
       "occurred_stat": " · 已发生 ",
       "variant_stat": " · 变体 ",
       "superseded_stat": " · 绕过 ",
-      "convergence_label": "收束 {{done}}/{{total}}"
+      "convergence_label": "收束 {{done}}/{{total}}",
+      "satisfy_btn": "标记已到达",
+      "satisfy_busy": "标记中…",
+      "satisfy_title": "确定性推进:把该原著锚点标记为本存档已发生(进度随之前进)",
+      "satisfy_confirm": "把这个原著锚点标记为「已到达」?玩家进度会推进到该章,该事件不再待发生。",
+      "satisfy_ok": "已标记到达,世界线已推进。",
+      "satisfy_failed": "标记失败"
     },
     "context": {
       "title": "本轮上下文",

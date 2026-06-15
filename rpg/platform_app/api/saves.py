@@ -417,6 +417,111 @@ async def api_save_anchors_reseed(request: Request, save_id: int, user=Depends(r
         )
 
 
+@router.post("/api/saves/{save_id}/anchors/{anchor_key}/satisfy")
+async def api_save_anchor_satisfy(save_id: int, anchor_key: str, user=Depends(require_user)):
+    """玩家确定性推进:把一个【当前 pending 窗口内、非 fatal】的原著锚点标记为已到达。
+
+    回答用户「世界线锚点卡在当前推不动 / 怎么推进」的治本路径 —— 不再只能靠 GM 调 LLM 工具。
+    复用 command_tools_anchors._t_mark_anchor_satisfied 的同一写逻辑(置 occurred +
+    advance_progress 到 source_chapter,取 max 只增不减),但加玩家级护栏:
+
+      · owns_save 鉴权 + _get_sync_scope_lock((user,save)) 同锁防并发互覆盖
+      · 仅允许 status='pending' 的锚点(已 occurred/variant/superseded → 明确提示)
+      · 拒绝 is_fatal(关键命运/死亡锚点须在剧情中由 GM 触发)
+      · 防剧透:锚点必须落在【该存档当前进度窗口】内(get_progress_window),
+        不允许玩家跳到远未来锚点提前剧透
+    """
+    user_id = int(user["id"])
+    anchor_key = (anchor_key or "").strip()
+    if not anchor_key:
+        return json_response({"ok": False, "error": "anchor_key 必填"}, status_code=400)
+
+    from tools_dsl.command_dispatcher import _get_sync_scope_lock
+    from gm_serving.settings import advance_progress
+
+    try:
+        # SEC: 整 read-modify-write 在 (user,save) 锁内,与 command_tools_anchors 同锁。
+        with _get_sync_scope_lock((user_id, save_id)), connect() as db:
+            if not owns_save(db, save_id, user_id):
+                return json_response({"ok": False, "error": "无权访问该存档"}, status_code=403)
+            row = db.execute(
+                """
+                select id, status, is_fatal, summary, source_chapter
+                  from save_anchor_states
+                 where save_id = %s and anchor_key = %s
+                """,
+                (save_id, anchor_key),
+            ).fetchone()
+            if not row:
+                return json_response(
+                    {"ok": False, "error": "找不到该锚点"}, status_code=404)
+            if row.get("status") in ("occurred", "variant"):
+                return json_response(
+                    {"ok": False, "error": "该锚点已经发生过了,无需重复标记。"},
+                    status_code=409)
+            if row.get("status") == "superseded":
+                return json_response(
+                    {"ok": False, "error": "该锚点已被剧情绕过,不能再标记为已到达。"},
+                    status_code=409)
+            if row.get("is_fatal"):
+                return json_response(
+                    {"ok": False, "error": "这是关键命运锚点,须在剧情中触发,不能手动标记。"},
+                    status_code=409)
+
+            # 防剧透:锚点必须落在当前进度窗口 [chapter_min, chapter_max] 内。
+            # get_progress_window 单独连库(已 init_db),与本事务读的是同一权威表,
+            # 在锁内调用安全(它只读不写)。
+            from agents.anchor_seed_agent import get_progress_window
+            win = get_progress_window(save_id, script_id=None)
+            src_ch = row.get("source_chapter")
+            win_min = win.get("chapter_min")
+            win_max = win.get("chapter_max")
+            if isinstance(src_ch, int) and isinstance(win_max, int) and src_ch > win_max:
+                return json_response(
+                    {"ok": False,
+                     "error": f"该锚点在第 {src_ch} 章,超出当前进度窗口,暂不能提前标记(防剧透)。"},
+                    status_code=409)
+
+            # 当前最大 turn(与 _t_mark_anchor_satisfied 一致默认)
+            tr = db.execute(
+                "select coalesce(max(turn_index), 0) as t from branch_commits where save_id = %s",
+                (save_id,),
+            ).fetchone()
+            occurred_turn = int((tr or {}).get("t") or 0)
+
+            # 玩家手动「标记已到达」语义 = 按原著方式发生(drift=0 → status='occurred')。
+            # 复用 _t_mark_anchor_satisfied 的同款 UPDATE。
+            db.execute(
+                """
+                update save_anchor_states set
+                  status = 'occurred',
+                  variant_description = %s,
+                  occurred_at_turn = %s,
+                  drift_score = 0.0,
+                  updated_at = now()
+                where save_id = %s and id = %s
+                """,
+                ("玩家在世界线面板手动标记已到达", occurred_turn, save_id, row["id"]),
+            )
+            # 同步玩家进度到该锚点章节(advance_progress 取 max 只增不减,幂等)。
+            if isinstance(src_ch, int) and src_ch >= 1:
+                try:
+                    advance_progress(db, save_id, src_ch)
+                except Exception:
+                    pass  # 进度同步失败不阻断锚点标记
+        return json_response({
+            "ok": True,
+            "anchor_id": row["id"],
+            "anchor_key": anchor_key,
+            "new_status": "occurred",
+            "occurred_at_turn": occurred_turn,
+            "advanced_to_chapter": src_ch if isinstance(src_ch, int) and src_ch >= 1 else None,
+        })
+    except Exception as exc:
+        return json_response(
+            {"ok": False, "error": f"{type(exc).__name__}: {exc}"}, status_code=500)
+
+
 # ── Phase F/W6: 创建引导 + 游戏内设置(读 schema/设置,写 apply 锁死 enforcement)──
 @router.get("/api/saves/{save_id}/settings")
 async def api_save_settings_get(save_id: int, user=Depends(require_user)):

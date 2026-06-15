@@ -79,6 +79,13 @@ def build_unified_tool_list(
         # 幻觉式叙述「已修改」而不真正调用。放 -1 保证它们永远落在窗口内。
         if n.startswith(("set_tavern_", "edit_tavern_", "tavern_")):
             return -1
+        # 世界线收束锚点工具显式提权:与 search_canon 同级(0/1),保证进 GM 直发工具
+        # 窗口(默认 16)、不被挤进 backend tiered 目录。否则 mark_anchor_satisfied /
+        # mark_anchor_superseded 落 rank 3、summarize_anchors 落 rank 3,窗口满时被截 →
+        # GM 拿不到 schema、剧情锚点永远「推不动」(用户反馈根因之一)。
+        if n in ("mark_anchor_satisfied", "mark_anchor_superseded",
+                 "list_pending_anchors", "summarize_anchors"):
+            return 0
         if n.startswith(("search_canon", "lookup_", "graph_neighbors")):
             return 0
         if n.startswith(("kb_", "get_", "list_", "query_")):

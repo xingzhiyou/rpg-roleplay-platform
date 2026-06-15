@@ -12,6 +12,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Icon } from '../icons.jsx';
 import { useStickToBottom } from '../../hooks/useStickToBottom.js';
+import {
+  useTavernChatRun, applyTavernState, abortRun,
+  toolCallInline, toolResultInline,
+} from '../../hooks/useTavernChatRun.js';
 // 不复用电脑端 cards.jsx 的 UI 组件 —— 移动原生重写卡片读视图/persona 表单 + 纯数据 helper。
 // 注:此处 cardFormInit/cardFormPayload 字段集刻意比 pages/cards.jsx 窄(酒馆 persona 用
 // language_style/secret,无 full_name/importance/first_revealed_chapter/token_budget/
@@ -929,8 +933,9 @@ export function MobileTavern({ nav }) {
     toastTimer.current = setTimeout(() => setToast(null), 2000);
   }, []);
 
-  /* ── SSE 控制 ref(照搬 tavern-app.jsx)───────────────────────── */
-  const runRef = useRef({ stopped: false, sse: null, runId: 0, inactivityTimer: null });
+  /* ── 收口的酒馆 SSE 状态机(runRef + startRun/stopRun 在 hook 内,折叠语义见
+   *    lib/tavern-chat-run.js;移动端 toast 走自有 fireToast)──────────────── */
+  const { runRef, startRun: runChat, stopRun } = useTavernChatRun({ setRunning });
 
   /* ── reloadList ───────────────────────────────────────────────── */
   const reloadList = useCallback(async () => {
@@ -947,33 +952,11 @@ export function MobileTavern({ nav }) {
     } finally { setLoadingList(false); }
   }, []);
 
-  /* ── applyState(照搬 tavern-app.jsx)─────────────────────────── */
+  /* ── applyState(收口到 applyTavernState 核心三段 + 移动端叠加 setSystemPrompt)──── */
   const applyState = useCallback((data) => {
-    if (!data) return;
-    const tavern = data.tavern || (data.data && data.data.tavern) || {};
-    const char = tavern.character || null;
-    setCharacter(char || null);
-    const personaCardId = tavern.persona_card_id;
-    if (personaCardId != null) {
-      window.api.cards.myGet(personaCardId)
-        .then((full) => { if (full && full.id) setPersona(full); else setPersona(data.player || null); })
-        .catch(() => setPersona(data.player || null));
-    } else {
-      setPersona(data.player || null);
-    }
-    if (Array.isArray(data.history)) setHistory(data.history);
-    if (data.save_id != null) {
-      setActiveChat(prev => ({
-        id: data.save_id,
-        title: data.save_title || prev?.title || `对话 #${data.save_id}`,
-        character_name: (char && char.name) || prev?.character_name || '',
-        updated_at: data.save_updated_at || prev?.updated_at || '',
-      }));
-    }
-    // 同步 systemPrompt
-    if (tavern.system_prompt !== undefined) {
-      setSystemPrompt(tavern.system_prompt || '');
-    }
+    applyTavernState(data, {
+      setCharacter, setPersona, setHistory, setActiveChat, setSystemPrompt,
+    });
   }, []);
 
   /* ── openChat(照搬 tavern-app.jsx)───────────────────────────── */
@@ -1006,12 +989,8 @@ export function MobileTavern({ nav }) {
   }, [loadingList, chats, activeId, openChat]);
 
   /* ── 卸载停流 ────────────────────────────────────────────────── */
-  useEffect(() => () => {
-    const rc = runRef.current;
-    rc.stopped = true;
-    if (rc.inactivityTimer) { clearTimeout(rc.inactivityTimer); rc.inactivityTimer = null; }
-    if (rc.sse) { try { rc.sse.stop('unmount'); } catch (_) {} rc.sse = null; }
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => () => { abortRun(runRef.current, 'unmount'); }, []);
 
   /* ── openSaveId ──────────────────────────────────────────────── */
   const openSaveId = useCallback(async (saveId, fallbackName) => {
@@ -1048,190 +1027,34 @@ export function MobileTavern({ nav }) {
     }
   }, [openSaveId, fireToast]);
 
-  /* ── stopRun(照搬 tavern-app.jsx)────────────────────────────── */
-  const stopRun = useCallback(() => {
-    runRef.current.stopped = true;
-    if (runRef.current.inactivityTimer) { clearTimeout(runRef.current.inactivityTimer); runRef.current.inactivityTimer = null; }
-    runRef.current.runId = (runRef.current.runId || 0) + 1;
-    if (runRef.current.sse) { try { runRef.current.sse.stop('manual_stop'); } catch (_) {} runRef.current.sse = null; }
-    try { window.api.game.stop(); } catch (_) {}
-    setRunning(false);
-  }, []);
+  /* ── stopRun:收口到 useTavernChatRun(移动端无秒表,与 hook 默认一致)──── */
+  // stopRun 由 hook 提供。
 
-  /* ── startRun(逐字照搬 tavern-app.jsx 行 709–887)────────────── */
+  /* ── startRun(收口到 useTavernChatRun;折叠语义见 lib/tavern-chat-run.js)──── */
+  // 移动端差异:toast 走自有 fireToast(只取 kind,不显示 detail);restoreFailedDraft
+  // 不回填输入框(setText:null);空回复文案不带「已恢复你的输入」;tool-op = inline 无 anchor。
   const startRun = useCallback(async (playerText) => {
-    const saveId = activeId;
-    if (saveId == null) { fireToast('请先选择或新建一个对话', 'warn'); return; }
-    const rc = runRef.current;
-    if (rc.sse) { rc.runId = (rc.runId || 0) + 1; try { rc.sse.stop('superseded'); } catch (_) {} rc.sse = null; try { window.api.game.stop(); } catch (_) {} }
-    if (rc.inactivityTimer) { clearTimeout(rc.inactivityTimer); rc.inactivityTimer = null; }
-    const runId = (rc.runId || 0) + 1;
-    rc.runId = runId; rc.stopped = false;
-    const isCurrentRun = () => rc.runId === runId;
-
-    const ts = tvNow();
-    setHistory(h => [...h, { role: 'user', content: playerText, ts }]);
-    setLastPlayerText(playerText);
-    setHasError(false);
-    setRunning(true);
-
-    let openedAssistant = false;
-    let gotDone = false;
-    const STREAM_IDLE_TIMEOUT_MS = 120000;
-
-    const restoreFailedDraft = () => {
-      if (!isCurrentRun() || openedAssistant) return;
-      setHistory(h => {
-        const last = h[h.length - 1];
-        if (last && last.role === 'user' && last.content === playerText) return h.slice(0, -1);
-        return h;
-      });
-    };
-
-    const resetIdle = () => {
-      if (rc.inactivityTimer) clearTimeout(rc.inactivityTimer);
-      rc.inactivityTimer = setTimeout(() => {
-        if (!isCurrentRun()) return;
-        try { rc.sse && rc.sse.stop && rc.sse.stop('idle_timeout'); } catch (_) {}
-        restoreFailedDraft();
-        setRunning(false);
-        setHasError('超过 120 秒没有新输出,已断开。请重试。');
-        fireToast('生成停滞,120 秒无响应', 'warn');
-      }, STREAM_IDLE_TIMEOUT_MS);
-    };
-    resetIdle();
-
-    rc.sse = window.api.game.chat(
-      { message: playerText, text: playerText, save_id: saveId },
-      {
-        onError: (err) => {
-          if (!isCurrentRun()) return;
-          if (rc.inactivityTimer) { clearTimeout(rc.inactivityTimer); rc.inactivityTimer = null; }
-          const detail = (err && err.payload && err.payload.message) || (err && err.message) || '请求失败';
-          setRunning(false); setHasError(detail);
-          fireToast('请求失败', 'danger');
-          restoreFailedDraft();
-        },
-        onAbort: (data) => {
-          if (!isCurrentRun()) return;
-          const reason = (data && data.reason) || '';
-          if (rc.inactivityTimer) { clearTimeout(rc.inactivityTimer); rc.inactivityTimer = null; }
-          if (rc.stopped || ['manual_stop', 'superseded', 'unmount', 'switch', 'idle_timeout'].includes(reason)) {
-            rc.sse = null; return;
-          }
-          restoreFailedDraft();
-          setRunning(false); setHasError('连接被取消,上一条输入已保留,请重试。');
-          rc.sse = null;
-        },
-        on_status: (data) => {
-          if (!isCurrentRun()) return;
-          resetIdle();
-          void data;
-        },
-        on_reasoning: (data) => {
-          if (!isCurrentRun()) return;
-          resetIdle();
-          const piece = (data && (data.text || data.delta)) || '';
-          if (!piece) return;
-          setHistory(h => {
-            let arr = h;
-            if (!openedAssistant) { openedAssistant = true; arr = [...h, { role: 'assistant', content: '', ts, streaming: true }]; }
-            const last = arr[arr.length - 1];
-            if (!last || last.role !== 'assistant') return arr;
-            return [...arr.slice(0, -1), { ...last, _thinking: (last._thinking || '') + piece }];
-          });
-        },
-        on_tool_call: (data) => {
-          if (!isCurrentRun()) return;
-          resetIdle();
-          const op = { tool: (data && data.tool) || '?', args: (data && (data.args_summary || data.args)) || null, _pending: true };
-          setHistory(h => {
-            let arr = h;
-            if (!openedAssistant) { openedAssistant = true; arr = [...h, { role: 'assistant', content: '', ts, streaming: true }]; }
-            const last = arr[arr.length - 1];
-            if (!last || last.role !== 'assistant') return arr;
-            return [...arr.slice(0, -1), { ...last, _toolOps: [...(last._toolOps || []), op] }];
-          });
-        },
-        on_tool_result: (data) => {
-          if (!isCurrentRun()) return;
-          resetIdle();
-          setHistory(h => {
-            const last = h[h.length - 1];
-            if (!last || last.role !== 'assistant' || !Array.isArray(last._toolOps) || !last._toolOps.length) return h;
-            const ops = [...last._toolOps];
-            for (let i = ops.length - 1; i >= 0; i--) {
-              if (ops[i]._pending) {
-                ops[i] = { ...ops[i], ok: !!(data && data.ok), result: (data && data.result_snippet) || null, error: (data && data.error) || null, _pending: false };
-                break;
-              }
-            }
-            return [...h.slice(0, -1), { ...last, _toolOps: ops }];
-          });
-        },
-        on_token: (data) => {
-          if (!isCurrentRun()) return;
-          resetIdle();
-          const piece = (data && (data.text || data.delta)) || '';
-          if (!piece) return;
-          setHistory(h => {
-            if (!openedAssistant) { openedAssistant = true; return [...h, { role: 'assistant', content: piece, ts, streaming: true }]; }
-            const last = h[h.length - 1];
-            if (!last || last.role !== 'assistant') return [...h, { role: 'assistant', content: piece, ts, streaming: true }];
-            return [...h.slice(0, -1), { ...last, content: (last.content || '') + piece }];
-          });
-        },
-        on_done: (data) => {
-          if (!isCurrentRun()) return;
-          gotDone = true;
-          if (rc.inactivityTimer) { clearTimeout(rc.inactivityTimer); rc.inactivityTimer = null; }
-          setRunning(false);
-          if (!openedAssistant) {
-            restoreFailedDraft();
-            const msg = data && data.interrupted ? '本轮已中断,已恢复你的输入。' : '本轮没有收到回复,请重试。';
-            setHasError(msg);
-            fireToast(data && data.interrupted ? '生成中断' : '空回复', 'warn');
-            rc.sse = null;
-            return;
-          }
-          setHistory(h => {
-            const last = h[h.length - 1];
-            if (!last || last.role !== 'assistant') return h;
-            return [...h.slice(0, -1), { ...last, streaming: false, streaming_done: true }];
-          });
-          const payload = (data && data.status) || null;
-          if (payload) applyState(payload);
-          else { window.api.game.state().then(applyState).catch(() => {}); }
-          reloadList();
-          rc.sse = null;
-        },
-        on_error: (data) => {
-          if (!isCurrentRun()) return;
-          if (rc.inactivityTimer) { clearTimeout(rc.inactivityTimer); rc.inactivityTimer = null; }
-          const realMsg = (data && (data.message || data.detail || data.error)) || '';
-          setRunning(false); setHasError(realMsg || true);
-          fireToast('生成失败', 'danger');
-          restoreFailedDraft();
-        },
-        onClose: () => {
-          if (!isCurrentRun()) return;
-          if (rc.inactivityTimer) { clearTimeout(rc.inactivityTimer); rc.inactivityTimer = null; }
-          if (gotDone || rc.stopped) { rc.sse = null; return; }
-          setRunning(r => {
-            if (!r) return r;
-            setHasError('连接中断,上一条输入已保留,可重试。');
-            restoreFailedDraft();
-            return false;
-          });
-          setHistory(h => {
-            const last = h[h.length - 1];
-            if (!last || last.role !== 'assistant' || !last.streaming) return h;
-            return [...h.slice(0, -1), { ...last, streaming: false, streaming_done: true }];
-          });
-        },
-      }
-    );
-  }, [activeId, applyState, reloadList, fireToast]);
+    runChat({
+      saveId: activeId, model: undefined, playerText, applyState,
+      ts: tvNow,   // 移动端用自有 tvNow()(零填充 HH:MM),不走 __fmt.nowHHMM 的 locale slice。
+      setHistory, setRunning, setText: null, setHasError, setLastPlayerText,
+      // 移动端 toast:fireToast(msg, kind);detail 不显示(逐字保留旧行为),
+      // 仅 idle 旧实现是合并串「生成停滞,120 秒无响应」→ 用 code 还原。
+      toast: (title, o) => {
+        const kind = o && o.kind;
+        if (o && o.code === 'idle') { fireToast('生成停滞,120 秒无响应', 'warn'); return; }
+        fireToast(title, kind);
+      },
+      reloadList,
+      // 空回复文案:移动端不带「已恢复你的输入」。
+      doneEmptyMsg: (interrupted) => (interrupted ? '本轮已中断,已恢复你的输入。' : '本轮没有收到回复,请重试。'),
+      // onClose 文案:移动端更短。
+      closeMsg: '连接中断,上一条输入已保留,可重试。',
+      // tool-op:inline 模型(无 anchor)。
+      onToolCall: toolCallInline,
+      onToolResult: toolResultInline,
+    });
+  }, [activeId, applyState, reloadList, fireToast, runChat]);
 
   /* ── onRetry(照搬 tavern-app.jsx)────────────────────────────── */
   const onRetry = useCallback(() => {

@@ -28,6 +28,9 @@ import AgentModelPicker from '../components/AgentModelPicker.jsx';
 import ModelConfigInterceptModal, { capConfig } from '../components/ModelConfigInterceptModal.jsx';
 import { isCredentialsError } from '../lib/creds.js';
 import {
+  useTavernChatRun, applyTavernState, abortRun,
+} from '../hooks/useTavernChatRun.js';
+import {
   TavernChatItem, TavernChatArea, TwoCardDrawer, ConfirmModal, RenameModal,
 } from '../tavern-app.jsx';
 
@@ -137,10 +140,15 @@ export default function TavernPage() {
   // 主区视图:'chat' | 'cards'(在本页内切换,不离开 Tavern)
   const [view, setView] = useState('chat');
 
-  const runRef = useRef({ stopped: false, sse: null, runId: 0, inactivityTimer: null });
   // F1:本轮工具流快照 —— applyState 用后端 history 覆盖时,把它补挂回最末 assistant,
   // 免得 done 后刷新就丢了后台工具流(后端 history 不带 _toolOps,纯前端展示态)。
   const lastTurnToolOpsRef = useRef(null);
+  // F1:本轮(run-scoped)后台工具调用累积数组,每轮 onStart 时重置;flushToolOps 用它整组快照。
+  const turnToolOpsRef = useRef([]);
+
+  // 收口的酒馆 SSE 状态机(runRef + 共用 startRun/stopRun,折叠语义见 lib/tavern-chat-run.js)。
+  // pages 的秒表(stopTicker)在下方本地 stopRun 包装里追加,故此处只交 setRunning。
+  const { runRef, startRun: runChat, stopRun: hookStopRun } = useTavernChatRun({ setRunning });
 
   /* ── 列表加载 ──────────────────────────────────────────────────── */
   const reloadList = useCallback(async () => {
@@ -157,58 +165,40 @@ export default function TavernPage() {
     } finally { setLoadingList(false); }
   }, []);
 
-  /* ── 把一份 state 投射进角色/persona/history ──────────────────────── */
-  const applyState = useCallback((data) => {
-    if (!data) return;
-    setGameState(data);  // 完整 state 喂 Composer:模型名/context 圆环/@mention 全靠它
-    try {
-      const pm = (data.permissions && data.permissions.mode) || (data.data && data.data.permissions && data.data.permissions.mode);
-      if (pm) setPermission(pm);
-    } catch (_) {}
-    const tavern = data.tavern || (data.data && data.data.tavern) || {};
-    const char = tavern.character || null;
-    setCharacter(char || null);
-    const personaCardId = tavern.persona_card_id;
-    if (personaCardId != null) {
-      window.api.cards.myGet(personaCardId)
-        .then((full) => { if (full && full.id) setPersona(full); else setPersona(data.player || null); })
-        .catch(() => setPersona(data.player || null));
-    } else {
-      setPersona(data.player || null);
-    }
-    if (Array.isArray(data.history)) {
-      // 后端 history 的 assistant 消息现在带 tool_ops / reasoning(record_turn 已持久化)→
-      // 映射成前端展示字段 _toolOps / _thinking,重开/刷新聊天后工具流 + 思考流仍可见。
-      let hist = data.history.map((m) => {
-        if (m && m.role === 'assistant') {
-          const mm = { ...m };
-          if (!mm._toolOps && Array.isArray(m.tool_ops) && m.tool_ops.length) mm._toolOps = m.tool_ops;
-          if (!mm._thinking && m.reasoning) mm._thinking = m.reasoning;
-          return mm;
-        }
-        return m;
-      });
-      // 兜底:刚完成那轮后端可能还没回带(异步持久化时序)→ 用本轮前端快照补挂最末 assistant。
-      const ops = lastTurnToolOpsRef.current;
-      if (Array.isArray(ops) && ops.length > 0) {
-        let lastAssistant = -1;
-        for (let i = hist.length - 1; i >= 0; i--) { if (hist[i] && hist[i].role === 'assistant') { lastAssistant = i; break; } }
-        if (lastAssistant >= 0 && !(hist[lastAssistant]._toolOps && hist[lastAssistant]._toolOps.length)) {
-          hist = hist.map((m, i) => (i === lastAssistant ? { ...m, _toolOps: ops } : m));
-        }
-        lastTurnToolOpsRef.current = null;
+  /* ── 把一份 state 投射进角色/persona/history(收口到 applyTavernState 核心三段 +
+   *   pages 叠加 setGameState/setPermission + 持久化 tool_ops/_thinking 的 history 映射)──── */
+  // 后端 history 的 assistant 消息带 tool_ops / reasoning(record_turn 已持久化)→ 映射成
+  // 前端展示字段 _toolOps / _thinking,重开/刷新后工具流 + 思考流仍可见;再用本轮前端快照
+  // (lastTurnToolOpsRef)兜底补挂最末 assistant(异步持久化时序未回带时)。
+  const mapHistoryWithToolOps = useCallback((rawHistory) => {
+    let hist = rawHistory.map((m) => {
+      if (m && m.role === 'assistant') {
+        const mm = { ...m };
+        if (!mm._toolOps && Array.isArray(m.tool_ops) && m.tool_ops.length) mm._toolOps = m.tool_ops;
+        if (!mm._thinking && m.reasoning) mm._thinking = m.reasoning;
+        return mm;
       }
-      setHistory(hist);
+      return m;
+    });
+    const ops = lastTurnToolOpsRef.current;
+    if (Array.isArray(ops) && ops.length > 0) {
+      let lastAssistant = -1;
+      for (let i = hist.length - 1; i >= 0; i--) { if (hist[i] && hist[i].role === 'assistant') { lastAssistant = i; break; } }
+      if (lastAssistant >= 0 && !(hist[lastAssistant]._toolOps && hist[lastAssistant]._toolOps.length)) {
+        hist = hist.map((m, i) => (i === lastAssistant ? { ...m, _toolOps: ops } : m));
+      }
+      lastTurnToolOpsRef.current = null;
     }
-    if (data.save_id != null) {
-      setActiveChat((prev) => ({
-        id: data.save_id,
-        title: data.save_title || prev?.title || `对话 #${data.save_id}`,
-        character_name: (char && char.name) || prev?.character_name || '',
-        updated_at: data.save_updated_at || prev?.updated_at || '',
-      }));
-    }
+    return hist;
   }, []);
+
+  const applyState = useCallback((data) => {
+    applyTavernState(data, {
+      setCharacter, setPersona, setHistory, setActiveChat,
+      setGameState, setPermission,
+      mapHistory: mapHistoryWithToolOps,
+    });
+  }, [mapHistoryWithToolOps]);
 
   // 平台首页空态输入框新建对话后,把首句暂存在 sessionStorage(rpg_tavern_pending_first);
   // 打开命中同一 save 时自动发出。openChat 在激活完成后把首句记进 pendingFirstRef 并 bump
@@ -268,11 +258,9 @@ export default function TavernPage() {
 
   // 卸载:abort 在途流 + 停秒表
   useEffect(() => () => {
-    const rc = runRef.current;
-    rc.stopped = true;
-    if (rc.inactivityTimer) { clearTimeout(rc.inactivityTimer); rc.inactivityTimer = null; }
-    if (rc.sse) { try { rc.sse.stop('unmount'); } catch (_) {} rc.sse = null; }
+    abortRun(runRef.current, 'unmount');
     if (tickRef.current.id) { clearInterval(tickRef.current.id); tickRef.current.id = null; }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // F2:本轮秒表 —— 仿 game-console.jsx ~801 的 totalElapsed ticker(200ms)
@@ -346,252 +334,114 @@ export default function TavernPage() {
     }
   }, [openSaveId]);
 
-  /* ── 流式发送(复用 api.game.chat,带 idle timeout)──────────────── */
+  /* ── 流式发送(收口到 useTavernChatRun;折叠语义见 lib/tavern-chat-run.js)──────── */
+  // 秒表是 pages 独有 → 包一层:共用停流逻辑(hookStopRun)+ 本端停秒表。
   const stopRun = useCallback(() => {
-    runRef.current.stopped = true;
-    if (runRef.current.inactivityTimer) { clearTimeout(runRef.current.inactivityTimer); runRef.current.inactivityTimer = null; }
-    runRef.current.runId = (runRef.current.runId || 0) + 1;
-    if (runRef.current.sse) { try { runRef.current.sse.stop('manual_stop'); } catch (_) {} runRef.current.sse = null; }
-    try { window.api.game.stop(); } catch (_) {}
-    setRunning(false);
+    hookStopRun();
     stopTicker();
-  }, [stopTicker]);
+  }, [hookStopRun, stopTicker]);
+
+  // F1:pages 的 tool-op 模型 = turnToolOps 整组快照 + flushToolOps(工具先于正文也能露出占位)。
+  // 与 tavern-app 的 inline-anchor 模型不同,逐字保留;turnToolOpsRef 每轮 onStart 重置。
+  const flushPagesToolOps = useCallback((ctx) => {
+    const turnToolOps = turnToolOpsRef.current;
+    const snapshot = turnToolOps.map((o) => ({ ...o }));
+    const hadAssistant = ctx.isOpened();
+    ctx.markOpened();
+    ctx.setHistory((h) => {
+      const last = h[h.length - 1];
+      if (hadAssistant && last && last.role === 'assistant') {
+        return [...h.slice(0, -1), { ...last, _toolOps: snapshot }];
+      }
+      return [...h, { role: 'assistant', content: '', ts: ctx.ts, streaming: true, _toolOps: snapshot }];
+    });
+  }, []);
 
   const startRun = useCallback(async (playerText, opts = {}) => {
     const sentAttachments = Array.isArray(opts.attachments) ? opts.attachments : [];
     const sentCommand = opts.command || null;
     // opts.saveId:显式指定目标 save(自动发首句时用,绕开 activeId 闭包可能还是旧值的问题)。
     const saveId = (opts.saveId != null) ? opts.saveId : activeId;
-    if (saveId == null) { window.__apiToast?.('请先选择或新建一个对话', { kind: 'warn', duration: 2400 }); return; }
-    const rc = runRef.current;
-    if (rc.sse) { rc.runId = (rc.runId || 0) + 1; try { rc.sse.stop('superseded'); } catch (_) {} rc.sse = null; try { window.api.game.stop(); } catch (_) {} }
-    if (rc.inactivityTimer) { clearTimeout(rc.inactivityTimer); rc.inactivityTimer = null; }
-    const runId = (rc.runId || 0) + 1;
-    rc.runId = runId; rc.stopped = false;
-    const isCurrentRun = () => rc.runId === runId;
+    const _sid = activeId;   // autotitle 用(逐字保留:沿用旧实现读 activeId)
 
-    const ts = (window.__fmt && window.__fmt.nowHHMM) ? window.__fmt.nowHHMM() : new Date().toLocaleTimeString().slice(0, 5);
-    setHistory((h) => [...h, { role: 'user', content: playerText, ts, attachments: sentAttachments.length ? sentAttachments : undefined }]);
-    setLastPlayerText(playerText);
-    setNeedsCreds(false);   // 新一轮开始,撤掉「缺 key」引导卡片
-    setText('');
-    setHasError(false);
-    setRunning(true);
-    startTicker();
-
-    let openedAssistant = false;
-    let gotDone = false;
-    // F1:本轮后台工具调用,归组挂到流式 assistant 消息的 _toolOps。
-    const turnToolOps = [];
-    // 把当前 turnToolOps 写进流式 assistant 气泡(不存在则建占位,使工具流在 token 前也能露出)。
-    // 工具通常先于正文 → 第一次 flush 即开占位 assistant 并同步置 openedAssistant,
-    // 后续 token 走 append 分支挂到同一气泡。
-    const flushToolOps = () => {
-      const snapshot = turnToolOps.map((o) => ({ ...o }));
-      const hadAssistant = openedAssistant;
-      openedAssistant = true;
-      setHistory((h) => {
-        const last = h[h.length - 1];
-        if (hadAssistant && last && last.role === 'assistant') {
-          return [...h.slice(0, -1), { ...last, _toolOps: snapshot }];
+    runChat({
+      saveId, model, playerText, applyState,
+      setHistory, setRunning, setText, setHasError, setLastPlayerText,
+      toast: (title, o) => window.__apiToast?.(title, o),
+      reloadList,
+      // pages 额外:chat body 带附件/命令;用户气泡带附件;done 总是再拉一次 state(刷新「她是谁」);
+      // 列表刷新由 onDoneExtra 的 autotitle finally 负责,故跳过 hook 默认 reload。
+      chatExtra: { attachments: sentAttachments, command: sentCommand },
+      userAttachments: sentAttachments.length ? sentAttachments : undefined,
+      doneAlwaysRefetch: true,
+      skipDoneReload: true,
+      // 提交前:重置本轮工具数组 + 撤「缺 key」引导卡 + 起秒表。
+      onStart: () => { turnToolOpsRef.current = []; setNeedsCreds(false); startTicker(); },
+      // idle/任何结束:停秒表。
+      onIdleExtra: stopTicker,
+      onStreamEndExtra: stopTicker,
+      // tool-op:flush 模型(turnToolOps 整组快照)。
+      onToolCall: (data, ctx) => {
+        turnToolOpsRef.current.push({
+          tool: (data && data.tool) || '工具',
+          args: data && data.arguments,
+          result: undefined, ok: undefined, error: undefined, _pending: true,
+        });
+        flushPagesToolOps(ctx);
+      },
+      onToolResult: (data, ctx) => {
+        const turnToolOps = turnToolOpsRef.current;
+        let op = null;
+        for (let i = turnToolOps.length - 1; i >= 0; i--) { if (turnToolOps[i]._pending) { op = turnToolOps[i]; break; } }
+        if (!op) { op = { tool: '工具', args: undefined }; turnToolOps.push(op); }
+        op._pending = false;
+        op.ok = data ? data.ok !== false : true;
+        op.result = data && data.result;
+        op.error = data && data.error;
+        flushPagesToolOps(ctx);
+      },
+      // F2:用量(context 圆环)。
+      onUsage: (data) => setLastUsage(data),
+      // 无条件收尾(空回复也跑,原实现在 !openedAssistant 之前):写本轮 elapsed/usage。
+      onDoneAlways: (data) => {
+        if (data && data.elapsed_ms != null) setElapsedMs(Number(data.elapsed_ms) || 0);
+        if (data && data.usage) setLastUsage(data.usage);
+      },
+      // 成功收尾(applyState 之前调):保留本轮工具流快照(供 applyState 回填)
+      // + 类 Claude 首轮自动标题(后端幂等;每对话本会话只触发一次,失败静默)。
+      onDoneExtra: () => {
+        const ops = turnToolOpsRef.current;
+        lastTurnToolOpsRef.current = ops.length ? ops.map((o) => ({ ...o })) : null;
+        if (_sid && !titledRef.current.has(String(_sid))) {
+          titledRef.current.add(String(_sid));
+          window.api.tavern.autotitle(_sid)
+            .then((r) => {
+              if (r && r.ok && r.title) {
+                setActiveChat((p) => (p && String(p.id) === String(_sid)) ? { ...p, title: r.title } : p);
+              }
+            })
+            .catch(() => {})
+            .finally(() => reloadList());
+        } else {
+          reloadList();
         }
-        return [...h, { role: 'assistant', content: '', ts, streaming: true, _toolOps: snapshot }];
-      });
-    };
-    const STREAM_IDLE_TIMEOUT_MS = 120000;
-    const restoreFailedDraft = () => {
-      if (!isCurrentRun() || openedAssistant) return;
-      setText((cur) => (String(cur || '').trim() ? cur : playerText));
-      setHistory((h) => {
-        const last = h[h.length - 1];
-        if (last && last.role === 'user' && last.content === playerText) return h.slice(0, -1);
-        return h;
-      });
-    };
-    const resetIdle = () => {
-      if (rc.inactivityTimer) clearTimeout(rc.inactivityTimer);
-      rc.inactivityTimer = setTimeout(() => {
-        if (!isCurrentRun()) return;
-        try { rc.sse && rc.sse.stop && rc.sse.stop('idle_timeout'); } catch (_) {}
-        stopTicker();
-        restoreFailedDraft();
-        setRunning(false);
-        setHasError('超过 120 秒没有新输出,已断开。请重试。');
-        window.__apiToast?.('生成停滞', { kind: 'warn', detail: '120 秒无响应,已中断', duration: 4000 });
-      }, STREAM_IDLE_TIMEOUT_MS);
-    };
-    resetIdle();
-
-    rc.sse = window.api.game.chat(
-      { message: playerText, text: playerText, attachments: sentAttachments, model, command: sentCommand, save_id: saveId },
-      {
-        onError: (err) => {
-          if (!isCurrentRun()) return;
-          if (rc.inactivityTimer) { clearTimeout(rc.inactivityTimer); rc.inactivityTimer = null; }
-          stopTicker();
-          const detail = (err && err.payload && err.payload.message) || (err && err.message) || '请求失败';
-          setRunning(false); setHasError(detail);
-          window.__apiToast?.('请求失败', { kind: 'danger', detail });
-          restoreFailedDraft();
-        },
-        onAbort: (data) => {
-          if (!isCurrentRun()) return;
-          const reason = (data && data.reason) || '';
-          if (rc.inactivityTimer) { clearTimeout(rc.inactivityTimer); rc.inactivityTimer = null; }
-          stopTicker();
-          if (rc.stopped || ['manual_stop', 'superseded', 'unmount', 'switch', 'idle_timeout'].includes(reason)) {
-            rc.sse = null; return;
-          }
-          restoreFailedDraft();
-          setRunning(false); setHasError('连接被取消,上一条输入已保留,请重试。');
-          rc.sse = null;
-        },
-        on_status: (data) => {
-          if (!isCurrentRun()) return;
-          resetIdle();
-          if (data && data.history && Array.isArray(data.history) && !openedAssistant) {
-            // 后端可能在 status 里回带最新 history,不强制覆盖流式气泡
-          }
-        },
-        on_reasoning: (data) => {
-          if (!isCurrentRun()) return;
-          resetIdle();
-          // 思考流挂到(或新建)流式 assistant 气泡的 _thinking,生成中即可见;done 后由后端
-          // 持久化的 reasoning 接管(applyState 映射),重开仍可见。
-          const piece = (data && (data.text || data.delta)) || '';
-          if (!piece) return;
-          setHistory((h) => {
-            const last = h[h.length - 1];
-            if (openedAssistant && last && last.role === 'assistant') {
-              return [...h.slice(0, -1), { ...last, _thinking: (last._thinking || '') + piece }];
-            }
-            openedAssistant = true;
-            return [...h, { role: 'assistant', content: '', ts, streaming: true, _thinking: piece }];
-          });
-        },
-        // F1:后台工具流 —— tool_call {tool, arguments};tool_result {ok, result, error}
-        on_tool_call: (data) => {
-          if (!isCurrentRun()) return;
-          resetIdle();
-          turnToolOps.push({
-            tool: (data && data.tool) || '工具',
-            args: data && data.arguments,
-            result: undefined, ok: undefined, error: undefined, _pending: true,
-          });
-          flushToolOps();
-        },
-        on_tool_result: (data) => {
-          if (!isCurrentRun()) return;
-          resetIdle();
-          // 关联到最后一个未完成的调用
-          let op = null;
-          for (let i = turnToolOps.length - 1; i >= 0; i--) { if (turnToolOps[i]._pending) { op = turnToolOps[i]; break; } }
-          if (!op) { op = { tool: '工具', args: undefined }; turnToolOps.push(op); }
-          op._pending = false;
-          op.ok = data ? data.ok !== false : true;
-          op.result = data && data.result;
-          op.error = data && data.error;
-          flushToolOps();
-        },
-        // F2:用量(context 圆环)—— {total_tokens, context_used, context_max, ...}
-        on_usage: (data) => {
-          if (!isCurrentRun()) return;
-          if (data) setLastUsage(data);
-        },
-        on_token: (data) => {
-          if (!isCurrentRun()) return;
-          resetIdle();
-          const piece = (data && (data.text || data.delta)) || '';
-          if (!piece) return;
-          setHistory((h) => {
-            if (!openedAssistant) { openedAssistant = true; return [...h, { role: 'assistant', content: piece, ts, streaming: true }]; }
-            const last = h[h.length - 1];
-            if (!last || last.role !== 'assistant') return [...h, { role: 'assistant', content: piece, ts, streaming: true }];
-            return [...h.slice(0, -1), { ...last, content: (last.content || '') + piece }];
-          });
-        },
-        on_done: (data) => {
-          if (!isCurrentRun()) return;
-          gotDone = true;
-          if (rc.inactivityTimer) { clearTimeout(rc.inactivityTimer); rc.inactivityTimer = null; }
-          stopTicker();
-          if (data && data.elapsed_ms != null) setElapsedMs(Number(data.elapsed_ms) || 0);
-          if (data && data.usage) setLastUsage(data.usage);
-          setRunning(false);
-          if (!openedAssistant) {
-            restoreFailedDraft();
-            const msg = data && data.interrupted ? '本轮已中断,已恢复你的输入。' : '本轮没有收到回复,已恢复你的输入。请重试。';
-            setHasError(msg);
-            window.__apiToast?.(data && data.interrupted ? '生成中断' : '空回复', { kind: 'warn', detail: msg, duration: 4500 });
-            rc.sse = null;
-            return;
-          }
-          setHistory((h) => {
-            const last = h[h.length - 1];
-            if (!last || last.role !== 'assistant') return h;
-            return [...h.slice(0, -1), { ...last, streaming: false, streaming_done: true }];
-          });
-          // 保留本轮后台工具流,供 applyState 用后端 history 覆盖后补挂回最末 assistant
-          lastTurnToolOpsRef.current = turnToolOps.length ? turnToolOps.map((o) => ({ ...o })) : null;
-          const payload = (data && data.status) || null;
-          if (payload) applyState(payload);
-          // 工具可能在本轮中途换/建了角色或 persona(set_tavern_character 等),done 的
-          // status 可能是持久化前快照 → 再拉一次最新 state,确保顶部「她是谁」+ persona 立刻刷新。
-          window.api.game.state().then(applyState).catch(() => {});
-          // 类 Claude:首轮结束后按内容自动生成标题(后端幂等;每对话本会话只触发一次,失败静默)
-          const _sid = activeId;
-          if (_sid && !titledRef.current.has(String(_sid))) {
-            titledRef.current.add(String(_sid));
-            window.api.tavern.autotitle(_sid)
-              .then((r) => {
-                if (r && r.ok && r.title) {
-                  setActiveChat((p) => (p && String(p.id) === String(_sid)) ? { ...p, title: r.title } : p);
-                }
-              })
-              .catch(() => {})
-              .finally(() => reloadList());
-          } else {
-            reloadList();
-          }
-          rc.sse = null;
-        },
-        on_error: (data) => {
-          if (!isCurrentRun()) return;
-          if (rc.inactivityTimer) { clearTimeout(rc.inactivityTimer); rc.inactivityTimer = null; }
-          stopTicker();
-          const realMsg = (data && (data.message || data.detail || data.error)) || '';
-          setRunning(false);
-          // Item 3:「发消息时没 key」→ 内联引导卡片(非普通报错红条),让用户就地配 LLM key 再重试。
-          if (isCredentialsError(realMsg)) {
-            setNeedsCreds(true);
-            setHasError(false);
-            window.__apiToast?.('需要配置模型 Key', { kind: 'warn', detail: '请先添加一把对话模型的 API Key,再重试。', duration: 4500 });
-          } else {
-            setHasError(realMsg || true);
-            window.__apiToast?.('生成失败', { kind: 'danger', detail: realMsg || '请重试' });
-          }
-          restoreFailedDraft();
-        },
-        onClose: () => {
-          if (!isCurrentRun()) return;
-          if (rc.inactivityTimer) { clearTimeout(rc.inactivityTimer); rc.inactivityTimer = null; }
-          stopTicker();
-          if (gotDone || rc.stopped) { rc.sse = null; return; }
-          setRunning((r) => {
-            if (!r) return r;
-            setHasError('连接中断:流式连接关闭但没有收到完成事件。上一条输入已保留,可重试。');
-            restoreFailedDraft();
-            return false;
-          });
-          setHistory((h) => {
-            const last = h[h.length - 1];
-            if (!last || last.role !== 'assistant' || !last.streaming) return h;
-            return [...h.slice(0, -1), { ...last, streaming: false, streaming_done: true }];
-          });
-        },
-      }
-    );
-  }, [activeId, model, applyState, reloadList, startTicker, stopTicker]);
+      },
+      // Item 3:「发消息时没 key」→ 内联引导卡片(非普通报错红条),让用户就地配 key 再重试。
+      onErrorEvent: (data, h) => {
+        const realMsg = (data && (data.message || data.detail || data.error)) || '';
+        h.setRunning(false);
+        if (isCredentialsError(realMsg)) {
+          setNeedsCreds(true);
+          h.setHasError(false);
+          window.__apiToast?.('需要配置模型 Key', { kind: 'warn', detail: '请先添加一把对话模型的 API Key,再重试。', duration: 4500 });
+        } else {
+          h.setHasError(realMsg || true);
+          window.__apiToast?.('生成失败', { kind: 'danger', detail: realMsg || '请重试' });
+        }
+        h.restoreFailedDraft();
+      },
+    });
+  }, [activeId, model, applyState, reloadList, startTicker, stopTicker, runChat, flushPagesToolOps]);
 
   const onSend = () => {
     if (running) return;

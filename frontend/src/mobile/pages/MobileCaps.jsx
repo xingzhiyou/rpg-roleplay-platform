@@ -5,6 +5,7 @@
  */
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Icon } from '../icons.jsx';
+import { Sheet } from '../Sheet.jsx';
 import { sha256hex } from '../../lib/crypto-safe.js';
 import { feedbackDecisionLabel } from '../../lib/feedback.js';
 
@@ -49,21 +50,9 @@ function StatusPill({ on, label }) {
   );
 }
 
-/* Bottom Sheet (add / edit forms) */
-function Sheet({ open, title, hint, children, onClose }) {
-  if (!open) return null;
-  return (
-    <div className="sheet-wrap show" style={{ zIndex: 70 }}>
-      <div className="sheet-scrim" onClick={onClose} />
-      <div className="sheet" style={{ maxHeight: '88%' }}>
-        <div className="sheet-grip" />
-        <div className="sheet-title">{title}</div>
-        {hint && <div className="sheet-sub mono" style={{ fontSize: 10.5 }}>{hint}</div>}
-        {children}
-      </div>
-    </div>
-  );
-}
+/* Bottom Sheet(新增/编辑表单)收口到 mobile/Sheet.jsx 的 <Sheet>(语义统一 Batch 6b)。
+   通用底抽屉超集:grip + scrim 点关 + title/hint + children body。调用点保留原 zIndex=70/
+   maxHeight=88% 以保视觉 1:1。 */
 
 /* Text input field wrapper */
 function MField({ label, desc, children }) {
@@ -334,7 +323,7 @@ function McpSection({ toast }) {
         )}
       </div>
 
-      <Sheet open={addOpen} title={isEdit ? '编辑 MCP 服务器' : '新增 MCP 服务器'} hint="POST /api/v1/mcp/server" onClose={() => setAddOpen(false)}>
+      <Sheet open={addOpen} title={isEdit ? '编辑 MCP 服务器' : '新增 MCP 服务器'} hint="POST /api/v1/mcp/server" onClose={() => setAddOpen(false)} zIndex={70} maxHeight="88%">
         <div style={{ padding: '4px 4px 8px' }}>
           <MField label="名称" desc="服务器显示名称">
             <input className="pl-input" placeholder="例：filesystem · 本地" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} style={{ fontSize: 16 }} />
@@ -456,7 +445,7 @@ function SkillsSection({ toast }) {
         )}
       </div>
 
-      <Sheet open={importOpen} title="导入 Skill 包" hint="POST /api/v1/skills/import" onClose={() => setImportOpen(false)}>
+      <Sheet open={importOpen} title="导入 Skill 包" hint="POST /api/v1/skills/import" onClose={() => setImportOpen(false)} zIndex={70} maxHeight="88%">
         <div style={{ padding: '4px 4px 8px' }}>
           <MField label="Skill 包文件" desc=".zip / .tar.gz 格式">
             <input
@@ -636,7 +625,7 @@ function ApisSection({ toast }) {
       </div>
 
       {/* Edit Key Sheet */}
-      <Sheet open={!!editProv} title={`设置 API Key · ${editProv?.name || editProv?.id || ''}`} hint="POST /api/v1/me/credentials" onClose={() => setEditProv(null)}>
+      <Sheet open={!!editProv} title={`设置 API Key · ${editProv?.name || editProv?.id || ''}`} hint="POST /api/v1/me/credentials" onClose={() => setEditProv(null)} zIndex={70} maxHeight="88%">
         <div style={{ padding: '4px 4px 8px' }}>
           <MField label="API Key" desc={isSet(editProv || {}) ? '留空则保留现有密钥' : '填写供应商提供的 API Key'}>
             <input

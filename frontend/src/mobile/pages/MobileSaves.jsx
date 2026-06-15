@@ -13,6 +13,7 @@
 */
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Icon } from '../icons.jsx';
+import { ConfirmSheet } from '../Sheet.jsx';
 
 /* ── 工具函数 ─────────────────────────────────────────────── */
 const API = () => window.__API_BASE || '';
@@ -32,30 +33,9 @@ const SORT_OPTS = [
 ];
 const PAGE_SIZE = 50;
 
-/* ── 确认弹窗 (底部 Sheet) ─────────────────────────────────── */
-function ConfirmSheet({ open, title, body, danger, confirmLabel = '确认', onClose, onConfirm, loading }) {
-  if (!open) return null;
-  return (
-    <div className="sheet-wrap show" onClick={onClose}>
-      <div className="sheet-scrim" />
-      <div className="sheet" onClick={(e) => e.stopPropagation()}>
-        <div className="sheet-grip" />
-        {title && <div className="sheet-title">{title}</div>}
-        {body && <div className="confirm-note">{body}</div>}
-        <div className="sheet-actions" style={{ marginTop: 8 }}>
-          <button className="sheet-btn" onClick={onClose}>取消</button>
-          <button
-            className={'sheet-btn ' + (danger ? 'danger' : 'primary')}
-            onClick={onConfirm}
-            disabled={loading}
-          >
-            {loading ? '处理中…' : confirmLabel}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
+/* 确认弹窗(底部 Sheet)收口到 mobile/Sheet.jsx 的 <ConfirmSheet>(语义统一 Batch 6b)。
+   原本地实现与统一版 DOM/视觉 1:1(sheet-wrap show 点关 + confirm-note 正文 + 取消/danger
+   确认 + loading 禁用),仅把调用点的 onClose 改为 onCancel。 */
 
 /* ── 导出弹窗 ────────────────────────────────────────────── */
 function ExportSheet({ open, save, onClose, onToast }) {
@@ -536,7 +516,7 @@ function SaveDetail({ save, scripts, onBack, onContinue, onToast, onReload }) {
         body={`确定要删除「${save.title}」吗？此操作不可恢复。`}
         danger
         confirmLabel="删除"
-        onClose={() => setDelConfirm(false)}
+        onCancel={() => setDelConfirm(false)}
         onConfirm={doDelete}
         loading={deleting}
       />
@@ -792,7 +772,7 @@ function BranchesPage({ nav }) {
         body={`确定删除「${delTarget?.summary || '该节点'}」？此操作不可立即恢复，30 天内可在 refs/trash 找回。`}
         danger
         confirmLabel="删除节点"
-        onClose={() => setDelTarget(null)}
+        onCancel={() => setDelTarget(null)}
         onConfirm={doDelete}
         loading={deleting}
       />

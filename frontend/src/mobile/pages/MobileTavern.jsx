@@ -240,7 +240,11 @@ function ChatMenuSheet({ show, chat, onClose, onRename, onArchive, onDelete, onA
   );
 }
 
-/* ─── 删除确认 sheet ─────────────────────────────────────────────── */
+/* ─── 删除确认 sheet ───────────────────────────────────────────────
+   语义统一 Batch 6b GUARD:本站不收口到 mobile/Sheet.jsx 的 <ConfirmSheet>。差异点:
+   ① 多一个 .confirm-preview 引用框(高亮显示对话标题)统一版无此结构
+   ② 删除钮内含 trash Icon(统一版纯文案)③ 包在本文件 <BottomSheet>(show 切换 + 滑入)中,
+   与统一版 open 渲染契约不同。1:1 复刻不了 → 保留原样。 */
 function DeleteConfirmSheet({ show, chat, onClose, onConfirm }) {
   if (!chat) return null;
   const title = chat.title || chat.character_name || `对话 #${chat.id}`;

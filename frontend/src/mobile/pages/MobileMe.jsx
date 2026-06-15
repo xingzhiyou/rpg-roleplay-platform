@@ -160,7 +160,10 @@ function Select({ label, value, onChange, options }) {
   );
 }
 
-/* ── 底部动作 Sheet ─────────────────────────────────────────────── */
+/* ── 底部动作 Sheet ───────────────────────────────────────────────
+   语义统一 Batch 6b GUARD:本站不收口到 mobile/Sheet.jsx。本实现是纯 inline-style 抽屉,
+   与 class-based .sheet 视觉/行为不同:scrim rgba(0.6)≠.sheet-scrim(0.5)、圆角 20px≠22px、
+   无 .sheet-wrap.show 的从底滑入 transform 动画。强迁会改变视觉/行为 → 按铁律保留原样。 */
 function ConfirmSheet({ open, title, body, confirmLabel, onClose, onConfirm, danger, loading }) {
   if (!open) return null;
   return (

@@ -32,7 +32,12 @@ function EmptyRow({ text = '暂无数据' }) {
   return <div className="pl-empty" style={{ padding: '24px 0', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>{text}</div>;
 }
 
-/* 底部操作确认 sheet */
+/* 底部操作确认 sheet
+   语义统一 Batch 6b GUARD:本站不收口到 mobile/Sheet.jsx。差异点(迁则改视觉/行为):
+   ① body 走 .sheet-sub(11.5px/lh1.5)而非统一版的 .confirm-note(12px/lh1.65)
+   ② scrim 点关由 busy 守护(处理中禁止关闭)③ sheet-actions marginTop:14(统一版 8)
+   ④ 与本文件 InputSheet 共用 position:fixed 内联模式 + busy/onCancel 契约(非 open/loading)。
+   1:1 复刻不了 → 按铁律保留原样。 */
 function ConfirmSheet({ title, body, confirmLabel = '确认', danger = false, busy, onConfirm, onCancel }) {
   return (
     <div className="sheet-wrap show" style={{ position: 'fixed', inset: 0, zIndex: 60, pointerEvents: 'auto' }}>

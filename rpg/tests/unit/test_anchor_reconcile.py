@@ -233,16 +233,33 @@ class ReconcileTest(unittest.TestCase):
             n = ar.reconcile_anchors_for_turn(1, 7, "正文", db=db, _judge=judge)
         self.assertEqual(n, 0)
 
-    # ── 成本门控:窗口内无 pending → 零 LLM 调用 ──────────────
-    def test_no_pending_zero_llm_call(self):
-        db = FakeDB()
+    # ── 成本门控:窗口内无 pending + 估章关 → 零 LLM 调用 ──────
+    #    (Bug B 后:无 pending 但估章开会为估章发 1 次调用,设计 §73;故此处显式关估章验成本闸仍在)
+    def test_no_pending_estimate_off_zero_llm_call(self):
+        os.environ["RPG_PROGRESS_NARRATIVE_ESTIMATE"] = "0"
+        try:
+            db = FakeDB()
+            called = {"n": 0}
+            def judge(*a, **k):
+                called["n"] += 1
+                return []
+            n = self._run(pending=[], judge=judge, db=db)
+            self.assertEqual(n, 0)
+            self.assertEqual(called["n"], 0)  # 估章关 + 无 pending → judge 绝不被调
+        finally:
+            os.environ.pop("RPG_PROGRESS_NARRATIVE_ESTIMATE", None)
+
+    # ── Bug B §73:窗口内无 pending 但估章开 → 仍跑判定器只估章并推进(根治 >50 章空白段冻结)──
+    def test_no_pending_estimate_still_runs(self):
+        db = FakeDB(occurred_max=0)
         called = {"n": 0}
-        def judge(*a, **k):
+        def judge(user_id, turn_text, pending, **kw):
             called["n"] += 1
-            return []
+            return {"reached": [], "estimated_chapter": 6}
         n = self._run(pending=[], judge=judge, db=db)
-        self.assertEqual(n, 0)
-        self.assertEqual(called["n"], 0)  # judge 绝不被调
+        self.assertEqual(n, 0, "无 pending → 无锚点标记")
+        self.assertEqual(called["n"], 1, "估章开 → 判定器仍被调一次只估章")
+        self.assertEqual(self.adv_calls, [(1, 6)], "无 pending 也能靠估章推进")
 
     # ── env 关闭 → 完全跳过(judge 不调) ─────────────────────
     def test_env_disabled_skips(self):

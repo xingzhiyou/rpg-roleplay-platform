@@ -41,19 +41,41 @@ class FakeDB:
     - select max(turn_index) → {"t": <turn>}
     - update save_anchor_states ... returning → 命中 set 里的 key 才返 row,否则 None
     """
-    def __init__(self, *, max_turn=42, pending_keys=None, src_chapter=12):
+    def __init__(self, *, max_turn=42, pending_keys=None, src_chapter=12, occurred_max=0,
+                 progress_pc=None, script_id_val=None, chapter_rows=None):
         self.max_turn = max_turn
         # 仍 pending(可被本兜底 UPDATE 命中)的 anchor_key 集合
         self.pending_keys = set(pending_keys if pending_keys is not None else [])
         self.src_chapter = src_chapter
+        # 已确认锚点最大原著章(_apply_estimate 算 ceiling 的 floor 真源)
+        self.occurred_max = occurred_max
+        # _load_estimate_context 备料用:进度/剧本/章节地图
+        self.progress_pc = progress_pc
+        self.script_id_val = script_id_val
+        self.chapter_rows = chapter_rows or []
         self.updates = []  # (anchor_key, new_status, drift)
         self.calls = []    # 原始 (sql, params)
+
+    # _load_estimate_context 用 `with connect() as db`,需上下文管理器协议
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
 
     def execute(self, sql, params=None):
         self.calls.append((sql, params))
         s = " ".join(sql.split())
         if "max(turn_index)" in s:
             return _FakeResult(row={"t": self.max_turn})
+        if "progress_chapter" in s and "game_sessions" in s:
+            return _FakeResult(row={"pc": self.progress_pc})
+        if "script_id" in s and "game_saves" in s:
+            return _FakeResult(row={"script_id": self.script_id_val})
+        if "from chapter_facts" in s:
+            return _FakeResult(rows=self.chapter_rows)
+        if "max(source_chapter)" in s:
+            return _FakeResult(row={"c": self.occurred_max})
         if s.startswith("update save_anchor_states"):
             # params: (new_status, desc, occurred_turn, drift, save_id, anchor_key)
             new_status, _desc, _turn, drift, _sid, anchor_key = params
@@ -84,6 +106,13 @@ def _judge_returns(*hits):
 def _judge_raises(exc):
     def _judge(*a, **k):
         raise exc
+    return _judge
+
+
+def _judge_dict(reached=(), estimated=None):
+    """新式判定器:返回 {reached, estimated_chapter}(测有界叙事章估计)。"""
+    def _judge(user_id, turn_text, pending, **kw):
+        return {"reached": list(reached), "estimated_chapter": estimated}
     return _judge
 
 
@@ -146,14 +175,16 @@ class ReconcileTest(unittest.TestCase):
         self.assertEqual(n, 0)
         self.assertEqual(db.updates, [])
 
-    # ── 默认判定器:无 key(harness 抛)→ 静默返 [] ────────────
+    # ── 默认判定器:无 key(harness 抛)→ 静默返空契约 dict ──────
+    _EMPTY_JUDGE = {"reached": [], "estimated_chapter": None}
+
     def test_default_judge_no_key_silent(self):
         with mock.patch(
             "agents._harness.resolve_api_and_model",
             side_effect=RuntimeError("no BYOK"),
         ):
             out = ar._default_judge(7, "正文", _pending("chapter:12:event:0"))
-        self.assertEqual(out, [])
+        self.assertEqual(out, self._EMPTY_JUDGE)
 
     def test_default_judge_call_fails_silent(self):
         with mock.patch(
@@ -164,7 +195,7 @@ class ReconcileTest(unittest.TestCase):
             side_effect=RuntimeError("401 no credentials"),
         ):
             out = ar._default_judge(7, "正文", _pending("chapter:12:event:0"))
-        self.assertEqual(out, [])
+        self.assertEqual(out, self._EMPTY_JUDGE)
 
     # ── 窗口外 anchor_key 命中 → 拒绝(防剧透,绝不跳远未来)──
     def test_out_of_window_key_rejected(self):
@@ -263,6 +294,129 @@ class ReconcileTest(unittest.TestCase):
             self.assertEqual(ar.reconcile_anchors_for_turn(0, 7, "x", db=db, _judge=judge), 0)
             self.assertEqual(ar.reconcile_anchors_for_turn(1, 0, "x", db=db, _judge=judge), 0)
             gpw.assert_not_called()  # 早退在窗口查询之前
+
+    # ══ Bug B 有界叙事章估计 ══════════════════════════════════════
+
+    # ── 无锚点命中也能靠估章推进(save 139 的核心场景)──────────
+    def test_estimate_advances_without_anchor_hit(self):
+        # 注入 _judge → 不走真实备料(prev 默认 1);floor=0 → ceiling=1+12=13;est=6 → 推到 6。
+        db = FakeDB(pending_keys=set(), occurred_max=0)
+        judge = _judge_dict(reached=[], estimated=6)
+        n = self._run(pending=_pending("chapter:9:event:0"), judge=judge, db=db)
+        self.assertEqual(n, 0, "无锚点命中 → 标记数 0")
+        self.assertEqual(db.updates, [], "无锚点 UPDATE")
+        self.assertEqual(self.adv_calls, [(1, 6)], "估章把进度从 1 推到 6")
+
+    # ── 估章超上限被 clamp 到 ceiling(防 ch77 乱跳)────────────
+    def test_estimate_clamped_to_ceiling(self):
+        db = FakeDB(pending_keys=set(), occurred_max=0)
+        judge = _judge_dict(reached=[], estimated=99)
+        n = self._run(pending=_pending("chapter:9:event:0"), judge=judge, db=db)
+        self.assertEqual(n, 0)
+        self.assertEqual(self.adv_calls, [(1, 13)], "prev=1,floor=0,CAP=12 → 钳到 13")
+
+    # ── 锚点命中 + 估章同回合都推进 ─────────────────────────────
+    def test_estimate_with_anchor_hit_both_advance(self):
+        db = FakeDB(pending_keys={"chapter:9:event:0"}, src_chapter=9, occurred_max=0)
+        judge = _judge_dict(
+            reached=[{"anchor_key": "chapter:9:event:0", "drift_score": 0.0}],
+            estimated=6,
+        )
+        n = self._run(pending=_pending("chapter:9:event:0"), judge=judge, db=db)
+        self.assertEqual(n, 1, "锚点标记 1 个")
+        # 锚点 advance(9) + 估章 advance(6) 都调用(advance_progress 自身 max-only 兜底)
+        self.assertIn((1, 9), self.adv_calls)
+        self.assertIn((1, 6), self.adv_calls)
+
+    # ── env 关闭 → 不估章 ───────────────────────────────────────
+    def test_estimate_env_off(self):
+        os.environ["RPG_PROGRESS_NARRATIVE_ESTIMATE"] = "0"
+        try:
+            db = FakeDB(pending_keys=set(), occurred_max=0)
+            judge = _judge_dict(reached=[], estimated=6)
+            n = self._run(pending=_pending("chapter:9:event:0"), judge=judge, db=db)
+            self.assertEqual(n, 0)
+            self.assertEqual(self.adv_calls, [], "开关关 → 不推进")
+        finally:
+            os.environ.pop("RPG_PROGRESS_NARRATIVE_ESTIMATE", None)
+
+    # ── _apply_estimate clamp 直测(各边界)─────────────────────
+    def test_apply_estimate_clamp_unit(self):
+        # 区间内
+        self.adv_calls.clear()
+        out = ar._apply_estimate(FakeDB(occurred_max=0), 1, prev_progress=5, estimated_chapter=8)
+        self.assertEqual(out, 8)
+        self.assertEqual(self.adv_calls, [(1, 8)])
+        # 超 ceiling = max(floor=0,prev=5)+12 = 17 → 钳 17
+        self.adv_calls.clear()
+        out = ar._apply_estimate(FakeDB(occurred_max=0), 1, prev_progress=5, estimated_chapter=99)
+        self.assertEqual(out, 17)
+        self.assertEqual(self.adv_calls, [(1, 17)])
+        # 低于 prev → 不推进(回退是 rewind 的职责)
+        self.adv_calls.clear()
+        out = ar._apply_estimate(FakeDB(occurred_max=0), 1, prev_progress=5, estimated_chapter=3)
+        self.assertEqual(out, 0)
+        self.assertEqual(self.adv_calls, [])
+        # floor(已确认锚点)抬高 ceiling:floor=20 → ceiling=32 → est=99 钳 32
+        self.adv_calls.clear()
+        out = ar._apply_estimate(FakeDB(occurred_max=20), 1, prev_progress=5, estimated_chapter=99)
+        self.assertEqual(out, 32)
+        self.assertEqual(self.adv_calls, [(1, 32)])
+
+    # ── _normalize_judge_result 兼容新旧返回 ────────────────────
+    def test_normalize_judge_result(self):
+        # 新式 dict
+        self.assertEqual(
+            ar._normalize_judge_result({"reached": [{"anchor_key": "a"}], "estimated_chapter": 7}),
+            ([{"anchor_key": "a"}], 7),
+        )
+        # 旧式裸 list → 无估章
+        self.assertEqual(ar._normalize_judge_result([{"anchor_key": "a"}]), ([{"anchor_key": "a"}], None))
+        # est < 1 / 非法 → None
+        self.assertEqual(ar._normalize_judge_result({"reached": [], "estimated_chapter": 0}), ([], None))
+        self.assertEqual(ar._normalize_judge_result({"reached": [], "estimated_chapter": "x"}), ([], None))
+        # 垃圾 → 空
+        self.assertEqual(ar._normalize_judge_result(None), ([], None))
+        self.assertEqual(ar._normalize_judge_result("nope"), ([], None))
+
+    # ── 关估章不连累锚点兜底(env=0 + 真锚点命中仍标记)──────────
+    def test_estimate_off_anchor_still_marks(self):
+        os.environ["RPG_PROGRESS_NARRATIVE_ESTIMATE"] = "0"
+        try:
+            db = FakeDB(pending_keys={"chapter:12:event:0"}, src_chapter=12, occurred_max=0)
+            judge = _judge_dict(
+                reached=[{"anchor_key": "chapter:12:event:0", "drift_score": 0.0}],
+                estimated=6,
+            )
+            n = self._run(pending=_pending("chapter:12:event:0"), judge=judge, db=db)
+            self.assertEqual(n, 1, "关估章不影响锚点标记")
+            self.assertEqual(self.adv_calls, [(1, 12)], "只有锚点推进(12),无估章推进(6)")
+        finally:
+            os.environ.pop("RPG_PROGRESS_NARRATIVE_ESTIMATE", None)
+
+    # ── _load_estimate_context 备料:列映射 + [max(floor,prev), +CAP] 边界 ──
+    def test_load_estimate_context(self):
+        fake = FakeDB(progress_pc="5", script_id_val=143, occurred_max=2,
+                      chapter_rows=[{"chapter": 5, "label": "活下去", "summary": "S5"},
+                                    {"chapter": 6, "label": "激光", "summary": "S6"}])
+        with mock.patch("platform_app.db.connect", return_value=fake), \
+             mock.patch("platform_app.db.init_db"):
+            ctx = ar._load_estimate_context(99)
+        self.assertEqual(ctx["prev"], 5)
+        self.assertEqual(ctx["floor"], 2)
+        self.assertEqual(ctx["script_id"], 143)
+        self.assertEqual([c["chapter"] for c in ctx["window_chapters"]], [5, 6])
+        self.assertEqual(ctx["window_chapters"][0]["label"], "活下去")
+        # 章节地图边界 = [max(1,floor=2,prev=5), +CAP] = [5, 17]
+        cf_call = next(c for c in fake.calls if "from chapter_facts" in " ".join(c[0].split()))
+        self.assertEqual(cf_call[1], (143, 5, 5 + ar._LOOKAHEAD_CAP))
+
+    # ── 无 script_id → 备料返 None(本回合关估章)────────────────
+    def test_load_estimate_context_no_script(self):
+        fake = FakeDB(progress_pc="3", script_id_val=None)
+        with mock.patch("platform_app.db.connect", return_value=fake), \
+             mock.patch("platform_app.db.init_db"):
+            self.assertIsNone(ar._load_estimate_context(99))
 
 
 if __name__ == "__main__":

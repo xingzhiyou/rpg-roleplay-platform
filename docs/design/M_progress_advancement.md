@@ -55,22 +55,24 @@
    candidate = clamp(est, prev_progress, ceiling)          # est 为 None 时跳过
    new       = max(prev_progress, floor, candidate)        # 单调,经 advance_progress
    ```
-   - `LOOKAHEAD_CAP`(待定,建议 8–12):叙事估计最多越过「已确认地面真值」N 章。
-   - bogus 兜底:floor=0 时 ceiling=CAP,即使 judge 误估 77 也被钳到 CAP(根治 ch77,blast radius = CAP 章而非整书)。
+   - **已实现 `LOOKAHEAD_CAP = 12`**:叙事估计最多越过「max(已确认锚点, 当前进度)」12 章。
+   - bogus 兜底:floor=0 时 ceiling = **prev + CAP**(prev 至少为 1,即上限 ≥13),即使 judge 误估 77 也被钳到 prev+CAP(根治 ch77,blast radius = CAP 章而非整书)。
    - 锚点确认后 floor 升 → ceiling 升 → 进度自然跟着往前放。
+   - **不变量**:progress 的叙事估章【只由 `anchor_reconcile._apply_estimate` 写】;`retrieval.py` 进度块只做 anchor-floor 同步、绝不引入估章;两路径都经 `gm_serving.settings.advance_progress`(max-only)收敛 → 双写不抖动、不互相拉低。改任一方前须维持此契约。
 
 ### 4.2 对 save 139 的效果(验证设计正确性)
-- floor=1、prev=1、CAP=10 → ceiling=11。
-- judge 读第 15 回合正文(B2/激光通道/蜂巢)+ ch2–11 summary → 估 ≈ ch6(「救命的激光通道」)。
-- candidate=clamp(6,1,11)=6 → new=max(1,1,6)=**6**。进度推到 6,面板高亮 ch6。**下一回合即修复,无需回填**。
+- floor=1、prev=1、CAP=12 → ceiling=max(1,1)+12=13。
+- judge 读第 15 回合正文(B2/激光通道/蜂巢)+ ch5–13 summary → 估 ≈ ch6(「救命的激光通道」)。
+- candidate=max(1,1,min(6,13))=6 → new=**6**。进度推到 6,面板高亮 ch6。**下一回合即修复,无需回填**。
 
 ### 4.3 对 ch77 历史 bug 的效果
-- floor=0、prev=1、ceiling=0+CAP=10。即使 judge 误估 77 → clamp 到 10。**有界**;用户仍可用 rewind 端点下修。
+- floor=0、prev=1、ceiling=max(0,1)+12=13。即使 judge 误估 77 → clamp 到 13。**有界**;用户仍可用 rewind 端点下修。
 
 ## 5. 成本 / 回退 / 开关
-- **零新增 LLM 调用**:复用 `anchor_reconcile` 每回合已有的 judge call,只在其输出 schema 加 `estimated_chapter` + 喂窗口章 summary。
-- 判定器无 key / 异常 → `est=None` → 纯锚点地板(= 当前行为,零回归)。
-- env `RPG_PROGRESS_NARRATIVE_ESTIMATE`(默认开),可一键关。沿用 `anchor_reconcile` 既有 gating(窗口内无 pending 也照样能估当前章——估计不依赖 pending 锚点,需把这条放在 pending 短路之前)。
+- **常态零新增 LLM 调用**:复用 `anchor_reconcile` 每回合已有的 judge call,只在其输出 schema 加 `estimated_chapter` + 喂窗口章 summary。窗口内有 pending 锚点时(绝大多数回合),估章纯搭便车。
+- **唯一新增成本场景**:窗口(默认 50 章)内**无任何 pending 锚点**的稀疏空白段——为兑现「估章不依赖 pending」(根治锚点间隔 >50 章的冻结),此时仍发 1 次廉价判定器调用只为估章。属罕见情形;`RPG_PROGRESS_NARRATIVE_ESTIMATE=0` 可整体关闭估章退回纯锚点地板。
+- 判定器无 key / 异常 / 备料失败(无 script_id)→ `est=None` 或 est_ctx=None → 本回合纯锚点地板(= 旧行为,零回归)。
+- 判定器返回兼容:`parse_llm_json(want=None)` 同时吃下新式 `{reached, current_chapter}` 与廉价模型退回的裸数组 `[{...}]`(裸数组按只含 reached 处理,不丢锚点命中)。
 
 ## 6. 存量存档影响
 - judge-估章:**无需回填**;存量卡死存档(如 139)下一回合自然推进。
@@ -88,7 +90,13 @@
 - save 139 场景:floor=1、估 6 → 进度 6。
 - judge schema:加 `estimated_chapter` 不破坏既有 anchor 命中解析。
 
-## 9. 待用户拍板
-1. `LOOKAHEAD_CAP` 取值(8 / 12 / 15)?越大越平滑、bogus 上限越松。
-2. 是否允许「零确认锚点时也靠估计推进」(floor=0 仍放行到 CAP)?——**需要**,否则事件稀疏的开局章永远不动(正是本 bug)。
-3. 备选「按章补播种」要不要一起做(双保险),还是先只上 judge-估章?
+## 9. 决策(用户授权「你拍板」,2026-06-16 已定)
+1. **`LOOKAHEAD_CAP = 12`** —— 覆盖事件稀疏弧段(本书 RE 蜂巢线 ch2–8),同时把误估 blast radius 钳在 prev+12。
+2. **允许 floor=0 时靠估计推进(钳到 prev+CAP)** —— 必须,否则事件稀疏开局章永不动(正是本 bug)。
+3. **只上 judge-估章,不做「按章补播种」** —— 二者填同一缺口,同时上 = 冗余;judge-估章用更少改动达成同效 + 立即救存量。
+4. **估章不被 pending 短路挡住**(经评审采纳):窗口内无 pending 也估章(罕见的 >50 章空白段会因此多 1 次廉价调用,可 env 关)。
+
+## 10. 已实现 + 验证(2026-06-16)
+- 实现落 `rpg/gm_serving/anchor_reconcile.py`(`_default_judge` 返回 `{reached, estimated_chapter}`、`_normalize_judge_result`、`_load_estimate_context`、`_apply_estimate`、`_reconcile_impl` 重排)。
+- 4 路对抗评审(clamp 数学 / 判定器成本门控 / 双写循环依赖 / 回归测试)→ 修齐:裸数组解析回归、估章前置短路、floor 纳入下界、章节地图口径对齐、备料失败关估章、2 条旧测同步、补 `_load_estimate_context` 覆盖。
+- 回归测试见 `rpg/tests/unit/test_anchor_reconcile.py`(估章推进/超 CAP 钳顶/低于 prev 不退/env 关/floor 抬 ceiling/normalize 新旧兼容/备料列映射+边界/关估章不连累锚点)。

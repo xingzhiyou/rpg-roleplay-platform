@@ -55,6 +55,16 @@ _MAX_MARK_PER_TURN = 4
 # GM 正文截断长度(判定器只需要本回合发生了什么)。
 _TURN_TEXT_CAP = 6000
 
+# ── Bug B(进度冻结)修复:有界叙事章估计 — 详见 docs/design/M_progress_advancement.md ──
+# 事件抽取稀疏的章(本书 ch2-8 有摘要、0 event → 0 锚点)进度系统全盲,玩家走完整段
+# 进度表死在第 1 章。本回合判定器【顺带】(常态:同一次 LLM 调用,零新增成本)读正文估「当前最
+# 接近原著第几章」,再 clamp 到 [当前进度, max(已确认锚点,当前进度) + CAP] 推进进度 —— 既补平滑又防
+# ch77 乱跳(floor=0 时上限 = prev+CAP,有界)。GM 自由 world.time 标签 resolve 不到锚点,故弃用标签
+# 路径、改读真实剧情正文。
+_LOOKAHEAD_CAP = 12
+# 喂给判定器估章的章节摘要截断(每章),控 prompt 体积。
+_EST_SUMMARY_CAP = 160
+
 
 def _enabled() -> bool:
     """env RPG_ANCHOR_AUTO_RECONCILE 默认 '1';设 '0'/'false' 关。"""
@@ -63,65 +73,98 @@ def _enabled() -> bool:
     )
 
 
-_SYSTEM_PROMPT = """\
-你是一个【世界线锚点到达判定器】。你的唯一职责:读本回合 GM 写的剧情正文,判断
-其中是否**明确叙述到了**某些「待发生的原著锚点事件」。
+def _estimate_enabled() -> bool:
+    """env RPG_PROGRESS_NARRATIVE_ESTIMATE 默认 '1';设 '0'/'false' 关有界叙事章估计。"""
+    return os.environ.get("RPG_PROGRESS_NARRATIVE_ESTIMATE", "1").strip().lower() not in (
+        "0", "false", "no", "off", "",
+    )
 
-【最高铁律 — 极度保守,宁漏勿误】
+
+_SYSTEM_PROMPT = """\
+你是一个【世界线锚点判定器】。读本回合 GM 写的剧情正文,完成两件事:
+(A) 判断其中是否**明确叙述到了**某些「待发生的原著锚点事件」;
+(B) 判断本回合剧情**最接近原著的第几章**(进度估计)。
+
+【任务 A — 锚点到达判定·极度保守,宁漏勿误】
 1. 只有当本回合正文【明确、确凿地叙述了】某锚点事件**实际发生 / 实际到达**时,
    才把它列出来。仅仅提到、暗示、铺垫、即将发生、有人计划、做梦、回忆、假设、
    讨论某事件 —— 都【不算】到达,绝不列出。
 2. 拿不准就【不列】。漏标的代价(下回合再核对一次)远小于误标(直接跳过原著内容)。
 3. 你只能从给定的 pending 锚点列表里选,绝不发明新锚点、绝不改 anchor_key。
 4. 只看本回合正文这一段材料,不要脑补正文之外的剧情。
+drift_score(偏离度 0.0-1.0):0.0=完全按原著;0.3=核心保留但过程/场景不同(变体);
+0.7+=核心结果保留但发生方式大改。拿不准给 0.2。
 
-【drift_score(偏离度,0.0-1.0)】
-  · 0.0  = 完全按原著方式发生
-  · 0.3  = 核心保留,具体过程/场景与原著不同(变体)
-  · 0.7+ = 核心结果保留但发生方式大改
-保守起见,拿不准 drift 时给 0.2。
+【任务 B — 当前章估计·保守】
+给你一份「原著章节地图」(章号 + 该章梗概)。判断本回合正文最接近哪一章,返回该章号。
+1. 只能返回章节地图里列出的章号;正文明显还没到地图最早那章 → 返回 null。
+2. 看正文实际演到哪里,不要被人物的回忆/预告/计划带偏。
+3. 拿不准、正文太抽象无法定位 → 返回 null(漏估的代价远小于误估推快进度)。
+
+【两任务独立】先独立完成任务 A(锚点到达,极度保守),再做任务 B(当前章估计)。
+任务 B 的章号推理【绝不可】反过来改变任务 A 对锚点的取舍。
 
 【输出格式(严格)】
-仅输出一个 JSON 数组(list),直接以 `[` 开头、以 `]` 结尾。不要 markdown 围栏,
-不要任何解释文字。每个元素:
-  {"anchor_key": "<必须来自给定列表>", "drift_score": <0.0-1.0 数字>}
-本回合没有任何锚点明确到达 → 输出空数组 []。
+仅输出一个 JSON 对象,以 `{` 开头、以 `}` 结尾。不要 markdown 围栏、不要解释:
+  {"reached": [{"anchor_key":"<来自列表>","drift_score":<0.0-1.0>}], "current_chapter": <章号整数 或 null>}
+没有锚点到达 → reached 为 []。无法定位章节 → current_chapter 为 null。
 """
 
 
-def _build_user_prompt(turn_text: str, pending: list[dict[str, Any]]) -> str:
-    lines = ["【待发生的原著锚点(只能从这里选)】"]
-    for a in pending:
-        key = a.get("anchor_key") or ""
-        summ = (a.get("summary") or "").strip().replace("\n", " ")
-        if len(summ) > 240:
-            summ = summ[:240]
-        fatal = "[死神来了·必发生]" if a.get("is_fatal") else ""
-        lines.append(f"- anchor_key={key} {fatal} 概要:{summ}")
+def _build_user_prompt(
+    turn_text: str,
+    pending: list[dict[str, Any]],
+    window_chapters: list[dict[str, Any]] | None = None,
+) -> str:
+    lines = ["【待发生的原著锚点(任务 A,只能从这里选)】"]
+    if pending:
+        for a in pending:
+            key = a.get("anchor_key") or ""
+            summ = (a.get("summary") or "").strip().replace("\n", " ")
+            if len(summ) > 240:
+                summ = summ[:240]
+            fatal = "[死神来了·必发生]" if a.get("is_fatal") else ""
+            lines.append(f"- anchor_key={key} {fatal} 概要:{summ}")
+    else:
+        lines.append("(本窗口暂无待发生锚点)")
+    if window_chapters:
+        lines.append("")
+        lines.append("【原著章节地图(任务 B,current_chapter 只能从这些章号里选或 null)】")
+        for c in window_chapters:
+            ch = c.get("chapter")
+            label = (c.get("label") or "").strip().replace("\n", " ")
+            summ = (c.get("summary") or "").strip().replace("\n", " ")
+            if len(summ) > _EST_SUMMARY_CAP:
+                summ = summ[:_EST_SUMMARY_CAP]
+            head = f"第{ch}章" + (f"「{label}」" if label else "")
+            lines.append(f"- chapter={ch} {head}:{summ}")
     lines.append("")
     lines.append("【本回合 GM 剧情正文】")
     lines.append(turn_text.strip())
     lines.append("")
     lines.append(
-        "请判断上面正文里【明确到达 / 实际发生】了哪些锚点。极度保守,宁漏勿误,"
-        "只输出 JSON 数组。"
+        "请完成任务 A(到达了哪些锚点)+ 任务 B(最接近第几章)。极度保守,宁漏勿误/宁漏勿快,"
+        "只输出 JSON 对象。"
     )
     return "\n".join(lines)
 
 
 def _default_judge(
     user_id: int | None, turn_text: str, pending: list[dict[str, Any]],
-    *, save_id: int | None = None,
-) -> list[dict[str, Any]]:
-    """默认判定器:廉价模型一次聚焦判定。
+    *, save_id: int | None = None, window_chapters: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """默认判定器:廉价模型一次聚焦判定(同一次调用顺带估当前章,零新增成本)。
 
-    解析不到模型 / 无 key / 任何 LLM 错误 → 返回 [](静默跳过,绝不抛)。
+    返回 {"reached": [{anchor_key, drift_score}], "estimated_chapter": int|None}。
+    解析不到模型 / 无 key / 任何 LLM 错误 → 返回 {"reached": [], "estimated_chapter": None}
+    (静默跳过,绝不抛)。
     """
+    empty: dict[str, Any] = {"reached": [], "estimated_chapter": None}
     try:
         from agents._harness import call_agent_json, resolve_api_and_model
     except Exception as exc:  # pragma: no cover - import 兜底
         log.warning("[anchor_reconcile] harness import 失败,跳过判定: %s", exc)
-        return []
+        return empty
 
     # 成本门控②:复用 agent 通配廉价模型偏好;解析不到 / 无可用 BYOK → 静默跳过。
     try:
@@ -132,19 +175,19 @@ def _default_judge(
         )
     except Exception as exc:
         log.info("[anchor_reconcile] 无可用廉价模型(静默跳过): %s", exc)
-        return []
+        return empty
     if not api_id or not model:
-        return []
+        return empty
 
     try:
         text, _usage = call_agent_json(
             api_id=api_id,
             model=model,
             system_prompt=_SYSTEM_PROMPT,
-            user_prompt=_build_user_prompt(turn_text, pending),
+            user_prompt=_build_user_prompt(turn_text, pending, window_chapters),
             user_id=user_id,
-            tool_schema=None,  # 文本 JSON 数组即可,保持最廉价路径
-            max_tokens=400,
+            tool_schema=None,  # 文本 JSON 即可,保持最廉价路径
+            max_tokens=500,
             timeout_sec=20,
             agent_kind="anchor_reconcile",
             save_id=save_id,
@@ -152,25 +195,44 @@ def _default_judge(
     except Exception as exc:
         # 无 key / 网络 / 凭证错误等一律静默跳过,绝不破回合。
         log.info("[anchor_reconcile] 判定调用失败(静默跳过): %s", exc)
-        return []
+        return empty
 
-    parsed = parse_llm_json(text or "", want=list)
-    if not isinstance(parsed, list):
-        return []
-    out: list[dict[str, Any]] = []
-    for item in parsed:
-        if not isinstance(item, dict):
-            continue
-        key = (item.get("anchor_key") or "").strip()
-        if not key:
-            continue
-        try:
-            drift = float(item.get("drift_score"))
-        except (TypeError, ValueError):
-            drift = 0.2
-        drift = max(0.0, min(1.0, drift))
-        out.append({"anchor_key": key, "drift_score": drift})
-    return out
+    # want=None 先原样拿到:廉价模型(haiku/flash)常忽略「对象 vs 数组」要求、退回裸数组
+    # [{...}]。若用 want=dict,顶层 list 会被过滤成 None → 锚点命中被静默吞掉(任务 A 退化)。
+    # 故 want=None,裸数组按「只含 reached」兼容,仍非 dict → 视空。
+    parsed = parse_llm_json(text or "", want=None)
+    if isinstance(parsed, list):
+        parsed = {"reached": parsed, "current_chapter": None}
+    if not isinstance(parsed, dict):
+        return empty
+
+    reached_raw = parsed.get("reached")
+    reached: list[dict[str, Any]] = []
+    if isinstance(reached_raw, list):
+        for item in reached_raw:
+            if not isinstance(item, dict):
+                continue
+            key = (item.get("anchor_key") or "").strip()
+            if not key:
+                continue
+            try:
+                drift = float(item.get("drift_score"))
+            except (TypeError, ValueError):
+                drift = 0.2
+            drift = max(0.0, min(1.0, drift))
+            reached.append({"anchor_key": key, "drift_score": drift})
+
+    est_raw = parsed.get("current_chapter")
+    estimated_chapter: int | None = None
+    try:
+        if est_raw is not None:
+            estimated_chapter = int(est_raw)
+            if estimated_chapter < 1:
+                estimated_chapter = None
+    except (TypeError, ValueError):
+        estimated_chapter = None
+
+    return {"reached": reached, "estimated_chapter": estimated_chapter}
 
 
 def reconcile_anchors_for_turn(
@@ -199,13 +261,115 @@ def reconcile_anchors_for_turn(
         return 0
 
 
+def _normalize_judge_result(raw: Any) -> tuple[list[dict[str, Any]], int | None]:
+    """统一判定器返回:新式 dict {reached, estimated_chapter} / 旧式裸 list(只含 reached)。
+
+    返回 (reached_list, estimated_chapter)。
+    """
+    if isinstance(raw, dict):
+        reached = raw.get("reached")
+        reached = reached if isinstance(reached, list) else []
+        est = raw.get("estimated_chapter")
+        try:
+            est = int(est) if est is not None else None
+        except (TypeError, ValueError):
+            est = None
+        return reached, (est if (est is None or est >= 1) else None)
+    if isinstance(raw, list):
+        return raw, None
+    return [], None
+
+
+def _load_estimate_context(save_id: int) -> dict[str, Any] | None:
+    """一次连接备齐有界叙事章估计所需上下文(自连接,与 get_progress_window 同模式):
+      · prev   = 当前 progress_chapter(权威进度)
+      · floor  = 已确认锚点(occurred/variant)最大原著章 —— ceiling 的地面真值
+      · script_id
+      · window_chapters = 章节地图 [max(floor,prev), max(floor,prev)+CAP] —— 与 ceiling 口径对齐,
+        让判定器既能定位「进度落后于 floor」的存档实际所处章,又不越过 clamp 上限。
+
+    无 script_id → 返 None(本回合跳过估章,调用方据此关估章基线失真)。
+    """
+    from platform_app.db import connect, init_db
+    init_db()
+    with connect() as db:
+        prev = 1
+        r = db.execute(
+            "select worldline->>'progress_chapter' as pc from game_sessions where save_id=%s",
+            (save_id,),
+        ).fetchone()
+        if r and r.get("pc") is not None:
+            try:
+                prev = max(1, int(r["pc"]))
+            except (TypeError, ValueError):
+                prev = 1
+        s = db.execute("select script_id from game_saves where id=%s", (save_id,)).fetchone()
+        script_id = int(s["script_id"]) if (s and s.get("script_id") is not None) else None
+        if not script_id:
+            return None
+        fr = db.execute(
+            "select coalesce(max(source_chapter), 0) as c from save_anchor_states "
+            "where save_id=%s and status in ('occurred','variant')",
+            (save_id,),
+        ).fetchone()
+        floor = int((fr or {}).get("c") or 0)
+        lo = max(1, floor, prev)
+        hi = lo + _LOOKAHEAD_CAP
+        rows = db.execute(
+            "select chapter, story_time_label as label, summary from chapter_facts "
+            "where script_id=%s and chapter between %s and %s order by chapter",
+            (script_id, lo, hi),
+        ).fetchall()
+    window_chapters = [
+        {"chapter": r["chapter"], "label": r.get("label") or "", "summary": r.get("summary") or ""}
+        for r in rows
+    ]
+    return {"prev": prev, "floor": floor, "script_id": script_id, "window_chapters": window_chapters}
+
+
+def _apply_estimate(db: Any, save_id: int, prev_progress: int, estimated_chapter: int) -> int:
+    """有界叙事章估计落库:new = max(prev, floor, clamp(估计, ≤ max(floor,prev)+CAP))(设计 §4.1)。
+
+    · floor = 已确认锚点(occurred/variant)最大原著章 —— 可靠地面真值(此处 fresh 重查,
+      故能反映本回合 _apply_hits 刚标记的锚点)。
+    · ceiling = max(floor, prev) + CAP —— 估计最多越过地面真值 CAP 章(floor=0 时上限 = prev+CAP,
+      根治 ch77 远跳:blast radius 有界)。
+    · 单调:绝不低于当前进度(回退是 rewind 端点的显式职责)。
+    · prev_progress 是标记前快照;floor 重查 + advance_progress max-only 共同保证不回退,故快照偏旧无害。
+
+    不变量(进度推进的唯一估章写者):progress_chapter 的叙事估章只由本函数写;retrieval.py 进度块
+    只做 anchor-floor 同步、绝不引入估章;两路径都经 gm_serving.settings.advance_progress(max-only)
+    收敛,故双写不抖动、不互相拉低。改动任一方前请维持此契约。
+
+    返回新进度(未推进返 0)。
+    """
+    row = db.execute(
+        "select coalesce(max(source_chapter), 0) as c from save_anchor_states "
+        "where save_id = %s and status in ('occurred', 'variant')",
+        (save_id,),
+    ).fetchone()
+    floor = int((row or {}).get("c") or 0)
+    prev = max(1, int(prev_progress or 1))
+    ceiling = max(floor, prev) + _LOOKAHEAD_CAP
+    candidate = max(prev, floor, min(int(estimated_chapter), ceiling))
+    if candidate <= prev:
+        return 0
+    from gm_serving.settings import advance_progress
+    advance_progress(db, save_id, candidate)
+    log.info(
+        "[anchor_reconcile] 叙事估章推进进度 save=%s %s→%s (floor=%s, est=%s, ceil=%s)",
+        save_id, prev, candidate, floor, estimated_chapter, ceiling,
+    )
+    return candidate
+
+
 def _reconcile_impl(
     save_id: int | None,
     user_id: int | None,
     turn_text: str | None,
     *,
     db: Any,
-    _judge: Callable[..., list[dict[str, Any]]] | None,
+    _judge: Callable[..., Any] | None,
 ) -> int:
     # 1. env 门控
     if not _enabled():
@@ -220,7 +384,7 @@ def _reconcile_impl(
     if len(text) > _TURN_TEXT_CAP:
         text = text[:_TURN_TEXT_CAP]
 
-    # 2. 进度窗口 + 窗口内 pending 锚点(零调用门控:为空直接 return)
+    # 2. 进度窗口 + 窗口内 pending 锚点。
     win = get_progress_window(save_id)
     ch_min = win.get("chapter_min")
     ch_max = win.get("chapter_max")
@@ -230,26 +394,49 @@ def _reconcile_impl(
         chapter_min=ch_min, chapter_max=ch_max,
         order_by_chapter=True,
     )
-    if not pending:
-        return 0  # 成本门控①:窗口内无 pending → 零 LLM 调用
-
-    # 窗口内 pending 的 anchor_key → source_chapter,后续校验命中合法性 + 推进进度。
+    # 窗口内 pending 的 anchor_key → 后续校验命中合法性(防越界/编造)。
     win_by_key: dict[str, dict[str, Any]] = {}
     for a in pending:
         k = a.get("anchor_key")
         if k:
             win_by_key[k] = a
 
-    # 3. 廉价判定(解析不到模型 / 无 key → judge 内部静默返 [])
-    judge = _judge or _default_judge
-    hits = judge(user_id, text, pending, save_id=save_id) or []
-    if not hits:
+    # 3. Bug B 有界叙事章估计上下文。只在【真实默认判定器】路径备料(只读自连接);注入式 _judge
+    #    (离线测试)不备料、不连库,估章值由注入判定器自带。备料失败 → est_ctx=None → 本回合关估章
+    #    (避免 prev 基线失真还参与落库)。
+    est_on = _estimate_enabled()
+    est_ctx: dict[str, Any] | None = None
+    if est_on and _judge is None:
+        try:
+            est_ctx = _load_estimate_context(save_id)
+        except Exception as exc:
+            log.info("[anchor_reconcile] 估章上下文备料失败(本回合跳过估章): %s", exc)
+            est_ctx = None
+
+    # 成本门控:窗口内无 pending 且本回合不会估章 → 零 LLM 调用直接 return。
+    #   · 有 pending → 判定器照常跑,估章搭这次调用便车(零新增成本,常态)。
+    #   · 无 pending 但估章就绪(设计 §73:估章不依赖 pending)→ 仍跑判定器只估章不标锚点。
+    #     此时该回合产生 1 次廉价调用,仅在「进度窗口(默认 50 章)内无任何 pending 锚点」的稀疏空白段
+    #     触发(根治锚点间隔 > 窗口时的进度冻结);env RPG_PROGRESS_NARRATIVE_ESTIMATE=0 可关此行为。
+    will_estimate = bool(est_on and (est_ctx is not None or _judge is not None))
+    if not pending and not will_estimate:
         return 0
+
+    # 4. 廉价判定(同一次调用:任务 A 锚点命中 + 任务 B 当前章估计)。
+    #    注入式 _judge 保持旧签名契约(老测试不破);默认判定器才接 window_chapters。
+    window_chapters = est_ctx.get("window_chapters") if est_ctx else None
+    if _judge is not None:
+        raw = _judge(user_id, text, pending, save_id=save_id)
+    else:
+        raw = _default_judge(user_id, text, pending, save_id=save_id, window_chapters=window_chapters)
+    reached, estimated_chapter = _normalize_judge_result(raw)
 
     # 只保留窗口内、合法 anchor_key 的命中(防判定器越界到远未来/编造 key)。去重。
     seen: set[str] = set()
     valid_hits: list[dict[str, Any]] = []
-    for h in hits:
+    for h in reached:
+        if not isinstance(h, dict):
+            continue
         key = (h.get("anchor_key") or "").strip()
         if not key or key in seen or key not in win_by_key:
             continue
@@ -261,18 +448,29 @@ def _reconcile_impl(
         valid_hits.append({"anchor_key": key, "drift_score": max(0.0, min(1.0, drift))})
         if len(valid_hits) >= _MAX_MARK_PER_TURN:
             break  # 保守:单回合最多标 N 个
-    if not valid_hits:
+
+    # 估章是否落库:本回合会估章 + 估章值有效。无锚点命中且不估章 → 无事可做。
+    do_estimate = bool(will_estimate and estimated_chapter)
+    if not valid_hits and not do_estimate:
         return 0
 
-    # 4. 确定性落库:复用既有写逻辑,在 (user,save) scope lock + 单连接内。
+    # 5. 确定性落库:锚点标记 + 有界估章推进,同一 (user,save) scope lock + 单连接内。
+    est_prev = int(est_ctx.get("prev")) if est_ctx else 1
+    def _do(conn: Any) -> int:
+        marked = _apply_hits(conn, save_id, user_id, valid_hits) if valid_hits else 0
+        if do_estimate:
+            # 锚点标记后 floor 可能已升,_apply_estimate 内重查 floor 算 ceiling。
+            _apply_estimate(conn, save_id, est_prev, int(estimated_chapter))
+        return marked
+
     if db is not None:
-        return _apply_hits(db, save_id, user_id, valid_hits)
+        return _do(db)
 
     from platform_app.db import connect, init_db
     from tools_dsl.command_dispatcher import _get_sync_scope_lock
     init_db()
     with _get_sync_scope_lock((user_id, save_id)), connect() as conn:
-        return _apply_hits(conn, save_id, user_id, valid_hits)
+        return _do(conn)
 
 
 def _apply_hits(

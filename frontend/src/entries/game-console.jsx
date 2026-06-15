@@ -1484,6 +1484,11 @@ function App() {
         <SearchDrawer open={showSearchDrawer} history={history} state={game} onClose={() => setShowSearchDrawer(false)} />
         <GCWelcomeModal open={welcomeGCOpen} onClose={() => setWelcomeGCOpen(false)} />
         {splashNeeded && <AdultSplash splashVersion={SPLASH_VERSION} onAcked={() => setSplashNeeded(false)} />}
+        {/* 移动早返同样需要 toast 渲染落点:MobileGame 全部 window.__apiToast 指向 game 通道,
+            但桌面 return 的 <GameToastStack/> 早返永不到达 → 切档/保存/分支/回滚反馈静默。
+            早返条件已是 mountStage>=1,直接挂(不复制桌面 mountStage>=2 守卫)。总线已 install,
+            这里只补渲染器,working 总线零变化。 */}
+        <GameToastStack />
         {sseLogOpen && (
           <div className="gc-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 9999, display: 'flex', alignItems: 'flex-end' }} onClick={() => setSseLogOpen(false)}>
             <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxHeight: '80vh', background: 'var(--panel,#211f1d)', color: 'var(--text)', borderRadius: '14px 14px 0 0', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>

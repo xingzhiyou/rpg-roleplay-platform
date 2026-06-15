@@ -106,6 +106,39 @@ export function MobileRoot({ page = 'profile', setPage }) {
     fireToast._t = setTimeout(() => setToast(null), 2000);
   }, []);
 
+  // ── 全局总线桥接(铁律):shared/工具代码(api-client.js 的 window.toast / 429+503、
+  //    launch.js 与 cards.jsx/ImageLightbox/CharacterCardHero 复用路径的 window.__apiToast)
+  //    在 Platform 移动外壳下指向无渲染器的 platform/game 总线 → 静默。这里把两条全局总线
+  //    都桥到本组件的原生 fireToast,使其经 .toast 可见。契约转换:pl-toast 是 (msg, opts)
+  //    {kind,icon,detail,duration},fireToast 是 (msg, kind, icon) 位置参数;映射 kind→原生
+  //    色(warn/warning→accent、info→默认)、detail 拼进 msg、icon 缺省按 kind 兜。
+  //    挂载期接管、卸载还原,绝不破坏其它宿主(桌面 platform/game/tavern)的现有总线。
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const NATIVE_KIND = (k) => (k === 'danger' ? 'danger' : k === 'ok' ? 'ok' : (k === 'warn' || k === 'warning') ? 'accent' : 'info');
+    const NATIVE_ICON = (k, icon) => {
+      // 沿用调用方给的合法图标;否则按 kind 兜底为 mobile/icons 里存在的名字。
+      const known = new Set(['check', 'info', 'warn', 'close', 'copy', 'image', 'upload', 'trash', 'save', 'refresh', 'spark', 'sparkle']);
+      if (icon && known.has(icon)) return icon;
+      return k === 'danger' ? 'warn' : k === 'ok' ? 'check' : (k === 'warn' || k === 'warning') ? 'warn' : 'info';
+    };
+    const bridge = (msg, o = {}) => {
+      const opts = (o && typeof o === 'object') ? o : {};
+      const kind = opts.kind || 'ok';
+      const full = opts.detail ? `${msg} · ${opts.detail}` : msg;
+      fireToast(full, NATIVE_KIND(kind), NATIVE_ICON(kind, opts.icon));
+    };
+    const prevToast = window.toast;
+    const prevApiToast = window.__apiToast;
+    window.toast = bridge;
+    window.__apiToast = bridge;
+    return () => {
+      // 仅在仍是我们装的桥时还原,避免覆盖期间被他者替换。
+      if (window.toast === bridge) window.toast = prevToast;
+      if (window.__apiToast === bridge) window.__apiToast = prevApiToast;
+    };
+  }, [fireToast]);
+
   const goRoute = useCallback((id) => { try { setPage && setPage(id); } catch (_) {} }, [setPage]);
   const pushLocal = useCallback((page2, params = {}) => {
     setStack((s) => [...s, { page: page2, params, key: 'k' + Date.now() + Math.random() }]);
@@ -126,7 +159,7 @@ export function MobileRoot({ page = 'profile', setPage }) {
     push: pushLocal,                               // 页内实体详情(不改 URL)
     pop: popLocal,
     back: () => { if (stack.length) popLocal(); else goRoute(TAB_ROOT[tab] || 'profile'); },
-    openGame: (save) => launchSave(save),
+    openGame: (save, nodeId) => launchSave(save, nodeId, fireToast),
     openTavern: () => goRoute('tavern'),
     toast: fireToast,
   };

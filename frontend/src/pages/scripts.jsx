@@ -621,7 +621,7 @@ function ScriptDetailPanel({ script: s, savesCount, scriptSaves = [], embedStatu
       if (r && r.ok === false) {
         if (r.needs_credentials) {
           window.__apiToast?.(t('scripts.audit.need_key', { defaultValue: '该模型还没配 API Key' }),
-            { kind: 'warning', detail: t('scripts.audit.need_key_hint', { defaultValue: '去「设置 → API 与模型」配置后重试,或在上面换一个已配置的模型。' }) });
+            { kind: 'warn', detail: t('scripts.audit.need_key_hint', { defaultValue: '去「设置 → API 与模型」配置后重试,或在上面换一个已配置的模型。' }) });
         } else {
           window.__apiToast?.(t('scripts.audit.fail', { defaultValue: 'AI 复核失败' }), { kind: 'danger', detail: r.error });
         }
@@ -2808,7 +2808,7 @@ function ScriptsImportView({ embedded = false, onClose } = {}) {
         if (isExpiredUploadError(e)) {
           clearPendingImport();
           window.__apiToast?.(t('scripts.import.saved_upload_expired'), {
-            kind: "warning",
+            kind: "warn",
             detail: t('scripts.import.saved_upload_expired_detail'),
             duration: 7000,
           });
@@ -2830,7 +2830,7 @@ function ScriptsImportView({ embedded = false, onClose } = {}) {
     }
     setJob(j => ({ ...j, status: "cancelled", cancelled_at: Date.now() }));
     window.__apiToast?.(t('scripts.toast.import_cancelled'), {
-      kind: "warning",
+      kind: "warn",
       detail: t('scripts.import.result_cancelled_detail', { id: job.id }),
       duration: 8000,
     });
@@ -2882,14 +2882,14 @@ function ScriptsImportView({ embedded = false, onClose } = {}) {
         : (prev.error || '');
       if (prev.status === 'cancelled') {
         window.__apiToast?.(t('scripts.toast.import_cancelled'), {
-          kind: 'warning',
+          kind: 'warn',
           detail: t('scripts.import.result_cancelled_detail', { id: prev.id || prev.job_id || '?' }),
           duration: 8000,
         });
       } else if (prev.status === 'failed') {
         window.__apiToast?.(t('scripts.toast.import_fail'), { kind: 'danger', detail: detail || t('scripts.toast.unknown_error'), duration: 5000 });
       } else if (hasErr) {
-        window.__apiToast?.(t('scripts.toast.import_partial'), { kind: 'warning', detail, duration: 6000 });
+        window.__apiToast?.(t('scripts.toast.import_partial'), { kind: 'warn', detail, duration: 6000 });
       } else {
         window.__apiToast?.(t('scripts.toast.import_ok'), { kind: 'ok', detail: t('scripts.toast.import_ok_detail', { id: prev.script_id || '?', title: prev.title || '' }), duration: 3000 });
       }
@@ -2902,7 +2902,7 @@ function ScriptsImportView({ embedded = false, onClose } = {}) {
   }, [t]);
 
   const onJobSseError = useCallbackPL(() => {
-    window.__apiToast?.(t('scripts.toast.sse_disconnected'), { kind: 'warning', duration: 3000 });
+    window.__apiToast?.(t('scripts.toast.sse_disconnected'), { kind: 'warn', duration: 3000 });
   }, [t]);
 
   const ruleOpt = SPLIT_RULES.find(r => r.id === rule) || SPLIT_RULES[0];

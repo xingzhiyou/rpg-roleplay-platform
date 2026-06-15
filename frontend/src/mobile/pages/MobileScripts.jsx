@@ -59,7 +59,7 @@ function EmptyState({ icon = 'book_open', title, desc, action }) {
 }
 
 /* ─── 章节列表子视图 ──────────────────────────── */
-function ChaptersView({ script, onBack }) {
+function ChaptersView({ script, onBack, nav }) {
   const [chapters, setChapters] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeIdx, setActiveIdx] = useState(0);
@@ -108,9 +108,9 @@ function ChaptersView({ script, onBack }) {
     if (!newTitle || newTitle === cur.title) return;
     try {
       await window.api.scripts.updateChapter(script.id, curIdx, { title: newTitle });
-      window.__apiToast?.('已重命名', { kind: 'ok' });
+      nav.toast('已重命名', 'ok', 'check');
       setReloadTick(x => x + 1);
-    } catch (e) { window.__apiToast?.(e?.message || '操作失败', { kind: 'danger' }); }
+    } catch (e) { nav.toast(e?.message || '操作失败', 'danger', 'warn'); }
   };
 
   const onMergeNext = async () => {
@@ -120,9 +120,9 @@ function ChaptersView({ script, onBack }) {
       const nextCh = chapters[activeIdx + 1];
       const nextIdx = nextCh ? (nextCh.chapter_index ?? nextCh.index ?? (activeIdx + 1)) : (activeIdx + 1);
       await window.api.scripts.mergeChapter(script.id, { first_index: curIdx, second_index: nextIdx });
-      window.__apiToast?.('已合并', { kind: 'ok' });
+      nav.toast('已合并', 'ok', 'check');
       setReloadTick(x => x + 1);
-    } catch (e) { window.__apiToast?.(e?.message || '操作失败', { kind: 'danger' }); }
+    } catch (e) { nav.toast(e?.message || '操作失败', 'danger', 'warn'); }
   };
   // 合并上一章:把前面那章折进当前章,保留当前章标题(序章/前言折进第一章)。
   const onMergePrev = async () => {
@@ -132,9 +132,9 @@ function ChaptersView({ script, onBack }) {
       const prevCh = chapters[activeIdx - 1];
       const prevIdx = prevCh ? (prevCh.chapter_index ?? prevCh.index ?? (activeIdx - 1)) : (activeIdx - 1);
       await window.api.scripts.mergeChapter(script.id, { first_index: prevIdx, second_index: curIdx, keep_title_index: curIdx });
-      window.__apiToast?.('已合并', { kind: 'ok' });
+      nav.toast('已合并', 'ok', 'check');
       setReloadTick(x => x + 1);
-    } catch (e) { window.__apiToast?.(e?.message || '操作失败', { kind: 'danger' }); }
+    } catch (e) { nav.toast(e?.message || '操作失败', 'danger', 'warn'); }
   };
 
   const onResplit = async () => {
@@ -142,9 +142,9 @@ function ChaptersView({ script, onBack }) {
     if (!rule) return;
     try {
       await window.api.scripts.resplit(script.id, { split_rule: rule });
-      window.__apiToast?.('已重新切分', { kind: 'ok' });
+      nav.toast('已重新切分', 'ok', 'check');
       setReloadTick(x => x + 1);
-    } catch (e) { window.__apiToast?.(e?.message || '操作失败', { kind: 'danger' }); }
+    } catch (e) { nav.toast(e?.message || '操作失败', 'danger', 'warn'); }
   };
 
   if (loading) {
@@ -422,7 +422,7 @@ function TimelineView({ script, onBack }) {
 }
 
 /* ─── 版本历史子视图 ───────────────────────────── */
-function VersionsView({ script, currentUserId, onBack }) {
+function VersionsView({ script, currentUserId, onBack, nav }) {
   const [commits, setCommits] = useState([]);
   const [loading, setLoading] = useState(true);
   const [cursor, setCursor] = useState(null);
@@ -442,7 +442,7 @@ function VersionsView({ script, currentUserId, onBack }) {
       const nextCursor = r?.next_cursor || null;
       setCursor(nextCursor);
       setHasMore(!!nextCursor);
-    } catch (_) { window.__apiToast?.('加载版本历史失败', { kind: 'danger' }); }
+    } catch (_) { nav.toast('加载版本历史失败', 'danger', 'warn'); }
     finally { setLoading(false); }
   }, [script?.id]);
 
@@ -455,11 +455,11 @@ function VersionsView({ script, currentUserId, onBack }) {
     setRollingBack(commit.id);
     try {
       await window.api.scripts.checkout(script.id, commit.id);
-      window.__apiToast?.('已回退到该版本', { kind: 'ok' });
+      nav.toast('已回退到该版本', 'ok', 'check');
       try { window.dispatchEvent(new CustomEvent('rpg-scripts-updated')); } catch (_) {}
       onBack();
     } catch (e) {
-      window.__apiToast?.(e?.message || '回退失败', { kind: 'danger' });
+      nav.toast(e?.message || '回退失败', 'danger', 'warn');
     } finally { setRollingBack(null); }
   };
 
@@ -523,7 +523,7 @@ function VersionsView({ script, currentUserId, onBack }) {
 }
 
 /* ─── 参数(overrides)子视图 ───────────────────── */
-function OverridesView({ script, onBack }) {
+function OverridesView({ script, onBack, nav }) {
   const [raw, setRaw] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -551,14 +551,14 @@ function OverridesView({ script, onBack }) {
   const onSave = async () => {
     let parsed;
     try { parsed = JSON.parse(raw); } catch (e) {
-      window.__apiToast?.('JSON 格式错误：' + e.message, { kind: 'danger' }); return;
+      nav.toast('JSON 格式错误：' + e.message, 'danger', 'warn'); return;
     }
     setSaving(true);
     try {
       await window.api.scripts.saveOverrides(script.id, parsed);
-      window.__apiToast?.('已保存', { kind: 'ok' });
+      nav.toast('已保存', 'ok', 'check');
       setDirty(false);
-    } catch (e) { window.__apiToast?.(e?.message || '保存失败', { kind: 'danger' }); }
+    } catch (e) { nav.toast(e?.message || '保存失败', 'danger', 'warn'); }
     finally { setSaving(false); }
   };
 
@@ -618,7 +618,7 @@ function OverridesView({ script, onBack }) {
 }
 
 /* ─── 发布/分享子视图 ─────────────────────────── */
-function ShareView({ script, currentUserId, onBack, onRefresh }) {
+function ShareView({ script, currentUserId, onBack, onRefresh, nav }) {
   const [saving, setSaving] = useState(false);
   const [exporting, setExporting] = useState(false);
   const isOwner = script && currentUserId && script.owner_id === currentUserId;
@@ -628,7 +628,7 @@ function ShareView({ script, currentUserId, onBack, onRefresh }) {
     if (!isOwner) return;
     const next = !isPublic;
     if (next && (script.review_status || 'unreviewed') !== 'reviewed') {
-      window.__apiToast?.('分享前需先完成剧本设定核对', { kind: 'warn', duration: 5000 });
+      nav.toast('分享前需先完成剧本设定核对', 'accent', 'warn');
       return;
     }
     if (next && !window.confirm(`确认将《${script.title}》发布到公开库？`)) return;
@@ -636,9 +636,9 @@ function ShareView({ script, currentUserId, onBack, onRefresh }) {
     try {
       const r = await window.api.scripts.setVisibility(script.id, next);
       if (r?.ok === false) throw new Error(r.message || r.error || '操作失败');
-      window.__apiToast?.(next ? '已发布到公开库' : '已取消发布', { kind: 'ok' });
+      nav.toast(next ? '已发布到公开库' : '已取消发布', 'ok', 'check');
       onRefresh?.();
-    } catch (e) { window.__apiToast?.(e?.message || '操作失败', { kind: 'danger' }); }
+    } catch (e) { nav.toast(e?.message || '操作失败', 'danger', 'warn'); }
     finally { setSaving(false); }
   };
 
@@ -647,8 +647,8 @@ function ShareView({ script, currentUserId, onBack, onRefresh }) {
     try {
       const filename = (script.title || 'script').replace(/[\\/:*?"<>|]/g, '_') + '_pack.zip';
       await window.api.scripts.exportPack(script.id, filename);
-      window.__apiToast?.('导出成功：' + filename, { kind: 'ok' });
-    } catch (e) { window.__apiToast?.(e?.message || '导出失败', { kind: 'danger' }); }
+      nav.toast('导出成功：' + filename, 'ok', 'check');
+    } catch (e) { nav.toast(e?.message || '导出失败', 'danger', 'warn'); }
     finally { setExporting(false); }
   };
 
@@ -657,10 +657,10 @@ function ShareView({ script, currentUserId, onBack, onRefresh }) {
     try {
       const r = await window.api.scripts.fork(script.id, { title: `${script.title} (副本)` });
       if (!r || r.ok === false) throw new Error(r?.error || '操作失败');
-      window.__apiToast?.('已另存为副本', { kind: 'ok' });
+      nav.toast('已另存为副本', 'ok', 'check');
       try { window.dispatchEvent(new CustomEvent('rpg-scripts-updated')); } catch (_) {}
       onBack();
-    } catch (e) { window.__apiToast?.(e?.message || '操作失败', { kind: 'danger' }); }
+    } catch (e) { nav.toast(e?.message || '操作失败', 'danger', 'warn'); }
   };
 
   return (
@@ -761,14 +761,14 @@ function ScriptDetailView({ script, saves, embedStatus, currentUserId, onBack, o
   const isOwner = currentUserId && script?.owner_id === currentUserId;
 
   const onPlay = async () => {
-    if (playBlock) { window.__apiToast?.(playBlock, { kind: 'warn', duration: 5000 }); return; }
+    if (playBlock) { nav.toast(playBlock, 'accent', 'warn'); return; }
     const sv = scriptSaves[0];
     if (sv) { nav.openGame?.(sv); return; }
     nav.push?.('new-game', { scriptId: script.id });   // 无存档 → 进新游戏向导(锁定本剧本)
   };
 
   const onNewGame = async () => {
-    if (playBlock) { window.__apiToast?.(playBlock, { kind: 'warn', duration: 5000 }); return; }
+    if (playBlock) { nav.toast(playBlock, 'accent', 'warn'); return; }
     nav.push?.('new-game', { scriptId: script.id });   // 新建存档 → 新游戏向导
   };
 
@@ -779,14 +779,14 @@ function ScriptDetailView({ script, saves, embedStatus, currentUserId, onBack, o
       const j = await r.json();
       if (j.ok === false) {
         if (isCredentialsError(j)) {
-          window.__apiToast?.('未配置向量嵌入模型，请先在设置中配置 RAG / Embedding 模型', { kind: 'warn', duration: 7000 });
+          nav.toast('未配置向量嵌入模型，请先在设置中配置 RAG / Embedding 模型', 'accent', 'warn');
         } else {
-          window.__apiToast?.(j.error || '向量化启动失败', { kind: 'danger' });
+          nav.toast(j.error || '向量化启动失败', 'danger', 'warn');
         }
         return;
       }
-      window.__apiToast?.('向量化任务已启动', { kind: 'ok', duration: 3000 });
-    } catch (e) { window.__apiToast?.(String(e), { kind: 'danger' }); }
+      nav.toast('向量化任务已启动', 'ok', 'check');
+    } catch (e) { nav.toast(String(e), 'danger', 'warn'); }
   };
 
   const onDelete = async () => {
@@ -794,10 +794,10 @@ function ScriptDetailView({ script, saves, embedStatus, currentUserId, onBack, o
     try {
       const r = await window.api.scripts.delete(script.id, { force: true });
       if (!r || r.ok !== true) throw new Error(r?.error || '删除失败');
-      window.__apiToast?.('已删除', { kind: 'ok' });
+      nav.toast('已删除', 'ok', 'check');
       try { window.dispatchEvent(new CustomEvent('rpg-scripts-updated')); } catch (_) {}
       onBack();
-    } catch (e) { window.__apiToast?.(e?.message || '删除失败', { kind: 'danger' }); }
+    } catch (e) { nav.toast(e?.message || '删除失败', 'danger', 'warn'); }
   };
 
   const onUnsubscribe = async () => {
@@ -805,19 +805,19 @@ function ScriptDetailView({ script, saves, embedStatus, currentUserId, onBack, o
     try {
       const r = await window.api.scripts.unsubscribe(script.id);
       if (!r || r.ok !== true) throw new Error(r?.error || '移出失败');
-      window.__apiToast?.('已移出我的列表', { kind: 'ok' });
+      nav.toast('已移出我的列表', 'ok', 'check');
       try { window.dispatchEvent(new CustomEvent('rpg-scripts-updated')); } catch (_) {}
       onBack();
-    } catch (e) { window.__apiToast?.(e?.message || '移出失败', { kind: 'danger' }); }
+    } catch (e) { nav.toast(e?.message || '移出失败', 'danger', 'warn'); }
   };
 
-  if (subView === 'chapters') return <ChaptersView script={script} onBack={() => setSubView(null)} />;
+  if (subView === 'chapters') return <ChaptersView script={script} onBack={() => setSubView(null)} nav={nav} />;
   if (subView === 'worldbook') return <WorldbookView script={script} onBack={() => setSubView(null)} />;
   if (subView === 'npc') return <NpcView script={script} onBack={() => setSubView(null)} />;
   if (subView === 'timeline') return <TimelineView script={script} onBack={() => setSubView(null)} />;
-  if (subView === 'versions') return <VersionsView script={script} currentUserId={currentUserId} onBack={() => setSubView(null)} />;
-  if (subView === 'overrides') return <OverridesView script={script} onBack={() => setSubView(null)} />;
-  if (subView === 'share') return <ShareView script={script} currentUserId={currentUserId} onBack={() => setSubView(null)} onRefresh={onRefresh} />;
+  if (subView === 'versions') return <VersionsView script={script} currentUserId={currentUserId} onBack={() => setSubView(null)} nav={nav} />;
+  if (subView === 'overrides') return <OverridesView script={script} onBack={() => setSubView(null)} nav={nav} />;
+  if (subView === 'share') return <ShareView script={script} currentUserId={currentUserId} onBack={() => setSubView(null)} onRefresh={onRefresh} nav={nav} />;
 
   const isInternal = typeof script.title === 'string' && script.title.startsWith('[内部]');
 
@@ -1013,7 +1013,7 @@ function ScriptDetailView({ script, saves, embedStatus, currentUserId, onBack, o
 }
 
 /* ─── 导入向导视图 ─────────────────────────────── */
-function ImportView({ onBack }) {
+function ImportView({ onBack, nav }) {
   const [step, setStep] = useState(0); // 0=上传 1=配置 2=预览 3=进行中/结果
   const [selectedFile, setSelectedFile] = useState(null);
   const [title, setTitle] = useState('');
@@ -1035,10 +1035,10 @@ function ImportView({ onBack }) {
     if (!file) return;
     const name = (file.name || '').toLowerCase();
     if (!/\.(txt|md)$/.test(name)) {
-      window.__apiToast?.('仅支持 .txt / .md 文件', { kind: 'danger' }); return;
+      nav.toast('仅支持 .txt / .md 文件', 'danger', 'warn'); return;
     }
     if (file.size > 50 * 1024 * 1024) {
-      window.__apiToast?.('文件过大（上限 50 MB）', { kind: 'danger' }); return;
+      nav.toast('文件过大（上限 50 MB）', 'danger', 'warn'); return;
     }
     setSelectedFile(file);
     setEstimate(null);
@@ -1064,7 +1064,7 @@ function ImportView({ onBack }) {
   };
 
   const startPreview = async () => {
-    if (!selectedFile) { window.__apiToast?.('请先选择文件', { kind: 'warn' }); return; }
+    if (!selectedFile) { nav.toast('请先选择文件', 'accent', 'warn'); return; }
     setPreviewBusy(true);
     setEstimate(null);
     try {
@@ -1084,7 +1084,7 @@ function ImportView({ onBack }) {
       setEstimate({ chapters, words, upload_id: uploadId, preview: result.preview, report: result.report });
       setStep(2);
     } catch (e) {
-      window.__apiToast?.(e?.message || '预览失败', { kind: 'danger', duration: 6000 });
+      nav.toast(e?.message || '预览失败', 'danger', 'warn');
     } finally {
       setPreviewBusy(false);
       setImportProgress('');
@@ -1123,7 +1123,7 @@ function ImportView({ onBack }) {
       });
       if (!pipelineResp || pipelineResp.ok === false || !pipelineResp.job_id) {
         if (isCredentialsError(pipelineResp)) {
-          window.__apiToast?.('未配置 LLM API Key，请先在设置中配置，剧本已导入（章节已创建）', { kind: 'warn', duration: 7000 });
+          nav.toast('未配置 LLM API Key，请先在设置中配置，剧本已导入（章节已创建）', 'accent', 'warn');
           setJob({ status: 'paused_credentials', title: sc.title || title, script_id: sc.id });
           try { window.dispatchEvent(new CustomEvent('rpg-scripts-updated')); } catch (_) {}
           return;
@@ -1131,14 +1131,14 @@ function ImportView({ onBack }) {
         throw new Error(pipelineResp?.error || '流水线启动失败');
       }
       setJob({ status: 'running', id: pipelineResp.job_id, title: sc.title || title, script_id: sc.id });
-      window.__apiToast?.('导入任务已派发后台', { kind: 'ok', duration: 3000 });
+      nav.toast('导入任务已派发后台', 'ok', 'check');
       try { window.dispatchEvent(new CustomEvent('rpg-scripts-updated')); } catch (_) {}
     } catch (e) {
       if (isCredentialsError(e)) {
-        window.__apiToast?.('未配置 LLM API Key，请先在设置中配置', { kind: 'warn', duration: 7000 });
+        nav.toast('未配置 LLM API Key，请先在设置中配置', 'accent', 'warn');
         setJob({ status: 'paused_credentials' });
       } else {
-        window.__apiToast?.(e?.message || '导入失败', { kind: 'danger', duration: 6000 });
+        nav.toast(e?.message || '导入失败', 'danger', 'warn');
         setJob(null);
         setStep(2);
       }
@@ -1400,7 +1400,7 @@ function LibraryView({ onBack, nav }) {
       const r = await window.api.scripts.publicList(query ? { q: query } : undefined);
       setItems(Array.isArray(r?.items) ? r.items : []);
     } catch (e) {
-      window.__apiToast?.(e?.message || '加载失败', { kind: 'danger' });
+      nav.toast(e?.message || '加载失败', 'danger', 'warn');
       setItems([]);
     } finally { setLoading(false); }
   }, []);
@@ -1412,12 +1412,12 @@ function LibraryView({ onBack, nav }) {
     try {
       const r = await window.api.scripts.cloneFromPublic(s.id);
       if (r?.ok === false) throw new Error(r.error || '导入失败');
-      window.__apiToast?.(`已导入《${s.title}》到你的剧本库`, { kind: 'ok', duration: 3000 });
+      nav.toast(`已导入《${s.title}》到你的剧本库`, 'ok', 'check');
       setImportedIds(m => ({ ...m, [s.id]: true }));
       setItems(arr => arr.map(x => x.id === s.id ? { ...x, clone_count: (x.clone_count || 0) + 1 } : x));
       try { window.dispatchEvent(new CustomEvent('rpg-scripts-updated')); } catch (_) {}
     } catch (e) {
-      window.__apiToast?.(e?.message || '导入失败', { kind: 'danger' });
+      nav.toast(e?.message || '导入失败', 'danger', 'warn');
     } finally { setCloningId(null); }
   };
 
@@ -1612,7 +1612,7 @@ export function MobileScripts({ nav }) {
   });
 
   if (view === 'import') {
-    return <ImportView onBack={() => { setView('list'); reload(); }} />;
+    return <ImportView onBack={() => { setView('list'); reload(); }} nav={nav} />;
   }
 
   if (view === 'library') {

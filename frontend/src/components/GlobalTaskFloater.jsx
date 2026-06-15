@@ -103,7 +103,7 @@ export default function GlobalTaskFloater() {
           if (!toast) return;
           toasted.current.add(id);
           if (t.status === 'done') toast(t.title + ' 已完成', { kind: 'ok', duration: 3500 });
-          else if (t.status === 'done_with_errors') toast(t.title + ' 完成(有警告)', { kind: 'warning', duration: 5000 });
+          else if (t.status === 'done_with_errors') toast(t.title + ' 完成(有警告)', { kind: 'warn', duration: 5000 });
           else if (t.status === 'failed') toast(t.title + ' 失败' + (t.error ? '：' + t.error : ''), { kind: 'danger', duration: 7000 });
           else if (t.status === 'cancelled') toast(t.title + ' 已取消', { kind: 'info', duration: 3000 });
         });

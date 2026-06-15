@@ -431,6 +431,17 @@ const __platformToast = createToastChannel({ name: 'platform', setWindowToast: t
 const { ToastStack } = __platformToast;
 __platformToast.install();
 
+// game 通道的渲染器(订阅 game-app install 的同名 'game' 总线 —— createToastChannel 按
+// name 去重,这里拿到的是同一条总线,不二次 install、不动 window.toast/__apiToast)。
+// 背景:platform bundle 静态拉入 game-app,其 setApiToast 把 window.__apiToast 无条件指向
+// game 总线;但桌面外壳此前只挂 platform <ToastStack/>,game 总线无渲染器 → 非 tavern 页
+// 的 cards/settings/scripts/saves/feedback/编辑器/FeedbackQuickModal/GlobalTaskFloater 等
+// 全部 __apiToast 静默丢失。在 PlatformShellCS 挂本渲染器即把这些「不可见」修成「可见」,
+// 不改任何 publish 侧契约(总线已 install,仅补渲染落点)。tavern 页原本自挂的 GameToastStack
+// 已移除以避免双挂(TavernPage 始终嵌在 PlatformShellCS 内)。
+const __platformGameToast = createToastChannel({ name: 'game' });
+const GameToastStack = __platformGameToast.ToastStack;
+
 // 成就解锁通知:对 unlocked && seen===false 的项弹一次(会话内去重)再标记 seen。
 // 由个人主页加载与 app 外壳(跨页面)共用,保证在任何页面解锁都能弹。
 const __achvToasted = new Set();
@@ -4528,6 +4539,8 @@ function PlatformShellCS({ page, setPage, children, assistant, assistantOpen, on
       />
 
       <ToastStack />
+      {/* game 通道渲染器:让桌面非 tavern 页的 window.__apiToast 可见(见上方注释)。 */}
+      <GameToastStack />
       <DialogHost />
       <ContinuePicker open={continueState.open} save={continueState.save} focusedNodeId={continueState.nodeId}
         onClose={() => setContinueState({ open: false, save: null, nodeId: null })} />

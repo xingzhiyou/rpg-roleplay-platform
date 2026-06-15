@@ -627,7 +627,7 @@ function ListView({ chats, archivedChats, activeId, loading, onExit, onOpen, onM
 /* ─── 对话屏 ──────────────────────────────────────────────────────── */
 function ChatView({
   activeChat, character, persona, history, running, hasError, systemPrompt,
-  onBack, onSend, onStop, onRetry, onOpenDrawer, onOpenMenu,
+  onBack, onSend, onStop, onRetry, onOpenDrawer, onOpenMenu, onToast,
 }) {
   const [text, setText] = useState('');
   const [pressedIdx, setPressedIdx] = useState(null);
@@ -673,7 +673,8 @@ function ChatView({
 
   const copy = async (txt) => {
     try { await navigator.clipboard.writeText(txt || ''); } catch (_) {}
-    window.__apiToast?.('已复制', { kind: 'ok', duration: 1400 });
+    // 用 MobileTavern 自有的可见 fireToast(经 onToast 传入),不再走无渲染器的 window.__apiToast。
+    onToast?.('已复制', 'ok');
   };
 
   return (
@@ -1382,6 +1383,7 @@ export function MobileTavern({ nav }) {
               onRetry={onRetry}
               onOpenDrawer={() => setDrawerOpen(true)}
               onOpenMenu={openChatMenu}
+              onToast={fireToast}
             />
           </div>
         )}

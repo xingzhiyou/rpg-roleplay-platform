@@ -21,7 +21,6 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import CSButton from '@cloudscape-design/components/button';
 
 import { Icon } from '../game-icons.jsx';
-import { GameToastStack } from '../game-app.jsx';
 import { Composer, ConfirmStrip } from '../game-composer.jsx';
 import { TavernImportModal, UserCardsView } from './cards.jsx';
 import { ModelParamsSection } from './settings.jsx';
@@ -866,7 +865,8 @@ export default function TavernPage() {
   /* ══════════════════════════════════════════════════════════════ */
   return (
     <div className="tvp-root tavern-chat">
-      <GameToastStack />
+      {/* GameToastStack 已上移到 PlatformShellCS 统一挂载(TavernPage 始终嵌在其中),
+          此处移除以避免 game 总线双订阅 → 重复 toast。 */}
 
       {/* ── 左:两段式子侧栏 ──────────────────────────────────────── */}
       <aside className="tvp-side">

@@ -103,7 +103,7 @@
       if (res.status === 429) {
         const retryAfter = res.headers.get("Retry-After");
         const detail = retryAfter ? ("请求过于频繁，请 " + retryAfter + " 秒后重试") : "请求过于频繁，请稍后重试";
-        try { toast(detail, { kind: "warning", duration: 4000 }); } catch (_) {}
+        try { toast(detail, { kind: "warn", duration: 4000 }); } catch (_) {}
         throw new ApiError(payload && payload.code, res.status, detail, payload);
       }
 

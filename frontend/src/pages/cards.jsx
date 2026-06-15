@@ -1247,7 +1247,7 @@ function TavernImportModal({ open, onClose, onConfirm }) {
     const MAX_FILES = 8;
     const arr = [...list].slice(0, MAX_FILES);
     if (list.length > MAX_FILES) {
-      window.__apiToast?.(`一次最多 ${MAX_FILES} 张角色卡,已截取前 ${MAX_FILES} 张`, { kind: 'warning', duration: 2400 });
+      window.__apiToast?.(`一次最多 ${MAX_FILES} 张角色卡,已截取前 ${MAX_FILES} 张`, { kind: 'warn', duration: 2400 });
     }
     const valid = arr.filter(f => {
       if (!f) return false;

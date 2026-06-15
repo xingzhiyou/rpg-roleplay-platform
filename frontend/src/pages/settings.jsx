@@ -3551,7 +3551,7 @@ function ConnectorConnect({ conn, onChange }) {
   useEffectPL(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
 
   const savePat = async () => {
-    if (!token.trim()) { window.__apiToast?.('请粘贴访问令牌', { kind: 'warning' }); return; }
+    if (!token.trim()) { window.__apiToast?.('请粘贴访问令牌', { kind: 'warn' }); return; }
     setBusy(true);
     try {
       await window.api.federation.connectorSet(base.trim(), token.trim());
@@ -3583,7 +3583,7 @@ function ConnectorConnect({ conn, onChange }) {
             setDevice(null); window.__apiToast?.('已连接在线剧本库', { kind: 'ok' }); onChange?.();
           } else if (r.status && !['authorization_pending', 'pending'].includes(r.status)) {
             clearInterval(pollRef.current); pollRef.current = null;
-            setDevice(null); window.__apiToast?.('授权未完成:' + r.status, { kind: 'warning' });
+            setDevice(null); window.__apiToast?.('授权未完成:' + r.status, { kind: 'warn' });
           }
         } catch { /* 继续轮询 */ }
       }, iv);
@@ -3714,7 +3714,7 @@ function DeviceApprove() {
   const lookup = async () => {
     setBusy(true); setInfo(null);
     try { const r = await window.api.federation.deviceLookup(code.trim().toUpperCase()); setInfo(r.device); }
-    catch (e) { window.__apiToast?.('未找到配对码', { kind: 'warning', detail: e?.payload?.error || e?.message }); }
+    catch (e) { window.__apiToast?.('未找到配对码', { kind: 'warn', detail: e?.payload?.error || e?.message }); }
     finally { setBusy(false); }
   };
   const decide = async (deny) => {
@@ -3759,7 +3759,7 @@ function PatManager() {
   useEffectPL(() => { reload(); }, [reload]);
   const create = async () => {
     const sc = [scopes.read && 'library:read', scopes.publish && 'library:publish'].filter(Boolean);
-    if (!sc.length) { window.__apiToast?.('至少选一个权限', { kind: 'warning' }); return; }
+    if (!sc.length) { window.__apiToast?.('至少选一个权限', { kind: 'warn' }); return; }
     setBusy(true);
     try {
       const r = await window.api.federation.patCreate({ name: name.trim(), scopes: sc });

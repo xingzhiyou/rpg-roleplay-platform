@@ -8,6 +8,7 @@ endpoints:
   PUT    /api/scripts/{script_id}/worldbook/{entry_id}
   POST   /api/scripts/{script_id}/worldbook
   DELETE /api/scripts/{script_id}/worldbook/{entry_id}
+  POST   /api/scripts/{script_id}/worldbook/batch   (批量 delete/enable/disable/set_priority)
   PUT    /api/scripts/{script_id}/canon-entities/{logical_key}
   POST   /api/scripts/{script_id}/canon-entities
   DELETE /api/scripts/{script_id}/canon-entities/{logical_key}
@@ -576,7 +577,10 @@ async def api_worldbook_add(
         book_id = int(book_row["id"]) if book_row else None
 
         tags = body.get("tags") if isinstance(body.get("tags"), list) else []
-        meta: dict[str, Any] = {"tags": tags}
+        # source='editor':标记为「用户/编辑器手写」,与 AI 工具 upsert_worldbook_entry 一致,
+        # 让 resolve.py 重建知识库时豁免本条(coalesce(source)<>'editor'),不被 canon 重建覆盖/清除。
+        # 此前 UI「新建」漏打此标记 → 手建条目会被重建静默覆盖(harness provenance 审计 P1)。
+        meta: dict[str, Any] = {"tags": tags, "source": "editor"}
 
         new_row = db.execute(
             """
@@ -617,7 +621,14 @@ async def api_worldbook_add(
 async def api_worldbook_delete(
     script_id: int, entry_id: int, user=Depends(require_user)
 ):
-    """软删除 worldbook entry（enabled=false），写 commit kind=worldbook_delete。"""
+    """删除 worldbook entry（物理删除），写 commit kind=worldbook_delete。
+
+    历史上这里是「软删除」(UPDATE enabled=false),但世界书列表不按 enabled 过滤、且
+    enabled 同时被「停用/启用」开关复用 —— 导致「删除」和「停用」语义冲突:删完前端本地
+    移除了行,reload 后该条又以「停用」态出现(用户反馈「管理不方便」的一部分)。改为物理
+    删除:删除=真没了,停用=enabled 开关切换,两者彻底分离。commit 仍记 before 供审计。
+    注:DELETE 用 `where id=` 的 targeted 形式(provenance 守卫豁免,见 test_editor_provenance_guards)。
+    """
     with connect() as db:
         try:
             _require_owner(db, script_id, user["id"])
@@ -625,7 +636,7 @@ async def api_worldbook_delete(
             return json_response({"ok": False, "error": str(exc)}, status_code=403)
 
         before_row = db.execute(
-            "SELECT id, title, content, priority, enabled FROM worldbook_entries WHERE id = %s AND script_id = %s",
+            "SELECT id, title, content, priority, enabled, metadata FROM worldbook_entries WHERE id = %s AND script_id = %s",
             (entry_id, script_id),
         ).fetchone()
         if not before_row:
@@ -633,7 +644,7 @@ async def api_worldbook_delete(
 
         before = dict(before_row)
         db.execute(
-            "UPDATE worldbook_entries SET enabled=false, updated_at=now() WHERE id=%s AND script_id=%s",
+            "DELETE FROM worldbook_entries WHERE id=%s AND script_id=%s",
             (entry_id, script_id),
         )
 
@@ -654,6 +665,107 @@ async def api_worldbook_delete(
     except Exception:
         pass
     return json_response({"ok": True, "deleted": True, "commit_id": commit_id})
+
+
+# 批量动作 → (中文标签, commit kind 后缀)。set_priority 需附带 priority。
+_WB_BATCH_ACTIONS = {
+    "delete": "删除",
+    "enable": "启用",
+    "disable": "停用",
+    "set_priority": "设置优先级",
+}
+
+
+@router.post("/api/scripts/{script_id}/worldbook/batch")
+async def api_worldbook_batch(
+    request: Request, script_id: int, user=Depends(require_user)
+):
+    """批量操作 worldbook entries:delete(物理删除)/ enable / disable / set_priority。
+
+    body: {entry_ids: [int], action: 'delete'|'enable'|'disable'|'set_priority', priority?: int}
+
+    单事务 + 单 commit(kind=worldbook_bulk_<action>),避免逐条 PUT 撑爆 script_commits
+    版本历史。SQL 用 `id = ANY(%s) AND script_id=%s`:① 双重校验防 IDOR(只动本剧本的条目);
+    ② targeted 形式豁免 provenance 守卫(用户主动选删,非全量重建)。一次 invalidate_constant_cache。
+    """
+    try:
+        body = await request.json()
+    except Exception:
+        return json_response({"ok": False, "error": "body 必须是合法 JSON"}, status_code=400)
+
+    action = str(body.get("action") or "").strip()
+    if action not in _WB_BATCH_ACTIONS:
+        return json_response({"ok": False, "error": f"不支持的 action: {action}"}, status_code=400)
+
+    raw_ids = body.get("entry_ids") or body.get("ids") or []
+    if not isinstance(raw_ids, list):
+        return json_response({"ok": False, "error": "entry_ids 必须是数组"}, status_code=400)
+    try:
+        ids = [int(x) for x in raw_ids if x is not None]
+    except (TypeError, ValueError):
+        return json_response({"ok": False, "error": "entry_ids 含非法 id"}, status_code=400)
+    ids = list(dict.fromkeys(ids))  # 去重保序
+    if not ids:
+        return json_response({"ok": False, "error": "entry_ids 不能为空"}, status_code=400)
+    MAX_BATCH = 1000
+    if len(ids) > MAX_BATCH:
+        return json_response({"ok": False, "error": f"单次批量上限 {MAX_BATCH} 条"}, status_code=400)
+
+    priority = None
+    if action == "set_priority":
+        try:
+            priority = int(body.get("priority"))
+        except (TypeError, ValueError):
+            return json_response({"ok": False, "error": "set_priority 需要整数 priority"}, status_code=400)
+        priority = max(0, min(1000, priority))  # clamp 到合理区间
+
+    with connect() as db:
+        try:
+            _require_owner(db, script_id, user["id"])
+        except ValueError as exc:
+            return json_response({"ok": False, "error": str(exc)}, status_code=403)
+
+        if action == "delete":
+            rows = db.execute(
+                "DELETE FROM worldbook_entries WHERE id = ANY(%s) AND script_id=%s RETURNING id",
+                (ids, script_id),
+            ).fetchall()
+        elif action in ("enable", "disable"):
+            rows = db.execute(
+                "UPDATE worldbook_entries SET enabled=%s, updated_at=now() "
+                "WHERE id = ANY(%s) AND script_id=%s RETURNING id",
+                (action == "enable", ids, script_id),
+            ).fetchall()
+        else:  # set_priority
+            rows = db.execute(
+                "UPDATE worldbook_entries SET priority=%s, updated_at=now() "
+                "WHERE id = ANY(%s) AND script_id=%s RETURNING id",
+                (priority, ids, script_id),
+            ).fetchall()
+        affected = len(rows or [])
+
+        payload: dict[str, Any] = {
+            "table": "worldbook_entries", "op": action,
+            "ids": ids, "requested": len(ids), "count": affected,
+        }
+        if priority is not None:
+            payload["priority"] = priority
+        commit_id = _write_commit(
+            db,
+            script_id=script_id,
+            user_id=user["id"],
+            kind=f"worldbook_bulk_{action}",
+            message=f"批量{_WB_BATCH_ACTIONS[action]} worldbook × {affected}",
+            payload=payload,
+        )
+        db.commit()
+
+    try:
+        from gm_serving.context_inject import invalidate_constant_cache
+        invalidate_constant_cache(script_id)
+    except Exception:
+        pass
+    return json_response({"ok": True, "action": action, "affected": affected, "commit_id": commit_id})
 
 
 # ─── canon-entities CRUD ─────────────────────────────────────────────────────

@@ -639,9 +639,11 @@ async def api_audit_character_cards(request: Request, script_id: int, user=Depen
 
 
 @router.get("/api/scripts/{script_id}/worldbook")
-async def api_script_worldbook(script_id: int, limit: int | None = None, cursor: str | None = None, user=Depends(require_user)):
+async def api_script_worldbook(script_id: int, limit: int | None = None, cursor: str | None = None, fetch_all: bool = False, user=Depends(require_user)):
+    # fetch_all=true:编辑器一次性全量加载(绕开游标分页漏条);否则走默认游标分页。
     try:
-        return json_response({"ok": True, **knowledge.list_worldbook_entries(user["id"], script_id, limit, cursor)})
+        return json_response({"ok": True, **knowledge.list_worldbook_entries(
+            user["id"], script_id, limit, cursor, fetch_all=fetch_all)})
     except ValueError as exc:
         return json_response({"ok": False, "error": str(exc)}, status_code=400)
 

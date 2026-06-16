@@ -440,10 +440,12 @@
       splitChapter: (sid, idx, body) => POST(`${API_PREFIX}/scripts/${sid}/chapters/${idx}/split`, body),
       resplit: (sid, body) => POST(`${API_PREFIX}/scripts/${sid}/resplit`, body),
       chapterFacts: (sid, q) => GET(`${API_PREFIX}/scripts/${sid}/chapter-facts`, q),
-      worldbook: (sid) => GET(`${API_PREFIX}/scripts/${sid}/worldbook`),
+      worldbook: (sid, q) => GET(`${API_PREFIX}/scripts/${sid}/worldbook`, q),
       worldbookCreate: (sid, body) => POST(`${API_PREFIX}/scripts/${sid}/worldbook`, body),
       worldbookUpdate: (sid, eid, body) => PUT(`${API_PREFIX}/scripts/${sid}/worldbook/${eid}`, body),
       worldbookDelete: (sid, eid) => DEL(`${API_PREFIX}/scripts/${sid}/worldbook/${eid}`, {}),
+      // 批量:body={entry_ids:[...], action:'delete'|'enable'|'disable'|'set_priority', priority?}
+      worldbookBatch: (sid, body) => POST(`${API_PREFIX}/scripts/${sid}/worldbook/batch`, body),
       // 出生点(玩家选择从哪个章节起场)
       birthpoints: (sid) => GET(`${API_PREFIX}/scripts/${sid}/birthpoints`),
       // 真实剧本时间线锚点(script_timeline_anchors,LLM 抽出的 story-time 段,

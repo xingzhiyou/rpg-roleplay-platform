@@ -93,6 +93,8 @@ export function WorldbookEditorView({ script }) {
 
   /* ── 批量操作 ── */
   const [selectedItems, setSelectedItems] = useState([]);
+  const [batchPriority, setBatchPriority] = useState('');  // 批量设优先级的输入值
+  const [batching, setBatching] = useState(false);          // 批量请求进行中(禁用按钮防重复)
 
   /* ── Fork 状态 ── */
   const [forking, setForking] = useState(false);
@@ -104,7 +106,8 @@ export function WorldbookEditorView({ script }) {
     setLoading(true);
     (async () => {
       try {
-        const r = await window.api.scripts.worldbook(script.id);
+        // fetch_all:一次性拉全量(后端绕开游标分页漏条);否则大世界书只能看到前 50 条。
+        const r = await window.api.scripts.worldbook(script.id, { fetch_all: 1 });
         if (!cancelled) setEntries(Array.isArray(r) ? r : (r?.items || r?.entries || []));
       } catch (_) {
         if (!cancelled) setEntries([]);
@@ -276,22 +279,13 @@ export function WorldbookEditorView({ script }) {
     }
   }, [draft, isOwner, script?.id, t, closePanel]);
 
-  /* ────── 批量 enable / disable ────── */
+  /* ────── 批量 enable / disable(走单事务批量端点,不再逐条 PUT) ────── */
   const onBatchEnable = useCallback(async (enable) => {
-    if (!isOwner || selectedItems.length === 0) return;
+    if (!isOwner || selectedItems.length === 0 || batching) return;
     const ids = selectedItems.map(i => i.id);
+    setBatching(true);
     try {
-      await Promise.all(ids.map(id => {
-        const e = entries.find(x => x.id === id);
-        if (!e) return Promise.resolve();
-        return _wbPut(script.id, id, {
-          title: e.title || e.keyword || '',
-          content: e.content || e.text || '',
-          priority: e.priority ?? 50,
-          enabled: enable,
-          tags: e.tags || [],
-        });
-      }));
+      await _wbBatch(script.id, { entry_ids: ids, action: enable ? 'enable' : 'disable' });
       setEntries(arr => arr.map(e => ids.includes(e.id) ? { ...e, enabled: enable } : e));
       window.__apiToast?.(enable
         ? t('scripts.edit.worldbook.toast_batch_enabled')
@@ -300,8 +294,76 @@ export function WorldbookEditorView({ script }) {
       setSelectedItems([]);
     } catch (err) {
       window.__apiToast?.(t('scripts.toast.op_fail'), { kind: 'danger', detail: err?.message });
+    } finally {
+      setBatching(false);
     }
-  }, [isOwner, selectedItems, entries, script?.id, t]);
+  }, [isOwner, selectedItems, script?.id, t, batching]);
+
+  /* ────── 批量删除(物理删除,带确认 + editor 源警示) ────── */
+  const onBatchDelete = useCallback(async () => {
+    if (!isOwner || selectedItems.length === 0 || batching) return;
+    const ids = selectedItems.map(i => i.id);
+    const n = ids.length;
+    // 删除是物理删除。重点提示「会在重建知识库后复活」的那批:source 非 'editor' 的条目
+    // (原著自动提取 / 旧无 source)——它们会被 resolve.py 重建从 canon 重新生成,删了又回来。
+    // source==='editor'(用户/AI 手写)受重建豁免,删了是真没了,不复活,无需此提示。
+    const rebuildCount = selectedItems.filter(
+      i => ((i.metadata && i.metadata.source) || '') !== 'editor'
+    ).length;
+    let message = t('scripts.edit.worldbook.batch_delete_confirm', { n });
+    if (rebuildCount > 0) {
+      message += '\n' + t('scripts.edit.worldbook.batch_delete_rebuild_warn', { n: rebuildCount });
+    }
+    const ok = await (window.__confirm
+      ? window.__confirm({
+          title: t('scripts.edit.worldbook.batch_delete_title'),
+          message,
+          danger: true,
+          confirmText: t('common.delete'),
+        })
+      : Promise.resolve(window.confirm(message)));
+    if (!ok) return;
+    setBatching(true);
+    try {
+      const r = await _wbBatch(script.id, { entry_ids: ids, action: 'delete' });
+      setEntries(arr => arr.filter(e => !ids.includes(e.id)));
+      setSelectedItems([]);
+      if (selectedId && ids.includes(selectedId)) { setSelectedId(null); closePanel(); }
+      window.__apiToast?.(
+        t('scripts.edit.worldbook.toast_batch_deleted', { n: r?.affected ?? n }),
+        { kind: 'ok', duration: 1500 });
+    } catch (err) {
+      window.__apiToast?.(t('scripts.toast.op_fail'), { kind: 'danger', detail: err?.message });
+    } finally {
+      setBatching(false);
+    }
+  }, [isOwner, selectedItems, script?.id, t, batching, selectedId, closePanel]);
+
+  /* ────── 批量设置优先级 ────── */
+  const onBatchSetPriority = useCallback(async () => {
+    if (!isOwner || selectedItems.length === 0 || batching) return;
+    const p = parseInt(batchPriority, 10);
+    if (Number.isNaN(p)) {
+      window.__apiToast?.(t('scripts.edit.worldbook.batch_priority_invalid'), { kind: 'warning' });
+      return;
+    }
+    const clamped = Math.max(0, Math.min(1000, p));
+    const ids = selectedItems.map(i => i.id);
+    setBatching(true);
+    try {
+      await _wbBatch(script.id, { entry_ids: ids, action: 'set_priority', priority: clamped });
+      setEntries(arr => arr.map(e => ids.includes(e.id) ? { ...e, priority: clamped } : e));
+      window.__apiToast?.(
+        t('scripts.edit.worldbook.toast_batch_priority', { n: ids.length, p: clamped }),
+        { kind: 'ok', duration: 1500 });
+      setSelectedItems([]);
+      setBatchPriority('');
+    } catch (err) {
+      window.__apiToast?.(t('scripts.toast.op_fail'), { kind: 'danger', detail: err?.message });
+    } finally {
+      setBatching(false);
+    }
+  }, [isOwner, selectedItems, script?.id, t, batching, batchPriority]);
 
   /* ────── Fork ────── */
   const onFork = useCallback(async () => {
@@ -471,15 +533,40 @@ export function WorldbookEditorView({ script }) {
             <>
               <CSButton
                 iconName="status-positive"
+                loading={batching}
                 onClick={() => onBatchEnable(true)}
               >
                 {t('scripts.edit.worldbook.batch_enable')}
               </CSButton>
               <CSButton
                 iconName="status-negative"
+                loading={batching}
                 onClick={() => onBatchEnable(false)}
               >
                 {t('scripts.edit.worldbook.batch_disable')}
+              </CSButton>
+              <div style={{ width: 88 }}>
+                <CSInput
+                  type="number"
+                  value={batchPriority}
+                  placeholder={t('scripts.edit.worldbook.batch_priority_ph')}
+                  onChange={({ detail }) => setBatchPriority(detail.value)}
+                />
+              </div>
+              <CSButton
+                iconName="edit"
+                loading={batching}
+                disabled={batchPriority === ''}
+                onClick={onBatchSetPriority}
+              >
+                {t('scripts.edit.worldbook.batch_set_priority')}
+              </CSButton>
+              <CSButton
+                iconName="remove"
+                loading={batching}
+                onClick={onBatchDelete}
+              >
+                {t('scripts.edit.worldbook.batch_delete')}
               </CSButton>
             </>
           )}
@@ -767,6 +854,21 @@ function _wbDelete(scriptId, entryId) {
   }).then(r => {
     if (!r.ok) return r.json().catch(() => ({})).then(j => { throw new Error(j.detail || j.error || r.statusText); });
     return r.json().catch(() => ({}));
+  });
+}
+
+function _wbBatch(scriptId, body) {
+  if (window.api?.scripts?.worldbookBatch) {
+    return window.api.scripts.worldbookBatch(scriptId, body);
+  }
+  return fetch(`/api/v1/scripts/${scriptId}/worldbook/batch`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  }).then(r => {
+    if (!r.ok) return r.json().catch(() => ({})).then(j => { throw new Error(j.detail || j.error || r.statusText); });
+    return r.json();
   });
 }
 

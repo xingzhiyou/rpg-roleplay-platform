@@ -93,7 +93,7 @@ const PL_NAV = getPLNav((k) => k);
 const getPLTitles = (t) => ({
   profile:  [t('platform.nav.profile'),  t('platform.nav.profile_sub')],
   scripts:  [t('platform.nav.scripts'),  t('platform.nav.scripts_sub')],
-  "md-editor": [t('platform.nav.md_editor', { defaultValue: 'Markdown 编辑器' }), t('platform.nav.md_editor_sub', { defaultValue: '剧本/角色卡/章节/时间线内联编辑' })],
+  "md-editor": [t('platform.nav.md_editor', { defaultValue: '剧本编辑器' }), t('platform.nav.md_editor_sub', { defaultValue: '剧本/角色卡/章节/时间线内联编辑' })],
   "scripts-import": [t('platform.nav.scripts_import'), t('platform.nav.scripts_import_sub')],
   modules:  [t('platform.nav.modules'),  t('platform.nav.modules_sub')],
   saves:    [t('platform.nav.saves'),    t('platform.nav.saves_sub')],
@@ -4039,10 +4039,10 @@ const getCSModules = (t) => [
       { text: t('platform.nav.cs_scripts_library'), href: '#scripts-library' },
     ] },
   // VSCode 风 MD 编辑器:剧本知识资产(章节/角色卡/世界书/时间线/canon)三栏内联编辑 + agent 直写。
-  { id: 'md-editor', label: t('platform.nav.md_editor', { defaultValue: 'MD 编辑器' }), group: t('platform.nav.group_create'),
+  { id: 'md-editor', label: t('platform.nav.md_editor', { defaultValue: '剧本编辑器' }), group: t('platform.nav.group_create'),
     pages: ['md-editor'],
     sub: [
-      { text: t('platform.nav.md_editor', { defaultValue: 'MD 编辑器' }), href: '#md-editor' },
+      { text: t('platform.nav.md_editor', { defaultValue: '剧本编辑器' }), href: '#md-editor' },
     ] },
   { id: 'play', label: t('platform.nav.saves'), group: t('platform.nav.group_play'),
     // NPC 角色卡已移入「剧本」详情面板(NPC 卡属于具体剧本),不再在开始游戏出现。
@@ -4478,14 +4478,8 @@ function PlatformShellCS({ page, setPage, children, assistant, assistantOpen, on
               {t('platform.menu.guide_btn')}
             </button>
           </div>
-          {/* 用户头像小图:CSTopNavigation 不支持自定义头像节点,在其左侧注入一枚独立 AvatarImg */}
-          <button
-            onClick={() => setPage('profile')}
-            title={reactiveUser.display_name || '个人主页'}
-            style={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0, border: 0, background: 'transparent', padding: '0 6px', cursor: 'pointer' }}
-          >
-            <AvatarImg src={reactiveUser._raw?.avatar_url || null} name={reactiveUser.display_name || '?'} size={28} shape="circle" />
-          </button>
+          {/* (去掉了这里多余的一枚独立头像 —— 与右侧 CSTopNavigation 的用户菜单重复;
+              用户身份/菜单统一走右上角下拉。) */}
           <div style={{ flex: 1, minWidth: 0 }}>
           <CSTopNavigation
             identity={{ href: '#profile', title: '', onFollow: (e) => { e.preventDefault(); setPage('profile'); } }}

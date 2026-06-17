@@ -532,6 +532,13 @@ async def api_worldbook_update(
             sets.append("metadata=%s")
             args.append(Jsonb(meta))
 
+        # KB 卫生(设计 O §5.2):正文/标题变了 → 脏化向量(NULL embedding_vec)。否则编辑后行仍带
+        # 旧内容的向量,而「重做」的增量循环 `WHERE embedding_vec IS NULL` 命中 0 行 → 秒完成且向量过期
+        # (群反馈 行者无疆「改了世界书条目后重做秒完成、实际没重新生成」的根因)。脏化后重做/增量会真重嵌。
+        if ("title" in body) or ("content" in body):
+            sets.append("embedding_vec=NULL")
+            sets.append("embedded_at=NULL")
+
         if not sets:
             return json_response({"ok": False, "error": "无可更新字段"}, status_code=400)
 

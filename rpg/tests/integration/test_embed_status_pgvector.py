@@ -14,10 +14,14 @@ class EmbedStatusQueriesVectorColumn(unittest.TestCase):
         src = inspect.getsource(_embed.embed_status)
         self.assertIn("embedding_vec is not null", src,
                       "embed_status 必须查 pgvector 列 embedding_vec")
-        # 不应该查 jsonb 'embedding' 列(那是 stale)
-        # 单引号查 'embedding' 不在 string 字面里出现(不应被 'where embedding' 匹配)
-        # 这里只要确保没有 "where embedding is" 模式
-        self.assertNotIn("where embedding is", src.lower())
+        # chunks/cards/worldbook 三张表向量列就叫 embedding_vec,绝不能查回 stale jsonb 'embedding'。
+        # 注:kb_canon_entities 的向量列**本就叫 `embedding`**(vector 类型,非 stale jsonb),所以全局
+        # 「禁止 embedding is」的旧启发式已失效(会误伤 canon 的合法列 + 注释);改为精确断言这三张表查 embedding_vec。
+        for tbl in ("document_chunks", "character_cards", "worldbook_entries"):
+            self.assertNotIn(
+                f"from {tbl} where script_id = %s and embedding is not null", src,
+                f"{tbl} 必须查 embedding_vec,不能查 stale jsonb embedding",
+            )
 
     def test_modules_status_uses_embedding_vec(self):
         from platform_app.api import scripts as api_scripts

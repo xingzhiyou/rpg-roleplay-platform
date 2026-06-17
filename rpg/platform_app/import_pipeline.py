@@ -2722,6 +2722,26 @@ def _run_module_rebuild(
             from extract.embed import embed_canon_entities
             counts = {}
             partial_failures = []
+            # KB 卫生(设计 O §5.2):「重做」= 强制重嵌。先把被选类型的向量清成 NULL,再跑增量循环
+            # (_embed_chunks_loop_inner / embed_canon_entities 都按 WHERE embedding_vec IS NULL 重嵌)→
+            # 真重嵌全部,而非「秒完成」空操作(群反馈:世界书编辑后重做秒完成、实际没重新生成)。
+            # embed_script 会重嵌 chunks+cards+worldbook,canon 由 embed_canon_entities 重嵌,故清空安全。
+            _FORCE_CLEAR = {
+                "chunks":    "update document_chunks set embedding_vec=NULL where script_id=%s",
+                "cards":     "update character_cards set embedding_vec=NULL, embedded_at=NULL where script_id=%s and card_type='npc'",
+                "worldbook": "update worldbook_entries set embedding_vec=NULL, embedded_at=NULL where script_id=%s",
+                "canon":     "update kb_canon_entities set embedding=NULL where script_id=%s",
+            }
+            with connect() as db:
+                for _k in includes:
+                    _sql = _FORCE_CLEAR.get(_k)
+                    if not _sql:
+                        continue
+                    try:
+                        db.execute(_sql, (script_id,))
+                    except Exception as exc:
+                        partial_failures.append({"stage": f"force_clear_{_k}", "error": str(exc)})
+                db.commit()
             with connect() as db:
                 if "chunks" in includes or "cards" in includes or "worldbook" in includes:
                     try:

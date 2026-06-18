@@ -33,6 +33,16 @@ contextBridge.exposeInMainWorld('sv', {
   // 反馈(发到中央服务器匿名端点)
   submitFeedback: (payload) => ipcRenderer.invoke('feedback:submit', payload),
 
+  // 账号数据迁移(对本地后端;仅本地模式+运行时有效)
+  accountEstimate: () => ipcRenderer.invoke('account:estimate'),
+  accountExport: (includeChunks) => ipcRenderer.invoke('account:export', includeChunks),
+  accountPickImport: () => ipcRenderer.invoke('account:pickImport'),
+  accountImport: (filePath) => ipcRenderer.invoke('account:import', filePath),
+
+  // 系统:清除本地数据 / 复制诊断
+  wipeData: () => ipcRenderer.invoke('sys:wipeData'),
+  copyDiagnostics: () => ipcRenderer.invoke('sys:copyDiagnostics'),
+
   // 事件订阅(返回取消函数)
   onStatus: (cb) => { const h = (_e, p) => cb(p); ipcRenderer.on('sv:status', h); return () => ipcRenderer.removeListener('sv:status', h); },
   onLog: (cb) => { const h = (_e, p) => cb(p); ipcRenderer.on('sv:log', h); return () => ipcRenderer.removeListener('sv:log', h); },

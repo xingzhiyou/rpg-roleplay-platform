@@ -3,7 +3,7 @@
 // 控制台窗口(起停服务/日志/配置/更新)+ 应用窗口(加载在线或本地的 Web UI)。
 // 单实例锁、优雅停机、自动更新全在这里。
 
-const { app, BrowserWindow, ipcMain, shell, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, dialog, clipboard } = require('electron');
 const path = require('path');
 
 const P = require('./paths');
@@ -120,12 +120,15 @@ function wireIpc() {
     const { net } = require('electron');
     const c = cfg.load();
     const base = (c.onlineUrl || 'https://play.stellatrix.icu').replace(/\/+$/, '');
+    const p = payload || {};
     const body = JSON.stringify({
-      free_text: (payload && payload.freeText) || '',
-      contact_email: (payload && payload.email) || '',
+      free_text: p.freeText || '',
+      contact_email: p.email || '',
+      consent_token: p.consentToken || '',
       client_id: c.clientId || '',
       app_version: app.getVersion(),
-      env_snapshot: {
+      // 仅当用户勾选「附带运行环境信息」时上报环境快照
+      env_snapshot: p.includeEnv === false ? {} : {
         os: process.platform, arch: process.arch,
         os_version: require('os').release(),
         app_version: app.getVersion(), electron: process.versions.electron,
@@ -149,6 +152,83 @@ function wireIpc() {
       req.write(body);
       req.end();
     });
+  });
+
+  // ── 账号数据迁移(对本地后端;本地模式 default user 无需鉴权)──
+  const _localBase = () => `http://127.0.0.1:${supervisor.backendPort}`;
+  const _localOk = () => cfg.load().mode === 'local' && supervisor.state === 'running' && !!supervisor.backendPort;
+
+  ipcMain.handle('account:estimate', async () => {
+    if (!_localOk()) return { ok: false, error: '需本地模式且服务运行' };
+    const { net } = require('electron');
+    return await new Promise((resolve) => {
+      const req = net.request(`${_localBase()}/api/me/account/export/estimate`);
+      let data = '';
+      req.on('response', (res) => { res.on('data', (d) => data += d); res.on('end', () => {
+        try { const j = JSON.parse(data); resolve({ ok: true, size: j.size_human || j.human || (j.bytes ? Math.round(j.bytes / 1048576) + ' MB' : (j.size || '—')) }); }
+        catch (_) { resolve({ ok: false }); }
+      }); });
+      req.on('error', () => resolve({ ok: false }));
+      req.end();
+    });
+  });
+
+  ipcMain.handle('account:export', async (_e, includeChunks) => {
+    if (!_localOk()) return { ok: false };
+    await shell.openExternal(`${_localBase()}/api/me/account/export${includeChunks ? '?include_chunks=1' : ''}`);
+    return { ok: true };
+  });
+
+  ipcMain.handle('account:pickImport', async () => {
+    const r = await dialog.showOpenDialog({ title: '选择账号数据 .zip', filters: [{ name: 'Zip', extensions: ['zip'] }], properties: ['openFile'] });
+    if (r.canceled || !r.filePaths[0]) return { ok: false };
+    return { ok: true, path: r.filePaths[0], name: require('path').basename(r.filePaths[0]) };
+  });
+
+  ipcMain.handle('account:import', async (_e, filePath) => {
+    if (!_localOk()) return { ok: false, error: '需本地模式且服务运行' };
+    const { net } = require('electron');
+    let buf;
+    try { buf = require('fs').readFileSync(filePath); } catch (_) { return { ok: false, error: '读取文件失败' }; }
+    const boundary = '----stxform' + process.hrtime.bigint().toString(36);
+    const name = require('path').basename(filePath);
+    const head = Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${name}"\r\nContent-Type: application/zip\r\n\r\n`);
+    const tail = Buffer.from(`\r\n--${boundary}--\r\n`);
+    const body = Buffer.concat([head, buf, tail]);
+    return await new Promise((resolve) => {
+      const req = net.request({ method: 'POST', url: `${_localBase()}/api/me/account/import` });
+      req.setHeader('Content-Type', `multipart/form-data; boundary=${boundary}`);
+      let data = '';
+      req.on('response', (res) => { res.on('data', (d) => data += d); res.on('end', () => {
+        try { const j = JSON.parse(data); resolve({ ok: res.statusCode < 400 && j.ok !== false, ...j }); }
+        catch (_) { resolve({ ok: res.statusCode < 400, status: res.statusCode }); }
+      }); });
+      req.on('error', (err) => resolve({ ok: false, error: String(err && err.message || err) }));
+      req.write(body);
+      req.end();
+    });
+  });
+
+  // ── 清除本地数据(危险区:停服务 + 删 pgdata/app 可写副本;保留 config)──
+  ipcMain.handle('sys:wipeData', async () => {
+    try { await supervisor.stop(); } catch (_) {}
+    const fsp = require('fs/promises');
+    for (const d of [P.pgData(), P.appDir()]) { try { await fsp.rm(d, { recursive: true, force: true }); } catch (_) {} }
+    return { ok: true };
+  });
+
+  // ── 复制诊断(脱敏:不含 env 值/密钥)──
+  ipcMain.handle('sys:copyDiagnostics', () => {
+    const c = cfg.load();
+    const recent = supervisor.recentLogs().slice(-50).map((l) => `${new Date(l.ts).toISOString()} [${l.src}] ${l.line}`).join('\n');
+    clipboard.writeText([
+      `Stellatrix ${app.getVersion()}`,
+      `platform: ${process.platform} ${process.arch} / os ${require('os').release()}`,
+      `electron: ${process.versions.electron} / node ${process.versions.node}`,
+      `mode: ${c.mode} / state: ${supervisor.state} / backend: ${supervisor.backendPort} / pg: ${supervisor.pgPort}`,
+      '--- recent logs ---', recent,
+    ].join('\n'));
+    return { ok: true };
   });
 }
 

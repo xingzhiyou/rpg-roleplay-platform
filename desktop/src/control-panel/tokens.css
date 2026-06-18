@@ -1,0 +1,411 @@
+/* === RPG Roplay design tokens — Claude-inspired warm dark + serif narrative === */
+
+:root {
+  color-scheme: dark;
+
+  /* surfaces */
+  --bg: #1a1817;
+  --bg-deep: #131211;
+  --panel: #211f1d;
+  --panel-2: #282623;
+  --panel-3: #2f2c28;
+  --rail: #1d1b19;
+
+  /* lines */
+  --line: #36322d;
+  --line-soft: #2a2724;
+  --line-strong: #4a4540;
+
+  /* text */
+  --text: #ebe7df;
+  --text-quiet: #c8c2b7;
+  --muted: #968f85;
+  --muted-2: #6b655e;
+  --muted-3: #4d4842;
+
+  /* accents (use SPARINGLY) */
+  --accent: #c96442;
+  --accent-soft: rgba(201, 100, 66, 0.14);
+  --accent-edge: rgba(201, 100, 66, 0.42);
+
+  /* status */
+  --ok: #7eb88e;
+  --ok-soft: rgba(126, 184, 142, 0.12);
+  --warn: #d4b366;
+  --warn-soft: rgba(212, 179, 102, 0.12);
+  --danger: #c8675d;
+  --danger-soft: rgba(200, 103, 93, 0.12);
+  --info: #7aa6c2;
+  --info-soft: rgba(122, 166, 194, 0.12);
+
+  /* type */
+  --font-sans: "Noto Sans SC", ui-sans-serif, -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-serif: "Noto Serif SC", "Source Han Serif SC", "Songti SC", "STSong", "SimSun", serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  /* density (overridden by Tweaks) */
+  --density: 1;
+  --ui-size: 13.5px;
+  --body-size: 15px;
+  --narrative-size: 16.5px;
+
+  /* density preset vars — set by RPG_setDensity / data-density attr on <html> */
+  --d-font-base: 14px;
+  --d-narrative: 16.5px;
+  --d-line: 1.55;
+  --d-pad: 10px;
+  --d-msg-pad: 24px;
+
+  /* spacing scale */
+  --s-1: 4px;
+  --s-2: 6px;
+  --s-3: 8px;
+  --s-4: 12px;
+  --s-5: 16px;
+  --s-6: 20px;
+  --s-7: 24px;
+  --s-8: 32px;
+  --s-9: 48px;
+
+  /* radii */
+  --r-1: 4px;
+  --r-2: 6px;
+  --r-3: 8px;
+
+  /* shadow (very restrained) */
+  --shadow-1: 0 1px 0 rgba(255, 255, 255, 0.02) inset, 0 1px 1px rgba(0, 0, 0, 0.18);
+  --shadow-2: 0 18px 48px -18px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.25);
+  --shadow-3: 0 24px 72px -24px rgba(0, 0, 0, 0.72), 0 4px 12px rgba(0, 0, 0, 0.32);
+}
+
+/* === Density presets — applied by [data-density] on <html> === */
+:root[data-density="compact"] {
+  --d-font-base: 12.5px;
+  --d-narrative: 14.5px;
+  --d-line: 1.4;
+  --d-pad: 5px;
+  --d-msg-pad: 14px;
+}
+:root[data-density="default"] {
+  --d-font-base: 14px;
+  --d-narrative: 16.5px;
+  --d-line: 1.55;
+  --d-pad: 10px;
+  --d-msg-pad: 24px;
+}
+:root[data-density="spacious"] {
+  --d-font-base: 15.5px;
+  --d-narrative: 18px;
+  --d-line: 1.75;
+  --d-pad: 12px;
+  --d-msg-pad: 32px;
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+/* 系统性根治表格横向溢出(深度 DOM 诊断结论,非个案补丁)。
+   根因:从表格往上,Cloudscape 多个结构容器默认 min-width:auto —— Container 内容
+   (awsui_content_)、SpaceBetween(awsui_child_ / awsui_root_ vertical|horizontal)、
+   AppLayout 内容定位容器(awsui_split-panel-position)、main(awsui_main_)。
+   flex/grid/block 子项 min-width:auto = 拒绝收缩到内容宽度以下,宽表就把这些祖先一路撑破、
+   推宽整页;而表格自带的 overflow-x:auto 横滚 wrapper 因祖先不收缩而永远触发不了。
+   统一给这条链 min-width:0 → 宽表回到自身 wrapper 内部横滚,绝不外溢。
+   实测:把表格强撑到 2200px,1280 视口整页仍 0 溢出。
+   (上一版选择器 [class*=awsui_content_][class*=awsui_layout] 是复合、要求同元素含两子串,
+    实际匹配 0 个,完全没生效——这是之前没修好的真因。) */
+[class*="awsui_split-panel-position"],
+[class*="awsui_content_"],
+[class*="awsui_content-inner_"],
+[class*="awsui_child_"],
+[class*="awsui_root_"][class*="awsui_vertical_"],
+[class*="awsui_root_"][class*="awsui_horizontal_"],
+[class*="awsui_main_"] { min-width: 0 !important; }
+/* 最终兜底:任何漏网内在宽度都不产生整页横滚(min-width:0 链已根治,这里只是双保险) */
+html, body { overflow-x: hidden; max-width: 100%; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font: var(--ui-size)/1.55 var(--font-sans);
+  letter-spacing: 0.01em;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* form resets */
+button, input, textarea, select {
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+}
+button {
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  color: inherit;
+  padding: 0;
+  text-align: left;
+}
+input, textarea, select {
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: var(--r-2);
+  padding: 8px 10px;
+  outline: 0;
+}
+input:focus, textarea:focus, select:focus {
+  border-color: var(--line-strong);
+  background: var(--panel-2);
+}
+textarea { resize: vertical; }
+
+/* Cloudscape 下拉 / 弹出层表面强制暖色。
+   applyTheme 的 colorBackgroundDropdownItemDefault 变量带上下文后缀(如 -qmc033),
+   部分场景(ButtonDropdown / Select 菜单)没被覆盖到,仍是 AWS 暗色蓝灰 #161d26。
+   直接按 class 锁表面背景,稳过 token 后缀差异。 */
+[class*="awsui_dropdown-content-wrapper"],
+[class*="awsui_options-list"],
+[class*="awsui_popover-body"],
+[class*="awsui_popover-content"] {
+  background-color: #211f1d !important;
+}
+
+/* 隐藏 Cloudscape AppLayout 自带的侧栏折叠/展开触发器(圆形按钮):
+   折叠按钮已自建并放进顶栏品牌名左侧。只隐藏「包含 navigation-toggle 的
+   trigger-wrapper」,不影响 tools / split-panel 的触发器。
+   (navigationTriggerHide 属性在当前 Cloudscape 版本未生效,用 CSS 兜底) */
+[class*="awsui_trigger-wrapper"]:has([class*="awsui_navigation-toggle"]) {
+  display: none !important;
+}
+
+/* 页面内可拖拽分栏(ResizableSplit)的分隔手柄:悬停/拖动时高亮暖色 */
+.pl-vsplit-handle:hover .pl-vsplit-grip,
+.pl-vsplit-handle:active .pl-vsplit-grip {
+  background: var(--accent, #c96442) !important;
+  width: 64px !important;
+}
+
+/* 分栏上栏滚动时:表格列头静止(sticky),只滚动行。
+   Cloudscape 表格内部自带一层 awsui_wrapper(overflow:auto),会和外层
+   .pl-vsplit-top 形成嵌套滚动、让 thead 无法相对外层 sticky;先把内层改成
+   overflow:visible,只保留 .pl-vsplit-top 这一个滚动容器,再把表头钉在顶部。 */
+.pl-vsplit-top [class*="awsui_wrapper"] {
+  /* 根因修复:原来 overflow:visible 把表格自带的 overflow-x:auto 横滚「安全气囊」
+     一起关掉了 → 宽表不再内部横滚、直接撑破外层 → 整页横向溢出。
+     现在只让纵向 visible(表头 sticky 相对外层吸顶仍生效),横向恢复 auto(宽表自滚)。 */
+  overflow-y: visible !important;
+  overflow-x: auto !important;
+}
+.pl-vsplit, .pl-vsplit-top, .pl-vsplit-bottom { min-width: 0; }
+/* 列头滚动时静止吸顶(搜索/筛选条已移到面板外,面板里只有表格 → top:0 即可) */
+.pl-vsplit-top thead[class*="awsui_thead"] th,
+.pl-vsplit-top thead[class*="awsui_thead"] td {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 5;
+  background-color: #211f1d;
+}
+
+/* ── SideNavigation 项美化 ──────────────────────────────────────
+   Cloudscape 侧栏链接默认是 display:inline、零内边距的「裸文字」,
+   只有文字本身是点击区,观感像没样式、标签挤在一起。
+   做成整行 block + 内边距 + 圆角,悬停/选中有背景,像正经导航行。 */
+[class*="awsui_navigation_"] [class*="awsui_list_l0dv0"] {
+  padding-left: 8px !important;
+  padding-right: 8px !important;
+}
+[class*="awsui_navigation_"] [class*="awsui_list-item_l0dv0"] {
+  margin-bottom: 1px !important;
+}
+[class*="awsui_navigation_"] [class*="awsui_link_l0dv0"] {
+  display: block;
+  padding: 6px 12px;
+  border-radius: 8px;
+  transition: background-color .12s ease;
+}
+[class*="awsui_navigation_"] [class*="awsui_link_l0dv0"]:hover {
+  background-color: #282623;
+}
+[class*="awsui_navigation_"] [class*="awsui_link-active_l0dv0"],
+[class*="awsui_navigation_"] [class*="awsui_link_l0dv0"][aria-current="page"] {
+  background-color: rgba(201, 100, 66, 0.16);
+  font-weight: 600;
+}
+/* 分组标题(header)对齐到同样的左内边距 */
+[class*="awsui_navigation_"] [class*="awsui_header-link_l0dv0"] {
+  padding-left: 12px;
+  padding-right: 12px;
+}
+
+/* link —— 不给裸 <a> 全局底边线:会泄漏到 Cloudscape SideNavigation / TopNavigation /
+   表格 inline-link 等所有 <a>,产生「莫名其妙的白色横线」。需要下划线效果的内容链接
+   显式用 .pl-textlink 或 inline style。Cloudscape 链接走自身样式。 */
+a { color: var(--text-quiet); text-decoration: none; }
+a:hover { color: var(--text); }
+.pl-textlink { border-bottom: 1px solid var(--line); padding-bottom: 1px; }
+.pl-textlink:hover { border-bottom-color: var(--line-strong); }
+
+/* scrollbars */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--line-soft); border-radius: 999px; border: 2px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background: var(--line); background-clip: padding-box; }
+* { scrollbar-color: var(--line-soft) transparent; scrollbar-width: thin; }
+
+/* utility classes */
+.mono { font-family: var(--font-mono); font-feature-settings: "ss01", "tnum"; }
+.serif { font-family: var(--font-serif); }
+.muted { color: var(--muted); }
+.muted-2 { color: var(--muted-2); }
+.ok { color: var(--ok); }
+.warn { color: var(--warn); }
+.danger { color: var(--danger); }
+.accent { color: var(--accent); }
+.nowrap { white-space: nowrap; }
+.truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* pill / tag */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 22px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 11.5px;
+  background: transparent;
+}
+.pill.solid { background: var(--panel-2); }
+.pill.ok { color: var(--ok); border-color: rgba(126, 184, 142, 0.32); background: var(--ok-soft); }
+.pill.warn { color: var(--warn); border-color: rgba(212, 179, 102, 0.32); background: var(--warn-soft); }
+.pill.danger { color: var(--danger); border-color: rgba(200, 103, 93, 0.32); background: var(--danger-soft); }
+.pill.info { color: var(--info); border-color: rgba(122, 166, 194, 0.32); background: var(--info-soft); }
+.pill.accent { color: var(--accent); border-color: var(--accent-edge); background: var(--accent-soft); }
+
+/* dot indicator */
+.dot { display: inline-block; width: 6px; height: 6px; border-radius: 999px; background: var(--muted-2); }
+.dot.ok { background: var(--ok); }
+.dot.warn { background: var(--warn); }
+.dot.danger { background: var(--danger); }
+.dot.accent { background: var(--accent); }
+.dot.pulse { box-shadow: 0 0 0 0 currentColor; animation: pulse 1.6s infinite; }
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(201, 100, 66, 0.5); }
+  100% { box-shadow: 0 0 0 8px rgba(201, 100, 66, 0); }
+}
+
+/* iconbtn — icon-only button */
+.iconbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border-radius: var(--r-2);
+  color: var(--muted);
+  border: 1px solid transparent;
+  vertical-align: middle;
+}
+.iconbtn:hover { color: var(--text); background: var(--panel-2); border-color: var(--line-soft); }
+.iconbtn.active { color: var(--text); background: var(--panel-3); border-color: var(--line); }
+.iconbtn svg { width: 16px; height: 16px; }
+
+/* btn */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: var(--r-2);
+  color: var(--text-quiet);
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  font-size: 12.5px;
+  /* task 101: 防止按钮在挤压式 flex 容器里被压成 1 字宽 → 文字竖排。
+     白底真相: nowrap + flex-shrink:0 是按钮在任何 flex 容器里的基本要求。 */
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+.btn:hover { color: var(--text); border-color: var(--line-strong); background: var(--panel-3); }
+.btn[disabled] { opacity: 0.4; cursor: not-allowed; }
+.btn.ghost { background: transparent; border-color: transparent; }
+.btn.ghost:hover { background: var(--panel-2); border-color: var(--line-soft); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff8f3; }
+.btn.primary:hover { background: #b85838; border-color: #b85838; }
+.btn.danger { color: var(--danger); border-color: rgba(200, 103, 93, 0.32); background: var(--danger-soft); }
+
+/* segmented */
+.seg {
+  display: inline-flex;
+  padding: 2px;
+  background: var(--bg-deep);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-2);
+}
+.seg button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 4px;
+  color: var(--muted);
+  font-size: 12px;
+  flex: 1 1 0;
+  min-width: 0;
+  white-space: nowrap;
+}
+.seg button:hover { color: var(--text); }
+.seg button.active { background: var(--panel-2); color: var(--text); }
+
+/* kbd */
+.kbd {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  border: 1px solid var(--line);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  color: var(--muted);
+  background: var(--bg-deep);
+}
+
+/* empty-state line (no card) */
+.empty-line {
+  padding: 14px 0;
+  color: var(--muted-2);
+  font-size: 12.5px;
+  border-top: 1px dashed var(--line-soft);
+  border-bottom: 1px dashed var(--line-soft);
+  text-align: center;
+}
+
+/* section header */
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 0 8px;
+  border-bottom: 1px solid var(--line-soft);
+  margin-bottom: 12px;
+}
+.section-head h3 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+
+/* focus ring */
+:focus-visible { outline: 1px solid var(--accent-edge); outline-offset: 2px; }

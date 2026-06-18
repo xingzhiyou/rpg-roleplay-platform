@@ -4,121 +4,232 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Stellatrix 控制台</title>
+  <link rel="stylesheet" href="tokens.css" />
   <link rel="stylesheet" href="panel.css" />
 </head>
 <body>
-  <header class="topbar">
-    <div class="brand">
-      <span class="logo">Stellatrix</span>
-      <span class="ver" id="appVersion">—</span>
+  <!-- ===== 首次运行向导(无 config 时;选模式)===== -->
+  <div id="onboard" class="onboard" hidden>
+    <div class="onboard-card">
+      <div class="brand"><span class="logo"></span><span class="serif onboard-title">欢迎使用 Stellatrix</span></div>
+      <p class="muted onboard-lead">先选一种运行模式。之后随时可在控制台切换。</p>
+      <div class="onboard-modes">
+        <button class="modecard" data-mode="online">
+          <div class="modecard-h">在线模式</div>
+          <div class="muted modecard-d">连接云端服务器,即开即用,数据存于你的云端账号。装包小、最省心。</div>
+        </button>
+        <button class="modecard" data-mode="local">
+          <div class="modecard-h">本地部署</div>
+          <div class="muted modecard-d">在本机启动数据库 + 后端,数据完全离线、NSFW 自主。首次启动需初始化。</div>
+        </button>
+      </div>
+      <div class="onboard-actions">
+        <button class="btn ghost" id="onboardSkip">跳过</button>
+        <button class="btn primary" id="onboardDone" disabled>进入控制台</button>
+      </div>
     </div>
-    <div class="statuschip" id="statusChip">
-      <span class="dot" id="statusDot"></span>
-      <span id="statusText">就绪</span>
+  </div>
+
+  <!-- ===== 主体:侧栏 + 主区 ===== -->
+  <div class="app">
+    <aside class="side">
+      <div class="brand"><span class="logo"></span>
+        <span class="brand-name serif">Stellatrix</span><span class="mono brand-ver" id="appVersion">—</span>
+      </div>
+      <nav class="nav" id="nav">
+        <button class="navitem active" data-tab="overview">概览</button>
+        <button class="navitem" data-tab="logs"><span>日志</span><span class="badge" id="logBadge" hidden>0</span></button>
+        <button class="navitem" data-tab="config">配置</button>
+        <button class="navitem" data-tab="update"><span>更新</span><span class="upddot" id="updDot" hidden></span></button>
+        <button class="navitem" data-tab="feedback">反馈</button>
+      </nav>
+      <div class="side-foot">
+        <div class="side-status"><span class="dot" id="sideDot"></span><span id="sideStatus">就绪</span></div>
+        <div class="mono side-mode" id="sideMode">—</div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="toolbar">
+        <span class="toolbar-title" id="tabTitle">概览</span>
+        <span class="chip" id="statusChip"><span class="dot" id="chipDot"></span><span id="chipLabel">—</span></span>
+      </div>
+      <div class="panes">
+
+        <!-- 概览 -->
+        <section class="pane active" data-pane="overview">
+          <div class="block">
+            <div class="block-head">运行模式</div>
+            <div class="seg modeseg">
+              <button data-mode="online">在线(连云端)</button>
+              <button data-mode="local">本地部署</button>
+            </div>
+            <p class="muted hint" id="modeHint"></p>
+          </div>
+          <div class="block">
+            <div class="row">
+              <button class="btn primary big" id="openAppBtn">打开应用</button>
+              <button class="btn ghost" id="openExtBtn">在浏览器打开</button>
+            </div>
+            <div id="localSvc" class="localsvc" hidden>
+              <div class="block-head" style="margin-top:18px;">本地服务</div>
+              <div class="row">
+                <button class="btn" id="startBtn">启动服务</button>
+                <button class="btn" id="stopBtn">停止</button>
+                <button class="btn" id="restartBtn">重启</button>
+              </div>
+              <div class="statgrid">
+                <div class="statcell"><div class="statk">状态</div><div class="statv" id="svDetail">—</div></div>
+                <div class="statcell ralign"><div class="statk">后端端口</div><div class="statv mono" id="svBackendPort">—</div></div>
+                <div class="statcell ralign"><div class="statk">数据库端口</div><div class="statv mono" id="svPgPort">—</div></div>
+              </div>
+              <div id="svError" class="errbox" hidden>
+                <div class="errtitle" id="svErrorTitle">启动失败</div>
+                <div class="row" style="margin-top:10px;">
+                  <button class="btn" id="retryBtn">重试</button>
+                  <button class="btn ghost" id="errLogsBtn">打开日志目录</button>
+                  <button class="btn ghost" id="copyDiagBtn">复制诊断</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 日志 -->
+        <section class="pane" data-pane="logs">
+          <div class="logbar">
+            <button class="btn ghost xs" id="clearLogBtn">清屏</button>
+            <button class="btn ghost xs" id="openLogsDirBtn">打开日志目录</button>
+          </div>
+          <pre class="logpane" id="logPane"></pre>
+        </section>
+
+        <!-- 配置 -->
+        <section class="pane" data-pane="config">
+          <div class="formgrid">
+            <label class="field"><span>云端地址</span>
+              <input type="text" id="cfgOnlineUrl" class="mono" placeholder="https://play.stellatrix.icu" /></label>
+            <label class="field"><span>后端端口 <em class="muted-2">(0 = 自动)</em></span>
+              <input type="number" id="cfgBackendPort" class="mono" min="0" max="65535" /></label>
+            <label class="field"><span>更新渠道</span>
+              <select id="cfgChannel"><option value="stable">stable</option><option value="beta">beta</option></select></label>
+            <label class="field check"><input type="checkbox" id="cfgAutoStart" /><span>「打开应用」时自动启动本地服务</span></label>
+          </div>
+          <button class="btn ghost xs" id="advToggle" style="margin-top:12px;">高级 ▾</button>
+          <label class="field" id="advBox" hidden style="margin-top:10px;"><span>额外环境变量 <em class="muted-2">(每行 KEY=VALUE)</em></span>
+            <textarea id="cfgExtraEnv" rows="3" class="mono" placeholder="EMBED_DIM=768"></textarea></label>
+          <div class="row" style="margin-top:14px;">
+            <button class="btn primary" id="saveCfgBtn">保存配置</button>
+            <button class="btn ghost" id="openDataDirBtn">打开数据目录</button>
+          </div>
+          <p class="muted-2 hint">LLM 的 API Key 在应用内「设置」里填(BYOK),不在此处。数据(存档/数据库)存于本机,卸载默认保留。</p>
+
+          <!-- 账号数据迁移 -->
+          <div class="section-divider">
+            <div class="block-head">账号数据迁移</div>
+            <p class="muted-2 hint" style="margin-top:0;">把剧本、存档、角色卡与偏好打包成单个 <span class="mono">.zip</span>。在线账号导出后可导入到本地部署。<span id="migGate" class="warn"></span></p>
+            <div class="migcards">
+              <div class="migcard">
+                <div class="migcard-h">导出账号数据</div>
+                <div class="migrow"><span class="muted">预计大小</span><span class="mono" id="exportSize">—</span></div>
+                <label class="field check small"><input type="checkbox" id="exportChunks" /><span>含对话切片(更大,更完整)</span></label>
+                <button class="btn" id="exportBtn" style="width:100%;">导出为 .zip</button>
+              </div>
+              <div class="migcard">
+                <div class="migcard-h">导入账号数据</div>
+                <div id="importIdle">
+                  <button class="btn dropzone" id="pickImportBtn">选择 .zip 文件…</button>
+                  <button class="btn primary" id="startImportBtn" style="width:100%;" disabled>开始导入</button>
+                </div>
+                <div id="importBusy" hidden>
+                  <div class="migrow"><span class="info" id="importStage">导入中…</span></div>
+                  <div class="progress indet"><div class="bar"></div></div>
+                  <p class="muted-2 hint" style="margin-top:8px;">多剧本账号串行恢复,可能数十秒到几分钟,请勿关闭。</p>
+                </div>
+                <div id="importDone" class="okbox" hidden><span class="dot ok"></span><span class="ok">导入完成</span><button class="btn ghost xs" id="importAgainBtn" style="margin-left:auto;">再导入</button></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 危险区:清除本地数据 -->
+          <div class="section-divider">
+            <div class="block-head danger">危险区</div>
+            <p class="muted-2 hint" style="margin-top:0;">清除本机全部存档与数据库(不可恢复)。建议先用上方「导出」备份。</p>
+            <button class="btn danger" id="wipeBtn">清除本地数据…</button>
+          </div>
+
+          <!-- 规划中 -->
+          <div class="section-divider">
+            <div class="block-head">规划中</div>
+            <div class="row planned">
+              <span class="pill">系统托盘</span><span class="pill">局域网访问</span><span class="pill">备份/恢复</span><span class="pill">诊断包导出</span><span class="pill">开机自启</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- 更新 -->
+        <section class="pane" data-pane="update">
+          <div class="row" style="justify-content:space-between;">
+            <span class="text-quiet">应用更新</span>
+            <span class="mono muted-2" id="updCurrent">当前 v— · stable</span>
+          </div>
+          <div class="row" style="margin-top:16px;">
+            <button class="btn" id="checkUpdBtn">检查更新</button>
+            <span class="muted hint" id="updText" style="margin:0;">—</span>
+            <button class="btn" id="downloadUpdBtn" hidden>下载更新</button>
+            <button class="btn primary" id="installUpdBtn" hidden>重启并安装</button>
+          </div>
+          <div class="progress" id="updProgress" hidden style="margin-top:14px;"><div class="bar" id="updBar"></div></div>
+        </section>
+
+        <!-- 反馈 -->
+        <section class="pane" data-pane="feedback">
+          <div id="fbForm">
+            <div class="warnbox"><span class="dot warn"></span><div>反馈渠道不得包含性、露骨、NSFW 或其他成人材料(无论是否年满 18)。违反将永久终止账号。详见 <a id="aupLink" class="warn pl-textlink" href="#" target="_blank" rel="noreferrer">AUP §2.J</a>。</div></div>
+            <textarea id="fbText" rows="3" placeholder="请描述您遇到的问题或建议…" style="width:100%;margin-top:14px;"></textarea>
+            <div id="fbErr" class="danger hint" hidden></div>
+            <input type="email" id="fbEmail" placeholder="邮箱(选填)" style="width:100%;margin-top:11px;" />
+            <p class="muted-2 hint">留邮箱,我们处理后把结果发给你。若与你的登录邮箱一致,将并入你的账户反馈记录。</p>
+            <label class="field check small"><input type="checkbox" id="fbAttach" checked /><span class="muted">附带运行环境信息(版本+系统,只发给管理员)</span></label>
+            <label class="field check small"><input type="checkbox" id="fbConsent" /><span class="muted">我已阅读 AUP §2.J,理解不得包含成人主题节选,同意(此操作记录我的同意)</span></label>
+            <div class="row" style="margin-top:16px;">
+              <button class="btn primary" id="fbSubmitBtn" disabled>提交反馈</button>
+              <span class="muted-2 hint" id="fbConsentHint" style="margin:0;">请先勾选同意以启用提交</span>
+            </div>
+          </div>
+          <div id="fbSuccess" class="okbox big" hidden>
+            <span class="dot ok"></span><span class="ok">已收到您的反馈,感谢!我们会在审核后处理。</span>
+            <button class="btn ghost xs" id="fbAgainBtn" style="margin-left:auto;">再提一条</button>
+          </div>
+          <div class="qqbox">
+            <div class="qq-h">玩家交流群</div>
+            <p class="muted hint" style="margin-top:4px;">遇到问题、想交流玩法,欢迎加入玩家 QQ 群(群号 <span class="mono text-quiet">584876566</span>)。</p>
+            <div class="qq-body">
+              <img src="assets/qq-group.jpg" alt="QQ 群二维码 584876566" class="qq-qr" />
+              <div class="qq-side">
+                <a class="btn" id="qqJoin" href="https://qm.qq.com/q/49Dqcr0aw0" target="_blank" rel="noreferrer">用 QQ 加入群聊 ↗</a>
+                <span class="muted-2 hint" style="margin:0;">或在 QQ 中搜索群号 584876566</span>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <!-- ===== 清除数据二次确认 ===== -->
+  <div id="wipeModal" class="modal" hidden>
+    <div class="modal-card">
+      <div class="modal-h danger">清除本地数据</div>
+      <p class="text-quiet">这会永久删除本机所有存档与数据库,且无法恢复。建议先导出备份。</p>
+      <p class="muted hint">确认请在下方输入 <span class="mono text-quiet">DELETE</span>:</p>
+      <input type="text" id="wipeConfirmInput" class="mono" placeholder="DELETE" style="width:100%;" />
+      <div class="row" style="justify-content:flex-end;margin-top:16px;">
+        <button class="btn ghost" id="wipeCancel">取消</button>
+        <button class="btn danger" id="wipeConfirm" disabled>永久删除</button>
+      </div>
     </div>
-  </header>
-
-  <main>
-    <!-- 模式 -->
-    <section class="card">
-      <div class="card-h">运行模式</div>
-      <div class="seg" id="modeSeg" role="tablist">
-        <button class="seg-btn" data-mode="online">在线(连云端)</button>
-        <button class="seg-btn" data-mode="local">本地部署</button>
-      </div>
-      <p class="hint" id="modeHint"></p>
-    </section>
-
-    <!-- 主操作 -->
-    <section class="card">
-      <div class="row">
-        <button class="btn primary big" id="openAppBtn">打开应用</button>
-        <button class="btn ghost" id="openExtBtn">在浏览器打开</button>
-      </div>
-      <!-- 本地模式服务控制 -->
-      <div id="localControls" class="local-controls">
-        <div class="row">
-          <button class="btn" id="startBtn">启动服务</button>
-          <button class="btn" id="stopBtn">停止</button>
-          <button class="btn" id="restartBtn">重启</button>
-        </div>
-        <div class="kv">
-          <div><span class="k">状态</span><span class="v" id="svDetail">—</span></div>
-          <div><span class="k">后端端口</span><span class="v" id="svBackendPort">—</span></div>
-          <div><span class="k">数据库端口</span><span class="v" id="svPgPort">—</span></div>
-        </div>
-      </div>
-    </section>
-
-    <!-- 日志 -->
-    <section class="card">
-      <div class="card-h">
-        日志
-        <div class="card-h-actions">
-          <button class="btn xs" id="clearLogBtn">清屏</button>
-          <button class="btn xs" id="openLogsDirBtn">打开日志目录</button>
-        </div>
-      </div>
-      <pre class="logpane" id="logPane"></pre>
-    </section>
-
-    <!-- 配置 -->
-    <details class="card">
-      <summary class="card-h">配置</summary>
-      <div class="form">
-        <label>云端地址(在线模式)
-          <input type="text" id="cfgOnlineUrl" placeholder="https://play.stellatrix.icu" />
-        </label>
-        <label>后端端口(0 = 自动)
-          <input type="number" id="cfgBackendPort" min="0" max="65535" />
-        </label>
-        <label>更新渠道
-          <select id="cfgChannel"><option value="stable">stable</option><option value="beta">beta</option></select>
-        </label>
-        <label class="check"><input type="checkbox" id="cfgAutoStart" /> 本地模式下「打开应用」时自动启动服务</label>
-        <label>额外环境变量(每行 KEY=VALUE,高级)
-          <textarea id="cfgExtraEnv" rows="4" placeholder="EMBED_DIM=768"></textarea>
-        </label>
-        <div class="row">
-          <button class="btn primary" id="saveCfgBtn">保存配置</button>
-          <button class="btn ghost" id="openDataDirBtn">打开数据目录</button>
-        </div>
-        <p class="hint">说明:LLM 的 API Key 在应用内「设置」里填(BYOK),不在此处。数据(存档/数据库)存于本机数据目录,卸载默认保留。</p>
-      </div>
-    </details>
-
-    <!-- 更新 -->
-    <section class="card">
-      <div class="card-h">更新</div>
-      <div class="row">
-        <button class="btn" id="checkUpdBtn">检查更新</button>
-        <span class="hint" id="updText">—</span>
-      </div>
-      <div class="updrow" id="updActions" hidden>
-        <button class="btn" id="downloadUpdBtn">下载更新</button>
-        <button class="btn primary" id="installUpdBtn" hidden>重启并安装</button>
-        <div class="progress" id="updProgress" hidden><div class="bar" id="updBar"></div></div>
-      </div>
-    </section>
-
-    <!-- 反馈 -->
-    <section class="card">
-      <div class="card-h">反馈问题</div>
-      <div class="form">
-        <label>问题描述
-          <textarea id="fbText" rows="3" placeholder="遇到的问题、建议…"></textarea>
-        </label>
-        <label>邮箱(选填,收处理结果)
-          <input type="email" id="fbEmail" placeholder="you@example.com" />
-        </label>
-        <p class="hint">留邮箱,我们处理后把结果发给你。若与你的登录邮箱一致,将并入你的账户反馈记录。</p>
-        <div class="row">
-          <button class="btn primary" id="fbSubmitBtn">提交反馈</button>
-          <span class="hint" id="fbStatus"></span>
-        </div>
-      </div>
-    </section>
-  </main>
+  </div>
 
   <script src="panel.js"></script>
 </body>

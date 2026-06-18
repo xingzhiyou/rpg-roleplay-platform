@@ -50,6 +50,12 @@ export default defineConfig(({ mode }) => {
   }
 
   return {
+    // 版本号注入:构建时把根 VERSION(经 APP_VERSION env 传入)编进前端,供反馈上报 app_version /
+    // 更新检查 / 关于页读取。单一真源 = 仓库根 VERSION 文件(scripts/bump_version.sh 维护)。
+    // build 命令前置 `APP_VERSION=$(cat ../VERSION)`;缺省退化 0.0.0-dev。
+    define: {
+      'window.__APP_VERSION__': JSON.stringify(process.env.APP_VERSION || '0.0.0-dev'),
+    },
     // jsxRuntime: 'classic' — 所有 JSX 文件已显式 import React,
     // classic runtime 用 React.createElement 替代 automatic 的 _jsx()。
     plugins: [react({ jsxRuntime: 'classic' }), spaHistoryFallbackPlugin()],

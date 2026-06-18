@@ -3,13 +3,20 @@
 All notable changes to RPG Roleplay are documented here.
 
 Format adapted from [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
-Version scheme: `0.x-waveN[.M]` where `wave` matches the in-repo development cadence (`feat: Wave 14.2 — ...`).
+Version scheme: **SemVer** `MAJOR.MINOR.PATCH[-channel.N][+build]` since `v0.5.0` (single source of truth: root `VERSION` file; bump via `scripts/bump_version.sh`). A new DB migration bumps at least MINOR. Historical `0.x-waveN` entries below are kept as-is.
 
 ---
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-06-18 (@ c12b37518)
+
+First SemVer release; baseline for desktop distribution + versioned releases.
+
 ### Added
+- Temporal knowledge-base (剧情体验升级): new games follow the source novel more faithfully, gate spoilers by reached-anchor frontier, and advance progress by confirmed anchors (no over-shoot). New-games-only via `RPG_TKB_*` flags; existing saves unaffected. Import pipeline auto-builds reveal anchors so any new script is spoiler-gated.
+- In-app update announcement: shown once on entry (reuses the disclaimer modal), never re-pops after seen, reopenable from the 使用须知 button.
+- Version single-source-of-truth: root `VERSION`, `__APP_VERSION__` injected into the frontend, `app_version` exposed on `/api/health`, carried on feedback submissions.
 - User feedback drawer history: users can see their submitted feedback and review status, including "adopted" acknowledgements after fixes are verified.
 - Admin feedback replies: administrators can answer feedback, and users can read those replies in their feedback history.
 

@@ -39,6 +39,13 @@ def retrieve_runtime_context(
         save = db.execute("select * from game_saves where id = %s", (save_id,)).fetchone()
         if not save:
             return ""
+        # P4(S2):元知识模式从 game_sessions.worldline 取(无则 none),供 reveal_clause_v2 前沿门控。
+        mode = "none"
+        sess = db.execute(
+            "select worldline from game_sessions where save_id=%s", (save_id,)
+        ).fetchone()
+        if sess and isinstance(sess.get("worldline"), dict):
+            mode = sess["worldline"].get("foreknowledge_mode") or "none"
         return retrieve_script_context(
             int(save["script_id"]),
             query,
@@ -48,6 +55,8 @@ def retrieve_runtime_context(
             user_id=user_id,
             db=db,
             progress_chapter=progress_chapter,
+            save_id=save_id,
+            mode=mode,
         )
 
 
@@ -61,6 +70,8 @@ def retrieve_script_context(
     user_id: int | None = None,
     db=None,
     progress_chapter: int | None = None,
+    save_id: int | None = None,
+    mode: str = "none",
 ) -> str:
     owns_connection = db is None
     if owns_connection:
@@ -137,6 +148,8 @@ def retrieve_script_context(
                 chapter_max=_entity_ceiling,
                 top_k_cards=3, top_k_wb=3,
                 user_id=user_id,
+                save_id=save_id,
+                mode=mode,
             )
             if ents.get("cards"):
                 lines = []

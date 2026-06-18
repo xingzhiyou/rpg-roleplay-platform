@@ -26,7 +26,7 @@ def resolve_world_view(
           这里返回活态层为主 + 规范世界线节点作为引导锚点(由 steering 单独取)。
     """
     canon_entities = canon_repo.read_canon_entities(
-        db, script_id, progress_chapter=progress_chapter, mode=mode
+        db, script_id, progress_chapter=progress_chapter, mode=mode, save_id=save_id
     )
     live = live_repo.live_world_view(db, save_id, commit_id)
 

@@ -61,7 +61,8 @@ def _save_ctx(db, save_id: int, user_id: int) -> dict | None:
     from platform_app.knowledge._pin import effective_kb_script_id
     return {"script_id": effective_kb_script_id(db, row["script_id"]),
             "commit_id": row["active_commit_id"],
-            "progress_chapter": progress, "mode": mode}
+            "progress_chapter": progress, "mode": mode,
+            "save_id": int(save_id)}  # P4:供 reveal_clause_v2 前沿门控(flag off 时不生效)
 
 
 def _int(v):
@@ -92,12 +93,13 @@ def _t_lookup_entity(user_id: int, args: dict) -> str:
                     break
         canon = canon_repo.lookup_canon_entity(
             db, ctx["script_id"], name,
-            progress_chapter=ctx["progress_chapter"], mode=ctx["mode"],
+            progress_chapter=ctx["progress_chapter"], mode=ctx["mode"], save_id=ctx["save_id"],
         )
         if not live and not canon:
             # 按 name 模糊找规范
             cands = canon_repo.read_canon_entities(
-                db, ctx["script_id"], progress_chapter=ctx["progress_chapter"], mode=ctx["mode"], limit=200)
+                db, ctx["script_id"], progress_chapter=ctx["progress_chapter"], mode=ctx["mode"],
+                limit=200, save_id=ctx["save_id"])
             canon = next((c for c in cands if c["name"] == name or name in (c.get("aliases") or [])), None)
         if not live and not canon:
             return f"未找到实体「{name}」(可能尚未在当前进度揭示)"

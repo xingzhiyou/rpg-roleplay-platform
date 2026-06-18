@@ -82,12 +82,16 @@ def _active_worldbook(
     state,
     script_id: int | None = None,
     book_id: int | None = None,
+    save_id: int | None = None,
+    mode: str = "omniscient",
 ) -> list[dict[str, Any]]:
     # 先取 DB worldbook 条目；为空时回退 JSON 内置条目
+    # P4(S4):save_id+mode 透传给 _load_worldbook_db 做前沿门控(flag off 时无门控,行为不变)。
     entries: list[dict[str, Any]] = []
     if script_id or book_id:
         try:
-            entries = _load_worldbook_db(script_id=script_id, book_id=book_id)
+            entries = _load_worldbook_db(script_id=script_id, book_id=book_id,
+                                         save_id=save_id, mode=mode)
         except Exception:
             entries = []
     if not entries:

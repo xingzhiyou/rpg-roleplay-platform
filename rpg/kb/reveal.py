@@ -11,15 +11,47 @@ P1(本文件):确定性 ETL,把剧本的 chapter_facts.events 物化成 reveal_a
 """
 from __future__ import annotations
 
+import logging
+import os
 from typing import Any
 
 from psycopg.types.json import Jsonb
 
 from platform_app.db import connect, init_db
 
+log = logging.getLogger("kb.reveal")
+
 _MIN_SUMMARY_LEN = 6
 _MIN_IMPORTANCE = 40
 _DEFAULT_MAY_VARY = ["地点", "触发时机", "旁观者"]
+
+_TRUTHY = ("1", "true", "on", "yes")
+
+
+def _frontier_on(save_id: int | None = None) -> bool:
+    """P4 前沿门控总闸。RPG_TKB_FRONTIER 默认 off;若设了 RPG_TKB_FRONTIER_SAVES(逗号分隔
+    save_id 白名单)则只对名单内的存档生效(按 save 灰度)。供各收口点统一判定走新/旧路径。"""
+    if os.environ.get("RPG_TKB_FRONTIER", "off").strip().lower() not in _TRUTHY:
+        return False
+    saves = os.environ.get("RPG_TKB_FRONTIER_SAVES", "").strip()
+    if saves and save_id is not None:
+        allow = {s.strip() for s in saves.split(",") if s.strip()}
+        return str(int(save_id)) in allow
+    return True
+
+
+def _frontier_shadow() -> bool:
+    """影子比对开关。RPG_TKB_FRONTIER_SHADOW 默认 off。on 时各收口点同回合跑新旧两套门控、
+    diff 落日志,但绝不改返回值(返回的始终是生效路径的结果)。"""
+    return os.environ.get("RPG_TKB_FRONTIER_SHADOW", "off").strip().lower() in _TRUTHY
+
+
+def _shadow_diff_log(tag: str, old_ids: set, new_ids: set) -> None:
+    """各收口点共用的影子比对日志器:新旧门控结果集相等则静默,否则 warning(只列前 20 条差异)。"""
+    if old_ids == new_ids:
+        return
+    log.warning("[shadow] %s diff: old_only=%s new_only=%s",
+                tag, sorted(old_ids - new_ids)[:20], sorted(new_ids - old_ids)[:20])
 
 
 def _collect_anchor_rows(facts: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -178,18 +210,20 @@ def seed_frontier(save_id: int) -> dict[str, Any]:
 
 
 def mark_anchor_reached(save_id: int, anchor_key: str, *, turn: int | None = None,
-                        via: str = "gm", drift: float = 0.0) -> dict[str, Any]:
-    """P4:把一条锚点加入前沿(GM 声明到达)+ 增量并入可见集。前沿只增不减(回退走 rewind)。"""
-    init_db()
+                        via: str = "gm", drift: float = 0.0, db=None) -> dict[str, Any]:
+    """P4:把一条锚点加入前沿(GM 声明到达)+ 增量并入可见集。前沿只增不减(回退走 rewind)。
+    db 非 None 时复用传入的事务连接(供 anchor_reconcile / GM 工具同连接原子写,避免锁竞争);
+    db=None 时自开连接(维持旧调用方行为)。"""
     sid = int(save_id)
     key = (anchor_key or "").strip()
     if not key:
         return {"ok": False, "reason": "anchor_key 为空"}
-    with connect() as db:
-        scr = _script_id_for_save(db, sid)
+
+    def _do(_db) -> dict[str, Any]:
+        scr = _script_id_for_save(_db, sid)
         if not scr:
             return {"ok": False, "reason": f"save {sid} 无 script_id"}
-        db.execute(
+        _db.execute(
             """
             insert into save_reveal_frontier (save_id, script_id, anchor_key, reached_at_turn,
                                               reached_via, drift_score, worldline_key)
@@ -199,8 +233,14 @@ def mark_anchor_reached(save_id: int, anchor_key: str, *, turn: int | None = Non
             """,
             (sid, scr, key, turn, via, drift, scr, key),
         )
-        visible = recompute_visible_set(db, sid, scr)
-    return {"ok": True, "save_id": sid, "anchor_key": key, "visible": visible}
+        visible = recompute_visible_set(_db, sid, scr)
+        return {"ok": True, "save_id": sid, "anchor_key": key, "visible": visible}
+
+    if db is not None:
+        return _do(db)
+    init_db()
+    with connect() as db2:
+        return _do(db2)
 
 
 def derived_progress_chapter(save_id: int, *, db=None) -> int:
@@ -270,16 +310,20 @@ def backfill_entity_reveal_anchors(script_id: int) -> dict[str, Any]:
     return {"ok": True, "script_id": sid, "mapped": out, "total": sum(out.values())}
 
 
-def reveal_clause_v2(save_id: int, mode: str = "none", prefix: str = "") -> tuple[str, list[Any]]:
+def reveal_clause_v2(save_id: int, mode: str = "none", prefix: str = "",
+                     has_public_knowledge: bool = True) -> tuple[str, list[Any]]:
     """收口剧透门控(替代标量 _reveal_clause)。返回 (SQL 片段, 参数列表)。
     节点可见 ⇔ 无揭示锚点(NULL) 或 其锚点在 save_visible_anchors。partial 再放行 public_knowledge。
-    调用方把片段嵌进 WHERE 并按顺序传参。reveal_anchor_key 列名前缀由 prefix 指定(如 'cc.')。"""
+    调用方把片段嵌进 WHERE 并按顺序传参。reveal_anchor_key 列名前缀由 prefix 指定(如 'cc.')。
+
+    has_public_knowledge:目标表是否有 public_knowledge 列。仅 kb_canon_entities 有(默认 True);
+      character_cards / worldbook_entries 没有该列 → 传 False,partial 模式不附加该子句(否则 SQL 报错)。"""
     p = prefix or ""
     m = (mode or "none").strip().lower()
     if m == "omniscient":
         return "true", []
     base = (f"({p}reveal_anchor_key is null or {p}reveal_anchor_key in "
             f"(select anchor_key from save_visible_anchors where save_id=%s))")
-    if m == "partial":
+    if m == "partial" and has_public_knowledge:
         return f"({base} or {p}public_knowledge)", [int(save_id)]
     return base, [int(save_id)]

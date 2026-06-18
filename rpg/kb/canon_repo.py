@@ -81,33 +81,74 @@ def upsert_canon_entity(db, script_id: int, logical_key: str, *, name: str, type
 
 def read_canon_entities(db, script_id: int, *, progress_chapter: int | None = None,
                         mode: ForeknowledgeMode = "none", entity_type: str | None = None,
-                        limit: int | None = None) -> list[dict]:
+                        limit: int | None = None, save_id: int | None = None) -> list[dict]:
     from platform_app.knowledge._pin import effective_kb_script_id
     script_id = effective_kb_script_id(db, script_id)  # pin 重定向(纯读)
     cols = ", ".join(_CANON_COLS)
-    clause, params = _reveal_clause(progress_chapter, mode)
-    sql = f"select {cols} from kb_canon_entities where script_id = %s and {clause}"
-    args: list = [script_id, *params]
-    if entity_type:
-        sql += " and type = %s"
-        args.append(entity_type)
-    sql += " order by importance desc, logical_key"
-    if limit:
-        sql += " limit %s"
-        args.append(limit)
-    return db.execute(sql, tuple(args)).fetchall()
+
+    # P4(S1):flag on 且有 save_id → 用前沿门控(reveal_clause_v2);否则旧标量门控。
+    from kb.reveal import _frontier_on, _frontier_shadow, _shadow_diff_log, reveal_clause_v2
+    use_v2 = save_id is not None and _frontier_on(save_id)
+    if use_v2:
+        clause, params = reveal_clause_v2(int(save_id), mode, prefix="")
+    else:
+        clause, params = _reveal_clause(progress_chapter, mode)
+
+    def _build(_clause: str, _params: list, *, key_only: bool = False) -> tuple[str, tuple]:
+        sel = "logical_key" if key_only else cols
+        s = f"select {sel} from kb_canon_entities where script_id = %s and {_clause}"
+        a: list = [script_id, *_params]
+        if entity_type:
+            s += " and type = %s"; a.append(entity_type)
+        if not key_only:
+            s += " order by importance desc, logical_key"
+            if limit:
+                s += " limit %s"; a.append(limit)
+        return s, tuple(a)
+
+    sql, args = _build(clause, params)
+    rows = db.execute(sql, args).fetchall()
+
+    # 影子比对:同连接跑另一套门控,diff 落日志,不改返回值。
+    if _frontier_shadow() and save_id is not None:
+        if use_v2:
+            oc, op = _reveal_clause(progress_chapter, mode)
+        else:
+            oc, op = reveal_clause_v2(int(save_id), mode, prefix="")
+        ssql, sargs = _build(oc, op, key_only=True)
+        shadow_ids = {r["logical_key"] for r in db.execute(ssql, sargs).fetchall()}
+        _shadow_diff_log("canon read", {r["logical_key"] for r in rows}, shadow_ids)
+    return rows
 
 
 def lookup_canon_entity(db, script_id: int, logical_key: str, *, progress_chapter: int | None = None,
-                        mode: ForeknowledgeMode = "none") -> dict | None:
+                        mode: ForeknowledgeMode = "none", save_id: int | None = None) -> dict | None:
     from platform_app.knowledge._pin import effective_kb_script_id
     script_id = effective_kb_script_id(db, script_id)  # pin 重定向(纯读)
-    clause, params = _reveal_clause(progress_chapter, mode)
-    row = db.execute(
-        f"select {', '.join(_CANON_COLS)} from kb_canon_entities "
-        f"where script_id=%s and logical_key=%s and {clause}",
-        (script_id, logical_key, *params),
-    ).fetchone()
+
+    from kb.reveal import _frontier_on, _frontier_shadow, _shadow_diff_log, reveal_clause_v2
+    use_v2 = save_id is not None and _frontier_on(save_id)
+    if use_v2:
+        clause, params = reveal_clause_v2(int(save_id), mode, prefix="")
+    else:
+        clause, params = _reveal_clause(progress_chapter, mode)
+
+    def _run(_clause: str, _params: list):
+        return db.execute(
+            f"select {', '.join(_CANON_COLS)} from kb_canon_entities "
+            f"where script_id=%s and logical_key=%s and {_clause}",
+            (script_id, logical_key, *_params),
+        ).fetchone()
+
+    row = _run(clause, params)
+    if _frontier_shadow() and save_id is not None:
+        if use_v2:
+            oc, op = _reveal_clause(progress_chapter, mode)
+        else:
+            oc, op = reveal_clause_v2(int(save_id), mode, prefix="")
+        srow = _run(oc, op)
+        _shadow_diff_log(
+            "canon lookup", {logical_key} if row else set(), {logical_key} if srow else set())
     return row
 
 

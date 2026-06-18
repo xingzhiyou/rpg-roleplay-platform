@@ -180,6 +180,8 @@ def _search_entities(
     top_k_cards: int = 3,
     top_k_wb: int = 3,
     user_id: int | None = None,
+    save_id: int | None = None,
+    mode: str = "none",
 ) -> dict[str, list[dict[str, Any]]]:
     """task 51/52: LightRAG 双层检索的第二层 — entity 层。
 
@@ -204,10 +206,33 @@ def _search_entities(
     if not vec:
         return out  # 没 embedding 跑不动,自动跳过
 
+    # P4(S2):门控有两套。旧=标量 `first_revealed_chapter <= chapter_max`(2 个 chapter_max 占位符);
+    # 新=前沿 reveal_clause_v2(save_id)(1 个 save_id 占位符)。用 *gate_params 展开自动适配占位符个数。
+    from kb.reveal import _frontier_on, _frontier_shadow, _shadow_diff_log, reveal_clause_v2
+    use_v2 = save_id is not None and _frontier_on(save_id)
+    _OLD_GATE = "(%s::integer is null or first_revealed_chapter <= %s)"
+    if use_v2:
+        gate_sql, gate_params = reveal_clause_v2(int(save_id), mode, prefix="", has_public_knowledge=False)
+    else:
+        gate_sql, gate_params = _OLD_GATE, [chapter_max, chapter_max]
+
+    def _gate_ids(table: str, extra: str, g: str, p: list) -> set:
+        """某门控放行的全集 id(不带 vector/limit),供影子比对隔离纯门控差异。"""
+        return {r["id"] for r in db.execute(
+            f"select id from {table} where script_id=%s and embedding_vec is not null{extra} and {g}",
+            (script_id, *p)).fetchall()}
+
+    def _shadow(table: str, extra: str, tag: str) -> None:
+        """对比旧标量门控 vs 新前沿门控的放行全集(与 vector 排序/limit 无关)。"""
+        old_g, old_p = _OLD_GATE, [chapter_max, chapter_max]
+        new_g, new_p = reveal_clause_v2(int(save_id), mode, prefix="", has_public_knowledge=False)
+        _shadow_diff_log(tag, _gate_ids(table, extra, old_g, old_p),
+                         _gate_ids(table, extra, new_g, new_p))
+
     if _vector_column_exists(db, "character_cards"):
         try:
             out["cards"] = db.execute(
-                """
+                f"""
                 select id, name, identity, personality, appearance,
                        first_revealed_chapter,
                        (1 - (embedding_vec <=> %s::vector)) as score
@@ -215,37 +240,35 @@ def _search_entities(
                 where script_id = %s
                   and embedding_vec is not null
                   and enabled = true
-                  -- BUG-1: 时间线硬过滤,GM 不该看到玩家还没读到的章节里的角色。
-                  -- chapter_max is null 仅出现在管理/编辑器视角(无进度上下文);
-                  -- 线上回合一定带 progress 钳定的 chapter_max,故 NULL 收紧。
-                  and (%s::integer is null
-                       or first_revealed_chapter <= %s)
+                  -- BUG-1/P4: 时间线硬过滤,GM 不该看到玩家还没读到的章节里的角色。
+                  and {gate_sql}
                 order by embedding_vec <=> %s::vector
                 limit %s
                 """,
-                (vec, script_id, chapter_max, chapter_max, vec,
-                 max(1, min(top_k_cards, 8))),
+                (vec, script_id, *gate_params, vec, max(1, min(top_k_cards, 8))),
             ).fetchall()
+            if _frontier_shadow() and save_id is not None:
+                _shadow("character_cards", " and enabled = true", "_search cards")
         except Exception:
             pass
 
     if _vector_column_exists(db, "worldbook_entries"):
         try:
             out["worldbook"] = db.execute(
-                """
+                f"""
                 select id, title, content, first_revealed_chapter,
                        (1 - (embedding_vec <=> %s::vector)) as score
                 from worldbook_entries
                 where script_id = %s
                   and embedding_vec is not null
-                  and (%s::integer is null
-                       or first_revealed_chapter <= %s)
+                  and {gate_sql}
                 order by embedding_vec <=> %s::vector
                 limit %s
                 """,
-                (vec, script_id, chapter_max, chapter_max, vec,
-                 max(1, min(top_k_wb, 8))),
+                (vec, script_id, *gate_params, vec, max(1, min(top_k_wb, 8))),
             ).fetchall()
+            if _frontier_shadow() and save_id is not None:
+                _shadow("worldbook_entries", "", "_search worldbook")
         except Exception:
             pass
 

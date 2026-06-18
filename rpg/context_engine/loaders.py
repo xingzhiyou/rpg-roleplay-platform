@@ -34,7 +34,8 @@ def _safe_load_chars(script_id, book_id, manifest,
 
 def _load_characters(script_id: int | None = None, book_id: int | None = None,
                      progress_chapter: int | None = None,
-                     foreknowledge_mode: str = "omniscient") -> dict[str, Any]:
+                     foreknowledge_mode: str = "omniscient",
+                     save_id: int | None = None) -> dict[str, Any]:
     """task 80: 通用底座 — 优先从 DB character_cards 取。
     传了 script_id/book_id 表示指定剧本: DB 空就返 {} (不要回退 JSON,
     那是单一书的固化数据,会污染其它剧本)。
@@ -49,7 +50,8 @@ def _load_characters(script_id: int | None = None, book_id: int | None = None,
         try:
             return _load_characters_db(script_id=script_id, book_id=book_id,
                                        progress_chapter=progress_chapter,
-                                       foreknowledge_mode=foreknowledge_mode) or {}
+                                       foreknowledge_mode=foreknowledge_mode,
+                                       save_id=save_id) or {}
         except Exception:
             return {}
     try:
@@ -61,7 +63,8 @@ def _load_characters(script_id: int | None = None, book_id: int | None = None,
 
 def _load_characters_db(script_id: int | None, book_id: int | None,
                         progress_chapter: int | None = None,
-                        foreknowledge_mode: str = "omniscient") -> dict[str, Any]:
+                        foreknowledge_mode: str = "omniscient",
+                        save_id: int | None = None) -> dict[str, Any]:
     """从 character_cards 表读取该 script/book 启用的角色卡，转成 JSON 风格 dict。
 
     进度感知角色卡 Phase 1B — reveal 闸(防剧透,确定性):
@@ -84,12 +87,27 @@ def _load_characters_db(script_id: int | None, book_id: int | None,
     #   none    : first_revealed_chapter <= progress(严格)
     #   partial : <= progress + 近未来缓冲(穿越者模糊预知,温和放宽,参 canon_repo partial 语义)
     mode = (foreknowledge_mode or "omniscient").lower()
-    if mode != "omniscient" and progress_chapter is not None:
-        ceiling = int(progress_chapter)
-        if mode == "partial":
-            ceiling += _PARTIAL_LOOKAHEAD_CHAPTERS
-        where_clauses.append("(first_revealed_chapter <= %s or first_revealed_chapter = 0)")
-        params.append(ceiling)
+    base_where, base_params = list(where_clauses), list(params)  # reveal 之前的 base 过滤(影子比对用)
+
+    # P4(S3):reveal 闸两套。旧=标量 first_revealed_chapter<=ceiling;新=前沿 reveal_clause_v2(save_id)。
+    from kb.reveal import _frontier_on, _frontier_shadow, _shadow_diff_log, reveal_clause_v2
+
+    def _old_reveal() -> tuple[str | None, list]:
+        if mode != "omniscient" and progress_chapter is not None:
+            ceiling = int(progress_chapter)
+            if mode == "partial":
+                ceiling += _PARTIAL_LOOKAHEAD_CHAPTERS
+            return "(first_revealed_chapter <= %s or first_revealed_chapter = 0)", [ceiling]
+        return None, []
+
+    use_v2 = save_id is not None and _frontier_on(save_id) and mode != "omniscient"
+    if use_v2:
+        rc, rcp = reveal_clause_v2(int(save_id), mode, prefix="", has_public_knowledge=False)
+        where_clauses.append(rc); params.extend(rcp)
+    else:
+        rc, rcp = _old_reveal()
+        if rc:
+            where_clauses.append(rc); params.extend(rcp)
     # v28: 显式补 card_type='npc' 过滤(PC/persona 不应进 GM 检索池);
     # 加 full_name / background / first_revealed_chapter — background 是 v28 核心新增
     # 给 GM context 看角色前史/出身/动机,first_revealed_chapter 是进度感知 reveal 闸的依据。
@@ -103,6 +121,17 @@ def _load_characters_db(script_id: int | None, book_id: int | None,
     )
     with connect() as db:
         rows = db.execute(sql, params).fetchall()
+        # 影子比对:旧 vs 新 reveal 放行的 name 集合(同 base 过滤),diff 落日志,不改返回。
+        if (_frontier_shadow() and save_id is not None and mode != "omniscient"
+                and progress_chapter is not None):
+            def _names(_rc, _rcp):
+                wc = base_where + ([_rc] if _rc else [])
+                s = ("select name from character_cards where " + " and ".join(wc)
+                     + " and card_type = 'npc'")
+                return {r["name"] for r in db.execute(s, base_params + list(_rcp)).fetchall()}
+            o_rc, o_rcp = _old_reveal()
+            n_rc, n_rcp = reveal_clause_v2(int(save_id), mode, prefix="", has_public_knowledge=False)
+            _shadow_diff_log("load_characters", _names(o_rc, o_rcp), _names(n_rc, n_rcp))
     out: dict[str, Any] = {}
     for r in rows:
         out[r["name"]] = {
@@ -125,8 +154,13 @@ def _load_characters_db(script_id: int | None, book_id: int | None,
     return out
 
 
-def _load_worldbook_db(script_id: int | None, book_id: int | None) -> list[dict[str, Any]]:
-    """从 worldbook_entries 取启用条目；返回 _worldbook_entries 风格的 list。"""
+def _load_worldbook_db(script_id: int | None, book_id: int | None,
+                       save_id: int | None = None, mode: str = "omniscient") -> list[dict[str, Any]]:
+    """从 worldbook_entries 取启用条目；返回 _worldbook_entries 风格的 list。
+
+    P4(S4):世界书此前【无】进度门控(门控缺口)——所有启用条目对任何进度等价可见。flag on 时
+    按前沿门控(reveal_clause_v2)挡掉当前进度尚未揭示的条目。注意这是【新增】门控,非等价替换:
+    影子比对的 diff = 被新门控挡掉的未来条目(预期非空,人工核实皆为未揭示剧透即正确)。"""
     from platform_app.db import connect
     where_clauses = ["enabled = true"]
     params: list[Any] = []
@@ -136,6 +170,15 @@ def _load_worldbook_db(script_id: int | None, book_id: int | None) -> list[dict[
     elif book_id:
         where_clauses.append("book_id = %s")
         params.append(int(book_id))
+    base_where, base_params = list(where_clauses), list(params)  # 门控之前(影子比对用)
+
+    from kb.reveal import _frontier_on, _frontier_shadow, _shadow_diff_log, reveal_clause_v2
+    m = (mode or "omniscient").lower()
+    use_v2 = save_id is not None and _frontier_on(save_id) and m != "omniscient"
+    if use_v2:
+        rc, rcp = reveal_clause_v2(int(save_id), m, prefix="", has_public_knowledge=False)
+        where_clauses.append(rc); params.extend(rcp)
+
     sql = (
         "select id, title, content, keys, regex_keys, priority, token_budget "
         "from worldbook_entries where " + " and ".join(where_clauses) +
@@ -143,6 +186,16 @@ def _load_worldbook_db(script_id: int | None, book_id: int | None) -> list[dict[
     )
     with connect() as db:
         rows = db.execute(sql, params).fetchall()
+        # 影子比对:旧(无门控全集) vs 新(前沿过滤)。预期 new_only 为空、old_only=被挡的未来条目。
+        if _frontier_shadow() and save_id is not None and m != "omniscient":
+            old_ids = {r["id"] for r in db.execute(
+                "select id from worldbook_entries where " + " and ".join(base_where),
+                base_params).fetchall()}
+            n_rc, n_rcp = reveal_clause_v2(int(save_id), m, prefix="", has_public_knowledge=False)
+            new_ids = {r["id"] for r in db.execute(
+                "select id from worldbook_entries where " + " and ".join(base_where + [n_rc]),
+                base_params + list(n_rcp)).fetchall()}
+            _shadow_diff_log("worldbook GATE-NEW(挡未揭示条目预期)", old_ids, new_ids)
     out = []
     for r in rows:
         out.append({

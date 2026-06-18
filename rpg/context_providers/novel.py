@@ -338,6 +338,7 @@ class NovelCharactersProvider(ContextProvider):
             chars = _load_characters(
                 script_id=services.script_id, book_id=services.book_id,
                 progress_chapter=progress_chapter, foreknowledge_mode=foreknowledge_mode,
+                save_id=services.save_id,  # P4(S3):前沿门控(flag off 时不生效)
             )
             # Phase 2 方案 C 运行时投影:把单态卡的易剧透字段(identity/current_status/
             # background/关系)替换/补充为「玩家当前进度下的态」(敌→友逐章演进)。
@@ -444,9 +445,12 @@ class NovelWorldbookProvider(ContextProvider):
                 data.get("player", {}).get("current_location", ""),
                 data.get("world", {}).get("time", ""),
             ])
+            # P4(S4):读进度+元知识,供世界书前沿门控(flag off 时 _active_worldbook 不门控,行为不变)。
+            _progress, _mode = _read_progress_and_mode(state, services.save_id)
             entries = _active_worldbook(scan_text, world, state,
                                         script_id=services.script_id,
-                                        book_id=services.book_id)
+                                        book_id=services.book_id,
+                                        save_id=services.save_id, mode=_mode)
         except Exception as exc:
             return ContextContribution(
                 provider_id=self.id, applied=False,

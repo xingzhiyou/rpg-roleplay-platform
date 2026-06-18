@@ -434,6 +434,7 @@ def retrieve_context(user_input: str, verbose: bool = False, state=None, user_id
     # jsonb 读(与 foreknowledge_mode 同源)。rail 档下,下方「锚点章节原文」会确定性注入当前
     # 进度章节的原著正文(含对话)并指示忠实重现;guided/free 维持活世界默认(原文仅作风格参考)。
     _steering_strength: str = "guided"
+    _save_id_prog: int | None = None  # P4(S5):前沿门控需要;在进度同步块里赋值,此处先兜底防 NameError
     # task 117: 算法 phase fallback — 当 state.world.time 空(turn=0 等)时 timeline_filter
     # 拿不到 chapter window,从 phase_digests 拿该 save 当前 phase 的 chapter_range。
     # 这样 BM25/worldbook 不会全文检索整本书。
@@ -763,8 +764,16 @@ def retrieve_context(user_input: str, verbose: bool = False, state=None, user_id
                 # 复用 canon_repo._reveal_clause(与 Phase D 同语义,单一真源):
                 #   CTE 实体用裸列;parent self-join 用 p. 前缀,防"早章子实体的后期父势力名"泄漏
                 #   (父若未揭示 → join 不命中 → 该实体退化为顶级独立项,不显示父名)。
-                _rc, _rc_p = _rc_fn(_progress_chapter, _foreknowledge_mode)
-                _rc_par, _rc_par_p = _rc_fn(_progress_chapter, _foreknowledge_mode, prefix="p.")
+                # P4(S5):flag on 且有 save_id → 前沿门控(占位符个数不变:标量章号 → save_id)。
+                from kb.reveal import (_frontier_on, _frontier_shadow, _shadow_diff_log,
+                                       reveal_clause_v2 as _rc_v2)
+                _use_v2_tree = bool(_save_id_prog) and _frontier_on(_save_id_prog)
+                if _use_v2_tree:
+                    _rc, _rc_p = _rc_v2(int(_save_id_prog), _foreknowledge_mode, prefix="")
+                    _rc_par, _rc_par_p = _rc_v2(int(_save_id_prog), _foreknowledge_mode, prefix="p.")
+                else:
+                    _rc, _rc_p = _rc_fn(_progress_chapter, _foreknowledge_mode)
+                    _rc_par, _rc_par_p = _rc_fn(_progress_chapter, _foreknowledge_mode, prefix="p.")
                 with _connect_tree() as _db_tree:
                     # 拉前 25 个 importance 最高的有 parent_logical_key 的实体 + 它们的 parent
                     # 再拉前 8 个无 parent 但有 children 的顶级 entity
@@ -791,6 +800,18 @@ def retrieve_context(user_input: str, verbose: bool = False, state=None, user_id
                         """,
                         (script_id, *_rc_p, script_id, *_rc_par_p),
                     ).fetchall()
+                    # 影子比对:top_entities 在旧 vs 新门控下放行的 logical_key 集合(隔离主剧透面)。
+                    if _frontier_shadow() and _save_id_prog:
+                        _top_sql = ("select logical_key from kb_canon_entities where script_id=%s "
+                                    "and type in ('faction','location','concept') and entity_subtype != '' "
+                                    "and {clause} order by importance desc limit 60")
+                        _o_rc, _o_p = _rc_fn(_progress_chapter, _foreknowledge_mode)
+                        _n_rc, _n_p = _rc_v2(int(_save_id_prog), _foreknowledge_mode, prefix="")
+                        _old_keys = {r["logical_key"] for r in _db_tree.execute(
+                            _top_sql.format(clause=_o_rc), (script_id, *_o_p)).fetchall()}
+                        _new_keys = {r["logical_key"] for r in _db_tree.execute(
+                            _top_sql.format(clause=_n_rc), (script_id, *_n_p)).fetchall()}
+                        _shadow_diff_log("hierarchy top_entities", _old_keys, _new_keys)
                 if rows:
                     # 建邻接:parent_lk → [(name, subtype, importance), ...]
                     by_parent: dict[str, list[dict]] = {}

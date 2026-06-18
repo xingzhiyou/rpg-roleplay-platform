@@ -25,8 +25,9 @@ jobs:
       matrix:
         include:
           - { os: macos-14, platform: mac, arch: arm64 }
-          - { os: macos-13, platform: mac, arch: x64 }
           - { os: windows-latest, platform: win, arch: x64 }
+          # Intel mac(macos-13)暂不构建:GitHub Intel runner 稀缺、常排队卡死;
+          # arm64 覆盖绝大多数在用 Mac。需要 x64 mac 时再加回 { os: macos-13, platform: mac, arch: x64 }。
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4

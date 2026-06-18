@@ -57,6 +57,7 @@ const STR = {
     'update.notes': '更新日志', 'update.checking': '检查中…', 'update.none': '已是最新版本',
     // 反馈
     'feedback.replies': '我的反馈 / 回执', 'feedback.submit': '提交反馈', 'feedback.again': '再提一条',
+    'logs.clear': '清屏', 'logs.open_dir': '打开日志目录', 'logs.report': '看到报错?提交反馈', 'logs.report_prefill': '遇到问题,最近日志:',
   },
   'en': {
     'common.save': 'Save', 'common.cancel': 'Cancel', 'common.refresh': 'Refresh',

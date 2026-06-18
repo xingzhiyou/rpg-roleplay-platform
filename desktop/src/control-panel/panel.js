@@ -443,6 +443,12 @@ async function init() {
   // logs
   $('clearLogBtn').addEventListener('click', () => { logPane.innerHTML = ''; logCount = 0; });
   $('openLogsDirBtn').addEventListener('click', () => sv.openLogsDir());
+  // 日志里快速提交反馈:把最近错误行带进反馈表单(本地反馈会附带环境信息上报服务器)。
+  if ($('logFeedbackBtn')) $('logFeedbackBtn').addEventListener('click', () => {
+    const errs = [...logPane.querySelectorAll('.le')].slice(-6).map((e) => e.textContent).join('\n');
+    switchTab('feedback');
+    if (errs && $('fbText') && !$('fbText').value.trim()) { $('fbText').value = t('logs.report_prefill') + '\n' + errs; fbValidate(); }
+  });
 
   // backup
   $('exportBtn').addEventListener('click', async () => { $('exportBtn').disabled = true; await sv.accountExport($('exportChunks').checked); $('exportBtn').disabled = false; });

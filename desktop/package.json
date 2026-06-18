@@ -80,7 +80,7 @@
     "publish": [
       {
         "provider": "github",
-        "owner": "REPLACE_GH_OWNER",
+        "owner": "felixchaos",
         "repo": "rpg-roleplay-platform",
         "releaseType": "release",
         "//": "发布到开源仓 GitHub Releases;electron-builder 自动生成 latest-mac.yml / latest.yml 更新 feed。owner 待填(开源仓所有者),CI 用 GH_TOKEN 鉴权。"

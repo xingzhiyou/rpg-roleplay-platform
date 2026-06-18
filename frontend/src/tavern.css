@@ -248,7 +248,7 @@
   border-radius: 22px;
   box-shadow: 0 2px 18px -4px rgba(0, 0, 0, 0.28);
 }
-.tavern-chat .gc-composer .gc-textarea { padding: 14px 16px 4px; }
+.tavern-chat .gc-composer .gc-textarea { padding: 10px 16}
 
 /* ── 两张卡抽屉 ──────────────────────────────────────────────────── */
 .tv-drawer-backdrop {

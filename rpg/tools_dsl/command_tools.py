@@ -193,13 +193,16 @@ COMMAND_TOOLS: list[dict[str, Any]] = [
     },
     {
         "name": "set_relationship",
-        "description": '设置玩家与某 NPC 的关系状态。用户写"NPC关系=信任"/"X对我警惕"等用这个工具。',
+        "description": (
+            '设置玩家与某 NPC 的关系状态。用户写"NPC关系=信任"/"X对我警惕"等用这个工具。\n'
+            "示例: set_relationship(character=\"迷迭香\", status=\"亲近\")"
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
-                "character": {"type": "string", "description": "NPC 名字"},
+                "character": {"type": "string", "description": "NPC 名字(字段名是 character,不是 npc_name)"},
                 "status": {"type": "string",
-                           "description": "关系状态描述,如 '信任/警惕/敌意/亲近/紧张/疏离'"},
+                           "description": "关系状态描述(字段名是 status,不是 status_label),如 '信任/警惕/敌意/亲近/紧张/疏离'"},
             },
             "required": ["character", "status"],
         },

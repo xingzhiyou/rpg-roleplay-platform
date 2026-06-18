@@ -601,6 +601,13 @@ export default function TavernPage() {
     startRun(t2);
   }, [running, lastPlayerText, history, startRun]);
 
+  // 监听 MsgActions 派发的 rpg-regenerate 事件(消息气泡「重新生成」按钮)
+  useEffect(() => {
+    const handler = () => onRetry();
+    window.addEventListener('rpg-regenerate', handler);
+    return () => window.removeEventListener('rpg-regenerate', handler);
+  }, [onRetry]);
+
   /* ── rail 操作:rename / archive / delete ───────────────────────── */
   const doRename = useCallback(async (chat, title) => {
     try {

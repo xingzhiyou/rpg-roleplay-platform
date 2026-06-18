@@ -122,6 +122,7 @@
   padding: 0 16px;
   border-bottom: 1px solid var(--line);
   background: color-mix(in srgb, var(--panel) 60%, transparent);
+  overflow: hidden;
 }
 .tvp-chat-title {
   display: inline-flex;
@@ -145,6 +146,7 @@
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   position: relative;
   /* #2 工具调用展开/折叠时历史上移修复:关闭浏览器滚动锚定 —— 否则展开 ToolCallBlock 使其下方
      内容变高时,浏览器锚到下方元素并增大 scrollTop,把上方历史顶上去。关掉后 scrollTop 不变 →
@@ -161,9 +163,10 @@
 }
 /* 酒馆输入框:默认 1 行,随输入增高,最多 ~5 行后内部滚动(覆盖 writing 模式的 88px 起始高度)。
    发送清空后由 Composer 的 reset effect 把高度收回 1 行。 */
-.tvp-foot .gc-composer.writing .gc-textarea {
+.tvp-root .tvp-foot .gc-composer.writing .gc-textarea {
   min-height: 36px;   /* 1 行(serif 15.5px/1.78 + padding) */
   max-height: 150px;  /* ~5 行,超出滚动(JS 把 height 设到 scrollHeight,这里 max-height 封顶) */
+  padding: 8px 16px;  /* 上下对称,文字垂直居中 */
 }
 
 /* ── cards 视图 ───────────────────────────────────────────────── */

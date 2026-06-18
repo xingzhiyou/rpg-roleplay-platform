@@ -560,7 +560,8 @@ def register_tavern_tools() -> None:
             description=(
                 "向玩家弹出一道有限选项的选择题(网页里以可点按钮呈现),把决定权交回玩家。\n"
                 "当剧情走到需要玩家在 2-6 个分支/偏好里抉择时调它,玩家点选后其选择会作为下一条消息发回;\n"
-                "不要替玩家做选择,也不要在正文里裸列 1/2/3。allow_free_text=true 时额外给一个自由输入入口。"
+                "不要替玩家做选择,也不要在正文里裸列 1/2/3。allow_free_text=true 时额外给一个自由输入入口。\n"
+                "注意:options 是纯字符串数组,不是对象数组! 不要用 choices/id/label,直接用 options 传字符串列表。"
             ),
             input_schema={
                 "type": "object",
@@ -568,7 +569,7 @@ def register_tavern_tools() -> None:
                     "question": {"type": "string", "description": "问题文本"},
                     "options": {
                         "type": "array", "items": {"type": "string"},
-                        "description": "2-6 个候选答案(纯字符串)",
+                        "description": "2-6 个候选答案,必须是纯字符串数组,例如 [\"选项A\", \"选项B\"]",
                         "minItems": 2, "maxItems": 6,
                     },
                     "allow_free_text": {"type": "boolean", "default": True,
@@ -582,6 +583,7 @@ def register_tavern_tools() -> None:
             destructive=False,
             input_examples=(
                 {"question": "今晚先去哪?", "options": ["天台", "图书馆", "回家"]},
+                {"question": "你要带迷迭香去哪里?", "options": ["办公室处理文件", "食堂吃早餐", "医疗部找凯尔希复查", "训练室测试源石技艺"]},
             ),
         ))
 

@@ -736,10 +736,19 @@ async def api_card_import_json(request: Request):
     raw = body.get("json") or ""
     try:
         data = json.loads(raw) if isinstance(raw, str) else raw
-    except Exception:
-        return _bad("JSON 解析失败")
+    except Exception as e:
+        return _bad(f"JSON 解析失败：{e}")
     # Accept a variety of shapes (SillyTavern v1/v2 etc.)
+    # 解包常见的外层包装（如 {"ok":true,"card":{...}}）
+    if isinstance(data, dict) and not data.get("name") and not data.get("char_name"):
+        for key in ("card", "character", "chara_card"):
+            inner = data.get(key)
+            if isinstance(inner, dict) and (inner.get("name") or inner.get("data", {}).get("name")):
+                data = inner
+                break
     name = data.get("name") or data.get("char_name") or ""
+    if not name and isinstance(data.get("data"), dict):
+        name = data["data"].get("name") or ""
     if not name:
         return _bad("缺少 name 字段")
     from . import user_cards as _uc

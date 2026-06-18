@@ -512,14 +512,19 @@ function ImportSheet({ show, onClose, onConfirm }) {
     setParseError('');
     try {
       const obj = JSON.parse(json);
-      const name = obj.name || obj.char_name || obj.data?.name || '(未命名)';
-      const desc = obj.description || obj.data?.description || '暂无简介';
+      // 解包常见的外层包装（如 {"ok":true,"card":{...}}）
+      const inner = obj.card?.data ? obj.card : obj.character?.data ? obj.character : obj;
+      const d = inner.data || {};
+      const name = inner.name || inner.char_name || d.name || '(未命名)';
+      const desc = inner.description || d.description || '暂无简介';
+      const spec = inner.spec || obj.spec;
+      const specVersion = inner.spec_version || obj.spec_version;
       setParsed({
         name,
-        format: obj.spec ? `${obj.spec} · ${obj.spec_version || 'v1'}` : 'JSON',
+        format: spec ? `${spec} · ${specVersion || 'v1'}` : 'JSON',
         description: desc.length > 120 ? desc.slice(0, 120) + '…' : desc,
-        tags: obj.tags || obj.data?.tags || [],
-        first_mes: obj.first_mes || obj.data?.first_mes || '—',
+        tags: inner.tags || d.tags || [],
+        first_mes: inner.first_mes || d.first_mes || '—',
         _jsonString: json,
       });
     } catch (e) {

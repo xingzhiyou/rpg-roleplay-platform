@@ -1287,15 +1287,20 @@ function TavernImportModal({ open, onClose, onConfirm }) {
     setParseError(null);
     try {
       const obj = JSON.parse(json);
-      const name = obj.name || obj.char_name || obj.data?.name || t('cards.detail.unnamed');
-      const desc = obj.description || obj.data?.description || t('cards.import.no_desc');
+      // 解包常见的外层包装（如 {"ok":true,"card":{...}}）
+      const inner = obj.card?.data ? obj.card : obj.character?.data ? obj.character : obj;
+      const d = inner.data || {};
+      const name = inner.name || inner.char_name || d.name || t('cards.detail.unnamed');
+      const desc = inner.description || d.description || t('cards.import.no_desc');
+      const spec = inner.spec || obj.spec;
+      const specVersion = inner.spec_version || obj.spec_version;
       setParsed({
         name,
-        format: obj.spec ? `${obj.spec} · ${obj.spec_version || "v1"}` : "SillyTavern · JSON",
+        format: spec ? `${spec} · ${specVersion || "v1"}` : "SillyTavern · JSON",
         description: desc.length > 160 ? desc.slice(0, 160) + "…" : desc,
-        tags: obj.tags || obj.data?.tags || [],
-        first_mes: obj.first_mes || obj.data?.first_mes || "—",
-        example_count: (obj.mes_example || obj.data?.mes_example || "").split(/<START>/).filter(Boolean).length,
+        tags: inner.tags || d.tags || [],
+        first_mes: inner.first_mes || d.first_mes || "—",
+        example_count: (inner.mes_example || d.mes_example || "").split(/<START>/).filter(Boolean).length,
         _jsonString: json,
       });
     } catch (e) {

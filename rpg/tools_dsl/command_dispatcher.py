@@ -352,10 +352,34 @@ class ToolDispatcher:
             if v is None:
                 missing.append(fld)
         if missing:
+            # 给出每个缺失字段的类型提示,方便模型自我纠正
+            props = (spec.input_schema or {}).get("properties") or {}
+            hints = []
+            for fld in missing:
+                p = props.get(fld) or {}
+                ftype = p.get("type") or "any"
+                fdesc = p.get("description") or ""
+                hint = f"{fld}({ftype})"
+                if fdesc:
+                    hint += f": {fdesc}"
+                hints.append(hint)
+            # 附带模型实际传入的字段名,帮助模型发现拼写/命名错误
+            actual_keys = sorted(env.args.keys()) if env.args else []
+            actual_hint = f"。你传入的字段是 {actual_keys}" if actual_keys else ""
+            # 当模型传入了与缺失字段名相似的字段时,显式提示正确字段名
+            typo_hint = ""
+            if actual_keys and missing:
+                for m in missing:
+                    # 简单相似度:首字母相同 or 编辑距离近的字段
+                    candidates = [k for k in actual_keys if k != m and (
+                        k[0] == m[0] or abs(len(k) - len(m)) <= 2
+                    )]
+                    if candidates:
+                        typo_hint = f"。注意:你可能误用了 {candidates},正确字段名是 '{m}'"
+                        break
             raise DispatchError(
                 "missing_required",
-                f"工具 {env.tool} 缺必填字段: {', '.join(missing)}. "
-                f"请用 ask_user_choice 让用户选 (给 3-4 个候选 + allow_free_text=true)。",
+                f"工具 {env.tool} 缺必填字段: {', '.join(hints)}{actual_hint}{typo_hint}",
             )
         # 9) trace 内去重 (同 trace 同 tool+args 只执行一次)
         if env.trace_id:

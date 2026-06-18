@@ -283,6 +283,15 @@ def parse_card(data: dict[str, Any] | str | bytes) -> dict[str, Any]:
             raise ValueError(f"无法解析角色卡：既不是 JSON 也不是 base64({exc})") from exc
     if not isinstance(data, dict):
         raise ValueError(f"不支持的角色卡类型：{type(data)}")
+    # 解包常见的外层包装（如 {"ok":true,"card":{...}}、{"data":{...}}、{"character":{...}}）。
+    # 仅当根级缺少有效 data 时才尝试解包，避免误拆合法 V2 卡。
+    root_has_valid_data = isinstance(data.get("data"), dict) and data["data"].get("name")
+    if not root_has_valid_data:
+        for key in ("card", "character", "chara_card"):
+            inner = data.get(key)
+            if isinstance(inner, dict) and inner.get("data"):
+                data = inner
+                break
     # 是 V2 还是 V1？
     if data.get("spec") == "chara_card_v2" or data.get("spec") == "chara_card_v3":
         return _normalize_v2(data)

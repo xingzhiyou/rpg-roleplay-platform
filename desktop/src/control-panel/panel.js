@@ -20,6 +20,7 @@ let cfg = null;
 let last = { state: 'stopped', detail: '', backendPort: 0, pgPort: 0 };
 let importFilePath = null;
 let appVer = '—';
+let _qrLoaded = false;  // QR:IIFE 级作用域,避免端口变化后持续用旧 QR
 
 async function sha256hex(s) {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
@@ -69,16 +70,25 @@ async function loadFeedbackReplies() {
   const list = $('fbReplyList'), empty = $('fbReplyEmpty');
   if (!list) return;
   let items = [];
-  try { const r = await sv.feedbackReplies(); items = (r && r.items) || []; } catch (_) { items = []; }
+  let fetchErr = false;
+  try {
+    const r = await sv.feedbackReplies();
+    if (!r || r.ok === false) { fetchErr = true; items = []; }
+    else { items = r.items || []; }
+  } catch (_) { fetchErr = true; items = []; }
   list.innerHTML = '';
-  if (!items.length) { empty.hidden = false; return; }
+  if (fetchErr) { empty.hidden = false; empty.textContent = '加载失败,请稍后重试。'; return; }
+  if (!items.length) { empty.hidden = false; empty.textContent = '暂无记录。'; return; }
   empty.hidden = true;
   for (const it of items) {
     const card = document.createElement('div');
     card.className = 'fbreply';
+    const esc = (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     const status = it.review_decision ? (FB_DECISION[it.review_decision] || it.review_decision) : '待处理';
     const head = document.createElement('div'); head.className = 'fbreply-h';
-    head.innerHTML = `<span class="fbreply-q">${(it.free_text_preview || '').replace(/[<>&]/g, '')}</span><span class="fbreply-s">${status}</span>`;
+    const qEl = document.createElement('span'); qEl.className = 'fbreply-q'; qEl.textContent = it.free_text_preview || '';
+    const sEl = document.createElement('span'); sEl.className = 'fbreply-s'; sEl.textContent = status;
+    head.appendChild(qEl); head.appendChild(sEl);
     card.appendChild(head);
     const meta = document.createElement('div'); meta.className = 'fbreply-m';
     meta.textContent = `提交于 ${_fbTime(it.created_at)}`;
@@ -97,6 +107,9 @@ async function loadFeedbackReplies() {
 // ── 状态渲染 ──
 const STATE_TEXT = { stopped: '已停止', starting: '启动中', running: '运行中', stopping: '停止中', error: '错误' };
 function renderStatus(s) {
+  // 服务停止时清除本地账户缓存,确保重启后重新拉取
+  if (last.state === 'running' && s.state !== 'running') _localAcct = null;
+  const _prevPort = last.backendPort;   // 在 last=s 之前捕获旧端口,供下方 QR 缓存失效比较
   last = s;
   const online = cfg && cfg.mode === 'online';
   const cls = online ? '' : (s.state === 'running' ? 'run' : (s.state === 'error' ? 'err' : (s.state === 'starting' || s.state === 'stopping' ? 'busy' : '')));
@@ -113,9 +126,13 @@ function renderStatus(s) {
   $('startBtn').disabled = busy || s.state === 'running';
   $('stopBtn').disabled = busy || s.state === 'stopped';
   $('restartBtn').disabled = busy || s.state === 'stopped';
+  if ($('openExtBtn')) $('openExtBtn').disabled = (s.state === 'starting' || s.state === 'stopping');
+  if ($('sideOpenBrowser')) $('sideOpenBrowser').disabled = (s.state === 'starting' || s.state === 'stopping');
   $('svError').hidden = s.state !== 'error';
   if (s.state === 'error') $('svErrorTitle').textContent = s.detail || t('overview.start_failed');
   if ($('localGuide')) $('localGuide').hidden = !(cfg && cfg.mode === 'local' && s.state === 'stopped');
+  // 端口变化(重启/新启动)时使 QR 缓存失效
+  if (s.backendPort !== _prevPort) { _qrLoaded = false; if ($('qrImg')) $('qrImg').src = ''; }
   // 服务转入运行后,本地账户信息才可读 → 拉一次(_localAcct 缓存,避免重复拉)。
   if (s.state === 'running' && cfg && cfg.mode === 'local' && _localAcct === null) loadLocalAccount();
   refreshBackupGate();
@@ -154,7 +171,7 @@ async function loadLocalAccount() {
     const base = last.backendPort ? `http://127.0.0.1:${last.backendPort}` : '';
     $('localName').textContent = a.display_name || a.username;
     $('localSub').textContent = `@${a.username} · ` + (a.has_password ? t('account.pw_set') : t('account.pw_none'));
-    _setAvatar($('localAvatar'), a.display_name || a.username, a.avatar_path, base);
+    _setAvatar($('localAvatar'), a.display_name || a.username, a.avatar_url || a.avatar_path, base);
   } catch (_) {}
 }
 let _cloudUser = null;
@@ -167,7 +184,7 @@ async function loadCloudAccount() {
       _cloudUser = u;
       $('cloudName').textContent = u.display_name || u.username;
       $('cloudSub').textContent = '@' + u.username;
-      _setAvatar($('cloudAvatar'), u.display_name || u.username, u.avatar_path, r.base || '');
+      _setAvatar($('cloudAvatar'), u.display_name || u.username, u.avatar_url || u.avatar_path, r.base || '');
       $('cloudLoginBtn').hidden = true; $('cloudLogoutBtn').hidden = false;
     } else {
       _cloudUser = null;
@@ -265,12 +282,18 @@ async function saveCfg() {
   });
   const lang = $('cfgLang') ? $('cfgLang').value : (cfg.uiLanguage || '');
   const langChanged = (cfg.uiLanguage || '') !== lang;
-  cfg = await sv.setConfig({
+  const saveResult = await sv.setConfig({
     onlineUrl: $('cfgOnlineUrl').value.trim() || 'https://rpg-roleplay.stellatrix.icu',
     backendPort: parseInt($('cfgBackendPort').value, 10) || 0,
     updateChannel: $('cfgChannel').value, autoStartLocal: $('cfgAutoStart').checked,
     uiLanguage: lang, extraEnv: env,
   });
+  if (saveResult && saveResult.ok === false) {
+    $('saveCfgBtn').textContent = '保存失败:' + (saveResult.error || '磁盘写入错误');
+    $('saveCfgBtn').disabled = false;
+    return;
+  }
+  cfg = saveResult;
   if (langChanged && window.I18N) { window.I18N.setLang(lang); renderMode(); }
   fillForm(); flash($('saveCfgBtn'), t('common.saved')); $('updCurrent').textContent = `当前 v${appVer} · ${cfg.updateChannel}`;
   if (restartNeeded && cfg.mode === 'local' && last.state === 'running') {
@@ -297,7 +320,7 @@ async function loadBackupAccount() {
     if (_localAcct) {
       $('bkAcctName').textContent = _localAcct.display_name || _localAcct.username;
       $('bkAcctSub').textContent = '@' + _localAcct.username + ' · ' + t('account.local');
-      _setAvatar($('bkAvatar'), _localAcct.display_name || _localAcct.username, _localAcct.avatar_path, last.backendPort ? `http://127.0.0.1:${last.backendPort}` : '');
+      _setAvatar($('bkAvatar'), _localAcct.display_name || _localAcct.username, _localAcct.avatar_url || _localAcct.avatar_path, last.backendPort ? `http://127.0.0.1:${last.backendPort}` : '');
     } else { $('bkAcctName').textContent = '—'; $('bkAcctSub').textContent = t('account.local'); _setAvatar($('bkAvatar'), 'L', null); }
     if (sync) {
       sync.hidden = false;
@@ -313,7 +336,7 @@ async function loadBackupAccount() {
       banner.hidden = false;
       $('bkAcctName').textContent = me.user.display_name || me.user.username;
       $('bkAcctSub').textContent = '@' + me.user.username + ' · ' + t('account.cloud');
-      _setAvatar($('bkAvatar'), me.user.display_name || me.user.username, me.user.avatar_path, me.base || '');
+      _setAvatar($('bkAvatar'), me.user.display_name || me.user.username, me.user.avatar_url || me.user.avatar_path, me.base || '');
     } else banner.hidden = true;
   }
 }
@@ -396,8 +419,13 @@ async function init() {
   $('rememberMode').addEventListener('change', async () => { cfg = await sv.setConfig({ rememberMode: $('rememberMode').checked }); });
   $('copyLanBtn').addEventListener('click', async () => { const r = await sv.lanInfo(); const ok = await copy((r && r.url) || ''); flash($('copyLanBtn'), ok ? '已复制地址' : '复制失败'); });
   // 二维码:hover 右侧 QR 区弹出供手机扫码(延时关闭跨越间隙)
-  let _qrLoaded = false, _qrT;
-  const _showQr = async () => { clearTimeout(_qrT); $('qrPop').hidden = false; if (!_qrLoaded) { try { const r = await sv.lanQr(); if (r && r.ok) { $('qrImg').src = r.dataUrl; _qrLoaded = true; } } catch (_) {} } };
+  let _qrT;
+  const _showQr = async () => {
+    clearTimeout(_qrT);
+    if (!_qrLoaded) {
+      try { const r = await sv.lanQr(); if (r && r.ok) { $('qrImg').src = r.dataUrl; _qrLoaded = true; $('qrPop').hidden = false; } } catch (_) {}
+    } else { $('qrPop').hidden = false; }
+  };
   const _hideQr = () => { _qrT = setTimeout(() => { $('qrPop').hidden = true; }, 180); };
   $('qrBtn').addEventListener('mouseenter', _showQr);
   $('qrBtn').addEventListener('mouseleave', _hideQr);
@@ -460,12 +488,30 @@ async function init() {
   $('startImportBtn').addEventListener('click', async () => {
     if (!importFilePath) return;
     $('importIdle').hidden = true; $('importBusy').hidden = false; $('importDone').hidden = true;
+    $('importStage').textContent = '导入中…';
+    if ($('importErr')) $('importErr').hidden = true;
     const r = await sv.accountImport(importFilePath); $('importBusy').hidden = true;
-    if (r && r.ok) $('importDone').hidden = false; else { $('importIdle').hidden = false; $('importStage').textContent = '导入失败:' + ((r && (r.detail || r.error)) || '请重试'); }
+    if (r && r.ok) {
+      $('importDone').hidden = false;
+    } else {
+      $('importIdle').hidden = false;
+      if ($('importErr')) {
+        $('importErr').hidden = false;
+        $('importErr').querySelector('span').textContent = '导入失败:' + ((r && (r.detail || r.error)) || '请重试');
+      }
+    }
   });
-  $('importAgainBtn').addEventListener('click', () => { importFilePath = null; $('importDone').hidden = true; $('importIdle').hidden = false; $('pickImportBtn').textContent = '选择 .zip 文件…'; $('startImportBtn').disabled = true; });
+  $('importAgainBtn').addEventListener('click', () => {
+    importFilePath = null; $('importDone').hidden = true; $('importIdle').hidden = false;
+    $('pickImportBtn').textContent = '选择 .zip 文件…'; $('startImportBtn').disabled = true;
+    if ($('importErr')) $('importErr').hidden = true;
+  });
   $('pickBackupDirBtn').addEventListener('click', async () => { const r = await sv.pickBackupDir(); if (r && r.path) { cfg = await sv.setConfig({ backupDir: r.path }); fillBackup(); } });
-  $('saveBackupBtn').addEventListener('click', async () => { cfg = await sv.setConfig({ autoBackup: $('autoBackup').checked, autoBackupHours: parseInt($('autoBackupHours').value, 10) || 168, backupKeep: Math.max(1, parseInt($('backupKeep').value, 10) || 3) }); flash($('saveBackupBtn'), '已保存'); });
+  $('saveBackupBtn').addEventListener('click', async () => {
+    const r = await sv.setConfig({ autoBackup: $('autoBackup').checked, autoBackupHours: parseInt($('autoBackupHours').value, 10) || 168, backupKeep: Math.max(1, parseInt($('backupKeep').value, 10) || 3) });
+    if (r && r.ok === false) { $('saveBackupBtn').textContent = '保存失败'; setTimeout(() => { $('saveBackupBtn').textContent = '保存'; }, 2000); }
+    else { cfg = r; flash($('saveBackupBtn'), '已保存'); }
+  });
   $('backupNowBtn').addEventListener('click', async () => { $('backupNowBtn').disabled = true; const r = await sv.backupNow(); flash($('backupNowBtn'), r && r.ok ? '已备份' : '失败'); refreshBackupGate(); });
   // 云端数据迁移(合并导入,新增不覆盖)
   const _cloudHost = () => { try { return new URL(cfg.onlineUrl || 'https://rpg-roleplay.stellatrix.icu').host; } catch (_) { return cfg.onlineUrl || ''; } };
@@ -487,7 +533,11 @@ async function init() {
   });
 
   // lan
-  $('lanEnabled').addEventListener('change', async () => { cfg = await sv.setConfig({ lanEnabled: $('lanEnabled').checked }); loadLan(); });
+  $('lanEnabled').addEventListener('change', async () => {
+    cfg = await sv.setConfig({ lanEnabled: $('lanEnabled').checked });
+    loadLan();
+    if (cfg && cfg.mode === 'local' && last.state === 'running' && window.confirm(t('restart.settings_changed'))) await doRestart();
+  });
   $('copyLanUrlBtn').addEventListener('click', async () => { await copy($('lanUrl').value); flash($('copyLanUrlBtn'), '已复制'); });
   $('copyFwBtn').addEventListener('click', async () => { await copy($('fwCmd').textContent); flash($('copyFwBtn'), '已复制'); });
 

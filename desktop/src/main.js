@@ -73,11 +73,12 @@ async function openAppWindow() {
   const c = cfg.load();
   let url;
   if (c.mode === 'local') {
-    if (supervisor.state !== 'running') await supervisor.start();
+    if (c.autoStartLocal !== false && supervisor.state !== 'running') await supervisor.start();
+    if (c.autoStartLocal === false && supervisor.state !== 'running') { showPanel(); return null; }
     // 后端裸 / 返回服务 JSON;应用入口是 Platform.html(desktop 模式免登录,无用户则自动跳 Login 注册)。
     url = `http://127.0.0.1:${supervisor.backendPort}/Platform.html`;
   } else {
-    url = c.onlineUrl.replace(/\/+$/, '') + '/';
+    url = (c.onlineUrl || 'https://rpg-roleplay.stellatrix.icu').replace(/\/+$/, '') + '/';
   }
   if (appWin && !appWin.isDestroyed()) { appWin.loadURL(url); appWin.focus(); return url; }
   appWin = new BrowserWindow({
@@ -106,7 +107,7 @@ function initUpdater() {
   if (!app.isPackaged) return;
   try { updater = require('electron-updater').autoUpdater; } catch (_) { return; }
   updater.autoDownload = false;
-  updater.channel = cfg.load().updateChannel || 'stable';
+  const _ch = cfg.load().updateChannel; if (_ch && _ch !== 'stable') updater.channel = _ch;
   const send = (channel, payload) => panelWin && !panelWin.isDestroyed() && panelWin.webContents.send(channel, payload);
   updater.on('checking-for-update', () => send('upd:status', { state: 'checking' }));
   const _notes = (i) => (Array.isArray(i.releaseNotes) ? i.releaseNotes.map((n) => n && n.note || '').join('\n\n') : (i.releaseNotes || ''));
@@ -180,12 +181,19 @@ function _cloudSession() {
   if (!_cloudSes) { const { session } = require('electron'); _cloudSes = session.fromPartition('persist:cloud'); }
   return _cloudSes;
 }
+// 应用窗口的持久化 session(与 appWin partition 一致):本地后端鉴权 cookie 走这个分区。
+function _appSession() {
+  const { session } = require('electron');
+  return session.fromPartition('persist:stellatrix');
+}
 
 // 统一重启前置:查本地后端有无正在运行的导入任务(防中断用户长任务)。
+// 返回 null 表示无法确认(请求失败/401),调用方应走保守路径(需用户确认)。
 async function _activeImportJobs() {
   try {
     if (cfg.load().mode !== 'local' || supervisor.state !== 'running' || !supervisor.backendPort) return [];
-    const r = await _netJson('GET', `http://127.0.0.1:${supervisor.backendPort}/api/me/tasks/active`);
+    const r = await _netJson('GET', `http://127.0.0.1:${supervisor.backendPort}/api/me/tasks/active`, null, _appSession());
+    if (!r || r.status === 401 || r.status === 403) return null;
     const items = (r && (r.tasks || r.items || r.active)) || [];
     return items.filter((t) => {
       const kind = (t.kind || t.type || '').toLowerCase();
@@ -193,7 +201,7 @@ async function _activeImportJobs() {
       return (kind.includes('import') || kind.includes('rebuild') || kind.includes('extract'))
         && !['done', 'failed', 'cancelled', 'canceled', 'error'].includes(st);
     });
-  } catch (_) { return []; }
+  } catch (_) { return null; }
 }
 
 // ── IPC ──
@@ -209,6 +217,8 @@ function wireIpc() {
     const force = !!(opts && opts.force);
     if (!force) {
       const active = await _activeImportJobs();
+      // null = 无法确认(鉴权失败等),保守处理:视为有活跃任务,要求用户确认
+      if (active === null) return { ok: false, needsConfirm: true, activeTasks: ['(无法确认,可能有导入任务正在运行)'] };
       if (active.length) return { ok: false, needsConfirm: true, activeTasks: active.map((t) => t.label || t.title || t.kind || '导入任务') };
     }
     await supervisor.restart();
@@ -219,14 +229,16 @@ function wireIpc() {
   ipcMain.handle('cfg:set', (_e, patch) => {
     const safe = { ...patch };
     delete safe.masterKey;                 // 不允许从 UI 改 master key
-    return cfg.save(safe);
+    try { const result = cfg.save(safe); return { ok: true, ...result }; }
+    catch (e) { return { ok: false, error: String(e && e.message || e) }; }
   });
 
   ipcMain.handle('app:open', async () => ({ url: await openAppWindow() }));
   ipcMain.handle('app:openExternal', async () => {
     const c = cfg.load();
     if (c.mode === 'local') {
-      if (supervisor.state !== 'running') await supervisor.start();
+      if (c.autoStartLocal !== false && supervisor.state !== 'running') await supervisor.start();
+      if (c.autoStartLocal === false && supervisor.state !== 'running') { showPanel(); return { ok: false, error: '服务未运行,请先在控制台启动服务' }; }
       const base = `http://127.0.0.1:${supervisor.backendPort}`;
       let target = `${base}/Platform.html`;
       // 免登录魔法链接:铸一次性 token → 打开 desktop-login(浏览器即登录默认账户)。
@@ -265,8 +277,8 @@ function wireIpc() {
     try { await _cloudSession().clearStorageData(); } catch (_) {}
     return { ok: true };
   });
-  ipcMain.handle('sys:openDataDir', () => { shell.openPath(P.userDataRoot()); });
-  ipcMain.handle('sys:openLogsDir', () => { shell.openPath(P.logsDir()); });
+  ipcMain.handle('sys:openDataDir', async () => { const err = await shell.openPath(P.userDataRoot()); return { ok: !err, error: err || undefined }; });
+  ipcMain.handle('sys:openLogsDir', async () => { try { await require('fs/promises').mkdir(P.logsDir(), { recursive: true }); } catch (_) {} const err = await shell.openPath(P.logsDir()); return { ok: !err, error: err || undefined }; });
 
   ipcMain.handle('upd:check', async () => {
     if (!updater) return { ok: false, reason: '更新仅在打包版可用' };
@@ -386,37 +398,37 @@ function wireIpc() {
     let buf;
     try { buf = await _fetchBytes(`${_cloudBase()}/api/me/account/export`, _cloudSession()); }
     catch (e) { return { ok: false, error: '云端导出失败:' + (e && e.message || e) }; }
-    return await _postZip(`${_localBase()}/api/me/account/import`, buf, 'cloud-account.zip', null);
+    return await _postZip(`${_localBase()}/api/me/account/import`, buf, 'cloud-account.zip', _appSession());
   });
   ipcMain.handle('cloud:syncFromLocal', async () => { // 本地 → 云端
     if (!_localOk()) return { ok: false, error: '需本地模式且服务运行' };
     const me = await _netJson('GET', `${_cloudBase()}/api/auth/me`, null, _cloudSession());
     if (!me || !me.user) return { ok: false, error: '未登录云端账户' };
     let buf;
-    try { buf = await _fetchBytes(`${_localBase()}/api/me/account/export`, null); }
+    try { buf = await _fetchBytes(`${_localBase()}/api/me/account/export`, _appSession()); }
     catch (e) { return { ok: false, error: '本地导出失败:' + (e && e.message || e) }; }
     return await _postZip(`${_cloudBase()}/api/me/account/import`, buf, 'local-account.zip', _cloudSession());
   });
 
   ipcMain.handle('account:estimate', async () => {
     if (!_localOk()) return { ok: false, error: '需本地模式且服务运行' };
-    const { net } = require('electron');
-    return await new Promise((resolve) => {
-      const req = net.request(`${_localBase()}/api/me/account/export/estimate`);
-      let data = '';
-      req.on('response', (res) => { res.on('data', (d) => data += d); res.on('end', () => {
-        try { const j = JSON.parse(data); resolve({ ok: true, size: j.size_human || j.human || (j.bytes ? Math.round(j.bytes / 1048576) + ' MB' : (j.size || '—')) }); }
-        catch (_) { resolve({ ok: false }); }
-      }); });
-      req.on('error', () => resolve({ ok: false }));
-      req.end();
-    });
+    try {
+      const j = await _netJson('GET', `${_localBase()}/api/me/account/export/estimate`, null, _appSession());
+      if (!j || !j.ok) return { ok: false };
+      const size = `剧本 ${j.scripts != null ? j.scripts : '—'} · 存档 ${j.saves != null ? j.saves : '—'} · 角色卡 ${j.cards != null ? j.cards : '—'}`;
+      return { ok: true, size };
+    } catch (_) { return { ok: false }; }
   });
 
   ipcMain.handle('account:export', async (_e, includeChunks) => {
     if (!_localOk()) return { ok: false };
-    await shell.openExternal(`${_localBase()}/api/me/account/export${includeChunks ? '?include_chunks=1' : ''}`);
-    return { ok: true };
+    const url = `${_localBase()}/api/me/account/export${includeChunks ? '?include_chunks=1' : ''}`;
+    try {
+      const buf = await _fetchBytes(url, _appSession());
+      const { canceled, filePath } = await require('electron').dialog.showSaveDialog({ defaultPath: 'rpg-account.zip', filters: [{ name: 'Zip', extensions: ['zip'] }] });
+      if (!canceled && filePath) { require('fs').writeFileSync(filePath, buf); return { ok: true, file: filePath }; }
+      return { ok: false, error: '已取消' };
+    } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
   });
 
   ipcMain.handle('account:pickImport', async () => {
@@ -436,7 +448,7 @@ function wireIpc() {
     const tail = Buffer.from(`\r\n--${boundary}--\r\n`);
     const body = Buffer.concat([head, buf, tail]);
     return await new Promise((resolve) => {
-      const req = net.request({ method: 'POST', url: `${_localBase()}/api/me/account/import` });
+      const req = net.request({ method: 'POST', url: `${_localBase()}/api/me/account/import`, session: _appSession() });
       req.setHeader('Content-Type', `multipart/form-data; boundary=${boundary}`);
       let data = '';
       req.on('response', (res) => { res.on('data', (d) => data += d); res.on('end', () => {
@@ -473,9 +485,11 @@ function wireIpc() {
 
   // ── 局域网:真·本机 LAN IP(排除 VPN/虚拟口)+ 访问地址 + 按系统的端口放行命令 ──
   ipcMain.handle('lan:info', () => {
+    const c = cfg.load();
     const ip = _lanIp();
-    const port = supervisor.backendPort || cfg.load().backendPort || 0;
-    const url = ip && port ? `http://${ip}:${port}/` : (ip ? `http://${ip}:<启动服务后端口>/` : '未检测到局域网 IP');
+    const port = supervisor.backendPort || c.backendPort || 0;
+    const url = !c.lanEnabled ? '局域网访问未开启;开启后重启服务生效'
+      : (ip && port ? `http://${ip}:${port}/` : (ip ? `http://${ip}:<启动服务后端口>/` : '未检测到局域网 IP'));
     let firewallCmd;
     if (process.platform === 'win32') {
       firewallCmd = port
@@ -494,6 +508,7 @@ function wireIpc() {
 
   // 局域网地址二维码(供手机扫码);qrcode 在主进程生成 data URL。
   ipcMain.handle('lan:qr', async () => {
+    if (!cfg.load().lanEnabled) return { ok: false };
     const ip = _lanIp();
     const port = supervisor.backendPort || cfg.load().backendPort || 0;
     if (!ip || !port) return { ok: false };
@@ -536,8 +551,10 @@ function _exportToDir(dir) {
       if (res.statusCode >= 400) { res.resume(); return resolve({ ok: false, status: res.statusCode }); }
       const ws = fs.createWriteStream(file);
       res.on('data', (d) => ws.write(d));
-      res.on('end', () => { ws.end(); _pruneBackups(dir, cfg.load().backupKeep || 3); resolve({ ok: true, file }); });
-      res.on('error', (e) => { ws.end(); resolve({ ok: false, error: String(e) }); });
+      res.on('end', () => { ws.end(); });
+      res.on('error', (e) => { ws.destroy(); resolve({ ok: false, error: String(e) }); });
+      ws.once('finish', () => { _pruneBackups(dir, cfg.load().backupKeep || 3); resolve({ ok: true, file }); });
+      ws.on('error', (e) => resolve({ ok: false, error: String(e) }));
     });
     req.on('error', (err) => resolve({ ok: false, error: String(err && err.message || err) }));
     req.end();
@@ -583,7 +600,7 @@ app.whenReady().then(() => {
   setInterval(() => {
     const c = cfg.load();
     if (c.autoBackup && c.backupDir && c.mode === 'local' && supervisor.state === 'running' && supervisor.backendPort) {
-      if (Date.now() - _lastAutoBackup >= (c.autoBackupHours || 24) * 3600 * 1000) {
+      if (Date.now() - _lastAutoBackup >= (c.autoBackupHours || 168) * 3600 * 1000) {
         _lastAutoBackup = Date.now();
         _exportToDir(c.backupDir).catch(() => {});
       }
@@ -597,7 +614,7 @@ app.on('window-all-closed', () => { /* 保持后台,由托盘/再次打开恢复
 let _quitting = false;
 app.on('before-quit', async (e) => {
   if (_quitting) return;
-  if (supervisor.state === 'running' || supervisor.state === 'starting') {
+  if (supervisor.state !== 'stopped') {
     e.preventDefault();
     _quitting = true;
     try { await supervisor.stop(); } catch (_) {}

@@ -102,6 +102,7 @@ const STR = {
     'update.title': 'App update', 'update.check': 'Check for updates', 'update.download': 'Download', 'update.install': 'Restart & install',
     'update.notes': 'Release notes', 'update.checking': 'Checking…', 'update.none': 'You are up to date',
     'feedback.replies': 'My feedback / replies', 'feedback.submit': 'Submit feedback', 'feedback.again': 'Submit another',
+    'logs.clear': 'Clear', 'logs.open_dir': 'Open logs folder', 'logs.report': 'See an error? Submit feedback', 'logs.report_prefill': 'Encountered an issue, recent logs:',
   },
 };
 

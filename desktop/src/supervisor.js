@@ -279,6 +279,7 @@ class Supervisor extends EventEmitter {
       this._uvicorn = null;
     }
     await this._pgStop();
+    this.backendPort = 0; this.pgPort = 0;
     this._setState('stopped', '已停止');
   }
 

@@ -151,7 +151,7 @@ def public_user(user: dict | None, db=None) -> dict | None:
     """
     if not user:
         return None
-    out = {k: user[k] for k in ("id", "public_id", "username", "display_name", "bio", "role", "created_at", "updated_at", "row_version", "welcome_dismissed_at") if k in user}
+    out = {k: user[k] for k in ("id", "public_id", "username", "display_name", "bio", "role", "created_at", "updated_at", "row_version", "welcome_dismissed_at", "avatar_url") if k in user}
     if out.get("public_id") is not None:
         out["uid"] = str(out["public_id"])
     out["has_password"] = bool(user.get("password_hash"))

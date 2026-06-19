@@ -3,7 +3,7 @@
 //
 // 字段:
 //   mode            'online' | 'local'        默认 online(装包小、即开即用)
-//   onlineUrl       云端地址                   默认 https://play.stellatrix.icu
+//   onlineUrl       云端地址                   默认 https://rpg-roleplay.stellatrix.icu
 //   backendPort     本地后端端口               0 = 每次启动自动选空闲端口
 //   pgPort          本地 PG 端口               0 = 自动选(默认从 15432 起避让)
 //   masterKey       32 字节 hex                首启生成,经 RPG_MASTER_KEY 注入后端(避免后端往只读区写 master.key)
@@ -48,6 +48,8 @@ function load() {
     data = JSON.parse(fs.readFileSync(P.configFile(), 'utf8'));
   } catch (_) { /* 首次无文件 */ }
   _cache = { ...DEFAULTS, ...data };
+  // onlineUrl 自愈:不允许为空(online 模式 app:open 等处需要)
+  if (!_cache.onlineUrl) _cache.onlineUrl = DEFAULTS.onlineUrl;
   // 首启生成 master key + 设备 client_id(一次性,持久化)
   let _dirty = false;
   if (!_cache.masterKey) { _cache.masterKey = crypto.randomBytes(32).toString('hex'); _dirty = true; }
@@ -58,13 +60,8 @@ function load() {
 
 function save(patch) {
   _cache = { ...load_noinit(), ...patch };
-  try {
-    fs.mkdirSync(require('path').dirname(P.configFile()), { recursive: true });
-    fs.writeFileSync(P.configFile(), JSON.stringify(_cache, null, 2), 'utf8');
-  } catch (e) {
-    // 配置写失败不致命,但要让上层知道
-    console.error('[config] save failed:', e.message);
-  }
+  fs.mkdirSync(require('path').dirname(P.configFile()), { recursive: true });
+  fs.writeFileSync(P.configFile(), JSON.stringify(_cache, null, 2), 'utf8');
   return _cache;
 }
 

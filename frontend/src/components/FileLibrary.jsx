@@ -1,4 +1,6 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
+import i18n from '../i18n';
 import AvatarImg from './AvatarImg.jsx';
 import CSSpaceBetween from '@cloudscape-design/components/space-between';
 import CSHeader from '@cloudscape-design/components/header';
@@ -21,36 +23,47 @@ import CSStatusIndicator from '@cloudscape-design/components/status-indicator';
  * ────────────────────────────────────────────────────────────────*/
 
 // ── kind 元数据 ────────────────────────────────────────────────
-const KIND_META = {
-  ai_image:   { label: 'AI 生图',   tab: '图片',  isImage: true },
-  card_image: { label: '角色卡图',  tab: '角色卡图', isImage: true },
-  avatar:     { label: '头像',      tab: '头像',  isImage: true },
-  cover:      { label: '封面',      tab: '封面',  isImage: true },
-  script_txt: { label: '导入文本',  tab: '导入文本', isImage: false },
-};
+function getKindMeta() {
+  return {
+    ai_image:   { label: i18n.t('components.file_library.kind.ai_image'),   isImage: true },
+    card_image: { label: i18n.t('components.file_library.kind.card_image'),  isImage: true },
+    avatar:     { label: i18n.t('components.file_library.kind.avatar'),      isImage: true },
+    cover:      { label: i18n.t('components.file_library.kind.cover'),       isImage: true },
+    script_txt: { label: i18n.t('components.file_library.kind.script_txt'),  isImage: false },
+  };
+}
 
-const TABS = [
-  { id: 'all',        label: '全部' },
-  { id: 'ai_image',   label: 'AI 生图' },
-  { id: 'card_image', label: '角色卡图' },
-  { id: 'avatar',     label: '头像' },
-  { id: 'cover',      label: '封面' },
-  { id: 'script_txt', label: '导入文本' },
-];
+function getTabs() {
+  return [
+    { id: 'all',        label: i18n.t('common.all') },
+    { id: 'ai_image',   label: i18n.t('components.file_library.kind.ai_image') },
+    { id: 'card_image', label: i18n.t('components.file_library.kind.card_image') },
+    { id: 'avatar',     label: i18n.t('components.file_library.kind.avatar') },
+    { id: 'cover',      label: i18n.t('components.file_library.kind.cover') },
+    { id: 'script_txt', label: i18n.t('components.file_library.kind.script_txt') },
+  ];
+}
 
 // ── 来源文案 ──────────────────────────────────────────────────
-const SOURCE_LABELS = {
-  image_gen:       'AI 生图',
-  avatar_upload:   '手动上传',
-  script_import:   '导入',
-  manual_upload:   '手动上传',
-};
+function getSourceLabels() {
+  return {
+    image_gen:     i18n.t('components.file_library.source.image_gen'),
+    avatar_upload: i18n.t('components.file_library.source.manual_upload'),
+    script_import: i18n.t('components.file_library.source.script_import'),
+    manual_upload: i18n.t('components.file_library.source.manual_upload'),
+  };
+}
 
 // ── 关联文案 ──────────────────────────────────────────────────
 function refLabel(ref_kind, ref_id) {
   if (!ref_kind || ref_id == null) return null;
-  const map = { card: '卡', script: '剧本', user: '用户', persona: '人设' };
-  return `用于:${map[ref_kind] || ref_kind}#${ref_id}`;
+  const map = {
+    card:    i18n.t('components.file_library.ref_kind.card'),
+    script:  i18n.t('components.file_library.ref_kind.script'),
+    user:    i18n.t('components.file_library.ref_kind.user'),
+    persona: i18n.t('components.file_library.ref_kind.persona'),
+  };
+  return i18n.t('components.file_library.ref_used_by', { kind: map[ref_kind] || ref_kind, id: ref_id });
 }
 
 // ── 格式化字节 ────────────────────────────────────────────────
@@ -100,26 +113,32 @@ function DocIcon({ name }) {
 
 // ── 删除确认弹窗 ─────────────────────────────────────────────
 function DeleteConfirmModal({ open, asset, references, onCancel, onConfirm, busy }) {
+  const { t } = useTranslation();
   if (!open || !asset) return null;
 
   const hasRefs = references && references.length > 0;
+  const refKindMap = {
+    card:    t('components.file_library.ref_kind.card'),
+    script:  t('components.file_library.ref_kind.script'),
+    user:    t('components.file_library.ref_kind.user'),
+    persona: t('components.file_library.ref_kind.persona'),
+  };
   const refText = (references || []).map(r => {
-    const map = { card: '卡', script: '剧本', user: '用户', persona: '人设' };
-    return `${map[r.kind] || r.kind}#${r.id}`;
-  }).join('、');
+    return `${refKindMap[r.kind] || r.kind}#${r.id}`;
+  }).join(t('components.file_library.ref_separator'));
 
   return (
     <CSModal
       visible
       onDismiss={onCancel}
-      header={hasRefs ? '确认删除(有关联引用)' : '确认删除'}
+      header={hasRefs ? t('components.file_library.delete_modal.header_with_refs') : t('components.file_library.delete_modal.header')}
       footer={
         <CSBox float="right">
           <CSSpaceBetween direction="horizontal" size="xs">
-            <CSButton variant="link" onClick={onCancel} disabled={busy}>取消</CSButton>
+            <CSButton variant="link" onClick={onCancel} disabled={busy}>{t('common.cancel')}</CSButton>
             <CSButton variant="primary" onClick={onConfirm} disabled={busy}
               style={{ '--btn-bg': 'var(--color-background-status-error,#d63031)' }}>
-              {busy ? '删除中…' : '确认删除'}
+              {busy ? t('components.file_library.delete_modal.deleting') : t('components.file_library.delete_modal.confirm_delete')}
             </CSButton>
           </CSSpaceBetween>
         </CSBox>
@@ -127,13 +146,13 @@ function DeleteConfirmModal({ open, asset, references, onCancel, onConfirm, busy
     >
       <CSSpaceBetween size="s">
         {hasRefs && (
-          <CSAlert type="warning" header="删除后相关位置将显示错误">
-            以下位置正在使用此文件,删除后它们会显示缺失图/错误:<br />
+          <CSAlert type="warning" header={t('components.file_library.delete_modal.refs_warning_header')}>
+            {t('components.file_library.delete_modal.refs_warning_body')}<br />
             <strong>{refText}</strong>
           </CSAlert>
         )}
         <CSBox>
-          确定要删除「{asset.name || asset.storage_key || `资产 #${asset.id}`}」？此操作不可撤销。
+          {t('components.file_library.delete_modal.confirm_text', { name: asset.name || asset.storage_key || t('components.file_library.delete_modal.asset_fallback', { id: asset.id }) })}
         </CSBox>
       </CSSpaceBetween>
     </CSModal>
@@ -142,6 +161,9 @@ function DeleteConfirmModal({ open, asset, references, onCancel, onConfirm, busy
 
 // ── 单卡片 ────────────────────────────────────────────────────
 function AssetCard({ asset, onDelete }) {
+  const { t } = useTranslation();
+  const KIND_META = getKindMeta();
+  const SOURCE_LABELS = getSourceLabels();
   const meta = KIND_META[asset.kind] || { label: asset.kind, isImage: false };
   const ref = refLabel(asset.ref_kind, asset.ref_id);
   const src = asset.url || null;
@@ -202,10 +224,10 @@ function AssetCard({ asset, onDelete }) {
       {/* 操作按钮 */}
       <div style={{ display: 'flex', gap: 8, marginTop: 2 }}>
         <CSButton variant="inline-link" iconName="download-alt" onClick={handleDownload} formAction="none">
-          下载
+          {t('components.file_library.card.download')}
         </CSButton>
         <CSButton variant="inline-link" iconName="remove" onClick={(e) => { e.stopPropagation(); onDelete(asset); }} formAction="none">
-          删除
+          {t('common.delete')}
         </CSButton>
       </div>
     </div>
@@ -214,6 +236,7 @@ function AssetCard({ asset, onDelete }) {
 
 // ── 主组件 ────────────────────────────────────────────────────
 export default function FileLibrary() {
+  const { t } = useTranslation();
   const [assets, setAssets] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
   const [err, setErr] = React.useState('');
@@ -237,7 +260,7 @@ export default function FileLibrary() {
       const items = (r && (r.items || r.entries || r.assets)) || [];
       setAssets(items);
     } catch (e) {
-      setErr(e?.message || '加载失败');
+      setErr(e?.message || t('components.file_library.load_error'));
     } finally {
       setLoading(false);
     }
@@ -252,6 +275,9 @@ export default function FileLibrary() {
   const handleTab = (id) => {
     setActiveTab(id);
   };
+
+  const TABS = getTabs();
+  const KIND_META = getKindMeta();
 
   const visibleAssets = activeTab === 'all'
     ? assets
@@ -286,7 +312,7 @@ export default function FileLibrary() {
           if (r.deleted) {
             setAssets(prev => prev.filter(a => a.id !== asset.id));
             setDeleteState(null);
-            window.toast?.(`已删除 ${asset.name || '#' + asset.id}`, { kind: 'ok', duration: 2400 });
+            window.toast?.(t('components.file_library.toast.deleted', { name: asset.name || '#' + asset.id }), { kind: 'ok', duration: 2400 });
           } else {
             // 后端返回 ok 但 deleted 未标(可能要前端再确认一次)
             setDeleteState({ asset, phase: 'confirm', references: [] });
@@ -296,7 +322,7 @@ export default function FileLibrary() {
           setDeleteState({ asset, phase: 'confirm', references: [] });
         }
       } catch (e) {
-        window.toast?.(e?.message || '删除失败', { kind: 'danger', duration: 3000 });
+        window.toast?.(e?.message || t('components.file_library.toast.delete_failed'), { kind: 'danger', duration: 3000 });
         setDeleteState(null);
       } finally {
         setDeleteBusy(false);
@@ -308,9 +334,9 @@ export default function FileLibrary() {
         await window.api?.library?.deleteAsset(asset.id, true);
         setAssets(prev => prev.filter(a => a.id !== asset.id));
         setDeleteState(null);
-        window.toast?.(`已删除 ${asset.name || '#' + asset.id}`, { kind: 'ok', duration: 2400 });
+        window.toast?.(t('components.file_library.toast.deleted', { name: asset.name || '#' + asset.id }), { kind: 'ok', duration: 2400 });
       } catch (e) {
-        window.toast?.(e?.message || '删除失败', { kind: 'danger', duration: 3000 });
+        window.toast?.(e?.message || t('components.file_library.toast.delete_failed'), { kind: 'danger', duration: 3000 });
         setDeleteState(null);
       } finally {
         setDeleteBusy(false);
@@ -326,7 +352,7 @@ export default function FileLibrary() {
         <CSHeader
           variant="h1"
           counter={loading ? '' : `(${assets.length})`}
-          description="你的全部文件资产(AI 生图 / 角色卡图 / 头像 / 封面 / 导入文本)。只读管理——不支持直接上传,文件由各功能组件产生。"
+          description={t('components.file_library.description')}
           actions={
             <CSButton
               iconName="refresh"
@@ -334,11 +360,11 @@ export default function FileLibrary() {
               onClick={() => load('all')}
               loading={loading}
             >
-              刷新
+              {t('common.refresh')}
             </CSButton>
           }
         >
-          文件库
+          {t('components.file_library.title')}
         </CSHeader>
 
         {/* Tab 过滤栏 */}
@@ -375,10 +401,10 @@ export default function FileLibrary() {
         {/* 内容区 */}
         {loading ? (
           <div style={{ padding: '48px 20px', textAlign: 'center', color: 'var(--color-text-body-secondary)' }}>
-            <CSStatusIndicator type="loading">加载中…</CSStatusIndicator>
+            <CSStatusIndicator type="loading">{t('common.loading')}</CSStatusIndicator>
           </div>
         ) : err ? (
-          <CSAlert type="error" header="加载失败">{err}</CSAlert>
+          <CSAlert type="error" header={t('components.file_library.load_error')}>{err}</CSAlert>
         ) : visibleAssets.length === 0 ? (
           <div style={{ padding: '64px 20px', textAlign: 'center', color: 'var(--color-text-body-secondary)' }}>
             <div style={{ fontSize: 36, marginBottom: 12, opacity: 0.3 }}>
@@ -387,10 +413,12 @@ export default function FileLibrary() {
               </svg>
             </div>
             <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-heading)', marginBottom: 6 }}>
-              {activeTab === 'all' ? '暂无文件资产' : `暂无「${KIND_META[activeTab]?.label || activeTab}」资产`}
+              {activeTab === 'all'
+                ? t('components.file_library.empty.all')
+                : t('components.file_library.empty.filtered', { kind: KIND_META[activeTab]?.label || activeTab })}
             </div>
             <div style={{ fontSize: 13, lineHeight: 1.7 }}>
-              文件由各功能组件产生:AI 生图、头像上传、剧本导入等操作后会在此显示。
+              {t('components.file_library.empty.hint')}
             </div>
           </div>
         ) : (

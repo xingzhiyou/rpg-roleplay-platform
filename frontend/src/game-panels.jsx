@@ -1776,7 +1776,7 @@ function PanelRules({ state }) {
     setErrorMsg("");
     try {
       const data = await window.api.rules[fnName](...args);
-      if (!data || !data.ok) throw new Error(data?.error || data?.detail || `请求失败: ${fnName}`);
+      if (!data || !data.ok) throw new Error(data?.error || data?.detail || t('game.panels.rules_request_failed', { fn: fnName }));
       window.dispatchEvent(new CustomEvent("game-state-refresh"));
       return data;
     } catch (e) {

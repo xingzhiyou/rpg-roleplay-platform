@@ -12,24 +12,45 @@ import CSButton from '@cloudscape-design/components/button';
 import CSHeader from '@cloudscape-design/components/header';
 import CSSpaceBetween from '@cloudscape-design/components/space-between';
 import CSAlert from '@cloudscape-design/components/alert';
+import { useTranslation } from 'react-i18next';
+import i18n from '../i18n';
 
 // 6 旋钮的中文标签 + 说明 + 两端语义(low ↔ high)。顺序即展示顺序。
 const KNOBS = [
-  { key: 'reply_length',        label: '篇幅',     lo: '精简', hi: '铺陈',
-    desc: 'GM 每轮正文的长度。越低越短促克制,越高越长、越多场景与细节。' },
-  { key: 'player_action_focus', label: '镜头焦点', lo: '对方反应', hi: '细写你的动作',
-    desc: '正文以谁为主体。越低越聚焦对方 NPC 与世界的反应(你的动作一笔带过);越高越细致描摹你这一动作本身。' },
-  { key: 'drama_density',       label: '戏剧密度', lo: '镜像你', hi: '主动放大',
-    desc: '越低越贴着你这一轮输入的强度(你平淡它也平淡);越高越主动加冲突、转折与张力。' },
-  { key: 'interiority',         label: '心理补写', lo: '只写外在', hi: '多写内心',
-    desc: '越低只描写外部可见的动作、神态、话语;越高越多补 NPC 的内心活动与潜台词。' },
-  { key: 'cliffhanger',         label: '悬念',     lo: '平稳收束', hi: '强钩子',
-    desc: '结尾的张力。越低越平稳收束;越高越爱用迫近的危机或未尽之言把你拽进下一轮。' },
-  { key: 'guidance_force',      label: '引导力度', lo: '高自由', hi: '强推进',
-    desc: '越低越跟着你自由发挥;越高 GM 越主动推进剧情、往原著关键节点引导。' },
+  { key: 'reply_length',
+    get label() { return i18n.t('components.gm_style_editor.knobs.reply_length.label'); },
+    get lo()    { return i18n.t('components.gm_style_editor.knobs.reply_length.lo'); },
+    get hi()    { return i18n.t('components.gm_style_editor.knobs.reply_length.hi'); },
+    get desc()  { return i18n.t('components.gm_style_editor.knobs.reply_length.desc'); } },
+  { key: 'player_action_focus',
+    get label() { return i18n.t('components.gm_style_editor.knobs.player_action_focus.label'); },
+    get lo()    { return i18n.t('components.gm_style_editor.knobs.player_action_focus.lo'); },
+    get hi()    { return i18n.t('components.gm_style_editor.knobs.player_action_focus.hi'); },
+    get desc()  { return i18n.t('components.gm_style_editor.knobs.player_action_focus.desc'); } },
+  { key: 'drama_density',
+    get label() { return i18n.t('components.gm_style_editor.knobs.drama_density.label'); },
+    get lo()    { return i18n.t('components.gm_style_editor.knobs.drama_density.lo'); },
+    get hi()    { return i18n.t('components.gm_style_editor.knobs.drama_density.hi'); },
+    get desc()  { return i18n.t('components.gm_style_editor.knobs.drama_density.desc'); } },
+  { key: 'interiority',
+    get label() { return i18n.t('components.gm_style_editor.knobs.interiority.label'); },
+    get lo()    { return i18n.t('components.gm_style_editor.knobs.interiority.lo'); },
+    get hi()    { return i18n.t('components.gm_style_editor.knobs.interiority.hi'); },
+    get desc()  { return i18n.t('components.gm_style_editor.knobs.interiority.desc'); } },
+  { key: 'cliffhanger',
+    get label() { return i18n.t('components.gm_style_editor.knobs.cliffhanger.label'); },
+    get lo()    { return i18n.t('components.gm_style_editor.knobs.cliffhanger.lo'); },
+    get hi()    { return i18n.t('components.gm_style_editor.knobs.cliffhanger.hi'); },
+    get desc()  { return i18n.t('components.gm_style_editor.knobs.cliffhanger.desc'); } },
+  { key: 'guidance_force',
+    get label() { return i18n.t('components.gm_style_editor.knobs.guidance_force.label'); },
+    get lo()    { return i18n.t('components.gm_style_editor.knobs.guidance_force.lo'); },
+    get hi()    { return i18n.t('components.gm_style_editor.knobs.guidance_force.hi'); },
+    get desc()  { return i18n.t('components.gm_style_editor.knobs.guidance_force.desc'); } },
 ];
 
 export default function GmStyleEditor({ scope = 'user', scriptId = null, canWrite = true }) {
+  const { t } = useTranslation();
   const [vals, setVals] = React.useState(null);     // {key: 0-100}
   const [base, setBase] = React.useState(null);     // 加载时快照,用于「是否有改动」
   const [loading, setLoading] = React.useState(true);
@@ -46,7 +67,7 @@ export default function GmStyleEditor({ scope = 'user', scriptId = null, canWrit
       const gs = (r && r.gm_style) || {};
       setVals(gs); setBase(gs);
     } catch (e) {
-      setErr(e?.message || '读取失败');
+      setErr(e?.message || t('components.gm_style_editor.err_load'));
     } finally { setLoading(false); }
   }, [scope, scriptId]);
 
@@ -73,34 +94,36 @@ export default function GmStyleEditor({ scope = 'user', scriptId = null, canWrit
       const saved = (r && r.gm_style) || patch;
       // 后端可能返回部分键,合并回完整 vals
       setVals((p) => ({ ...p, ...saved })); setBase((p) => ({ ...p, ...saved }));
-      setOkMsg('已保存。' + (scope === 'script' ? '本剧本' : '你的默认') + '风格已更新,下一轮 GM 即按此生效。');
+      setOkMsg(scope === 'script'
+        ? t('components.gm_style_editor.ok_saved_script')
+        : t('components.gm_style_editor.ok_saved_user'));
     } catch (e) {
-      setErr(e?.message || '保存失败');
+      setErr(e?.message || t('components.gm_style_editor.err_save'));
     } finally { setSaving(false); }
   };
 
   const reset = () => { setVals(base); setOkMsg(''); };
 
-  if (loading) return <CSBox color="text-body-secondary" padding="m">正在读取叙事风格…</CSBox>;
+  if (loading) return <CSBox color="text-body-secondary" padding="m">{t('components.gm_style_editor.loading')}</CSBox>;
 
   return (
     <CSSpaceBetween size="m">
       <CSHeader
         variant="h3"
         description={scope === 'script'
-          ? '当前显示的是本剧本的【有效风格】(已叠加你的个人默认)。只调你想为本剧本特别定制的旋钮,未调的继续跟随你的个人默认 / 平台默认。'
-          : '你的全局默认 GM 风格,所有未单独设置的剧本都用它。剧本级 / 存档级设置会覆盖它。'}
+          ? t('components.gm_style_editor.desc_script')
+          : t('components.gm_style_editor.desc_user')}
         actions={canWrite ? (
           <CSSpaceBetween direction="horizontal" size="xs">
-            {dirty && <CSButton onClick={reset} disabled={saving}>还原</CSButton>}
-            <CSButton variant="primary" onClick={save} loading={saving} disabled={!dirty}>保存</CSButton>
+            {dirty && <CSButton onClick={reset} disabled={saving}>{t('components.gm_style_editor.revert')}</CSButton>}
+            <CSButton variant="primary" onClick={save} loading={saving} disabled={!dirty}>{t('common.save')}</CSButton>
           </CSSpaceBetween>
         ) : undefined}
-      >叙事风格(线性可调)</CSHeader>
+      >{t('components.gm_style_editor.title')}</CSHeader>
 
-      {err && <CSAlert type="error" header="出错了">{err}</CSAlert>}
+      {err && <CSAlert type="error" header={t('components.gm_style_editor.err_header')}>{err}</CSAlert>}
       {okMsg && <CSAlert type="success" dismissible onDismiss={() => setOkMsg('')}>{okMsg}</CSAlert>}
-      {!canWrite && <CSAlert type="info">只有剧本作者能修改本剧本的叙事风格。</CSAlert>}
+      {!canWrite && <CSAlert type="info">{t('components.gm_style_editor.readonly_notice')}</CSAlert>}
 
       <div style={{ display: 'grid', gap: 18 }}>
         {KNOBS.map((k) => (

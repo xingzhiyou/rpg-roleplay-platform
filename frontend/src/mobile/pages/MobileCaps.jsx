@@ -4,6 +4,7 @@
  * 铁律:零 Cloudscape / 零电脑端组件复用。数据层全接 window.api.*。
  */
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Icon } from '../icons.jsx';
 import { Sheet } from '../Sheet.jsx';
 import { sha256hex } from '../../lib/crypto-safe.js';
@@ -13,11 +14,11 @@ import { feedbackDecisionLabel } from '../../lib/feedback.js';
    Constants
    ────────────────────────────────────────────────────────────────── */
 const TABS = [
-  { id: 'plugins', label: '插件',    icon: 'plug'    },
-  { id: 'mcp',     label: 'MCP',     icon: 'diamond' },
-  { id: 'skills',  label: 'Skill',   icon: 'spark'   },
-  { id: 'apis',    label: 'API',     icon: 'braces'  },
-  { id: 'feedback',label: '反馈',    icon: 'feedback'},
+  { id: 'plugins', labelKey: 'mobile.caps.tab.plugins', icon: 'plug'    },
+  { id: 'mcp',     labelKey: 'mobile.caps.tab.mcp',     icon: 'diamond' },
+  { id: 'skills',  labelKey: 'mobile.caps.tab.skills',  icon: 'spark'   },
+  { id: 'apis',    labelKey: 'mobile.caps.tab.apis',    icon: 'braces'  },
+  { id: 'feedback',labelKey: 'mobile.caps.tab.feedback',icon: 'feedback'},
 ];
 
 const CONSENT_TEXT = '我已阅读 AUP §2.J,理解不得包含成人主题节选,同意(此操作记录我的同意)';
@@ -71,6 +72,7 @@ function MField({ label, desc, children }) {
    PLUGINS
    ────────────────────────────────────────────────────────────────── */
 function PluginsSection({ toast }) {
+  const { t } = useTranslation();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState('');
@@ -79,45 +81,45 @@ function PluginsSection({ toast }) {
     setLoading(true); setErr('');
     try {
       const r = await window.api.tools.list();
-      const t = (r && r.tools) || {};
-      setItems((t.plugins || []).map(p => ({
+      const tl = (r && r.tools) || {};
+      setItems((tl.plugins || []).map(p => ({
         id: p.id || p.name,
         name: p.name || p.id,
-        desc: p.description || '平台内置插件',
+        desc: p.description || t('mobile.caps.plugins.builtin_desc'),
         tag: p.kind || 'plugin',
         on: p.enabled !== false,
       })));
     } catch (e) {
-      setErr(e?.message || '加载失败');
+      setErr(e?.message || t('mobile.caps.error.load_failed'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => { load(); }, [load]);
 
   if (loading && items.length === 0) return (
-    <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--muted)' }}>加载中…</div>
+    <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--muted)' }}>{t('common.loading')}</div>
   );
   if (err) return (
     <div style={{ margin: '16px', padding: '12px 14px', borderRadius: 12, background: 'var(--danger-soft)', border: '1px solid rgba(200,103,93,0.3)', color: 'var(--danger)', fontSize: 13 }}>
       {err}
-      <button className="pl-btn-ghost" style={{ marginTop: 10, height: 38 }} onClick={load}>重试</button>
+      <button className="pl-btn-ghost" style={{ marginTop: 10, height: 38 }} onClick={load}>{t('mobile.caps.error.retry')}</button>
     </div>
   );
   if (items.length === 0) return (
     <div className="pl-empty">
       <div className="ic"><Icon name="plug" size={22} /></div>
-      <h3>暂无插件</h3>
-      <p>插件由平台预置,目前无可用插件。</p>
+      <h3>{t('mobile.caps.plugins.empty_title')}</h3>
+      <p>{t('mobile.caps.plugins.empty_desc')}</p>
     </div>
   );
 
   return (
     <div className="pl-pad">
       <div className="pl-sec-head" style={{ marginBottom: 14 }}>
-        <h2 style={{ margin: 0 }}>插件</h2>
-        <span style={{ fontSize: 12, color: 'var(--muted)' }}>{items.length} 项 · {items.filter(i => i.on).length} 已启用</span>
+        <h2 style={{ margin: 0 }}>{t('mobile.caps.tab.plugins')}</h2>
+        <span style={{ fontSize: 12, color: 'var(--muted)' }}>{t('mobile.caps.plugins.count', { total: items.length, enabled: items.filter(i => i.on).length })}</span>
       </div>
       <div style={{ display: 'grid', gap: 9 }}>
         {items.map((it) => (
@@ -130,10 +132,10 @@ function PluginsSection({ toast }) {
                 <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.name}</div>
                 <div className="mono" style={{ fontSize: 10.5, color: 'var(--muted-2)' }}>{it.tag}</div>
               </div>
-              <Toggle on={it.on} onChange={() => toast('插件状态由平台管理 · 暂不支持手动切换', 'warn')} />
+              <Toggle on={it.on} onChange={() => toast(t('mobile.caps.plugins.managed_by_platform'), 'warn')} />
             </div>
             <div style={{ fontSize: 12.5, color: 'var(--muted)', lineHeight: 1.55 }}>{it.desc}</div>
-            <StatusPill on={it.on} label={it.on ? '已启用' : '未启用'} />
+            <StatusPill on={it.on} label={it.on ? t('common.enabled') : t('common.disabled')} />
           </div>
         ))}
       </div>
@@ -145,6 +147,7 @@ function PluginsSection({ toast }) {
    MCP
    ────────────────────────────────────────────────────────────────── */
 function McpSection({ toast }) {
+  const { t } = useTranslation();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState('');
@@ -161,8 +164,8 @@ function McpSection({ toast }) {
         window.api.tools.list(),
         window.api.mcp.runtime().catch(() => null),
       ]);
-      const t = (toolsRes && toolsRes.tools) || {};
-      const servers = ((t.mcp || {}).servers) || [];
+      const tl = (toolsRes && toolsRes.tools) || {};
+      const servers = ((tl.mcp || {}).servers) || [];
       const running = (rtRes && (rtRes.running || [])) || [];
       const runSet = new Set(running.map(r => r.id || r.server_id || r.name));
       setItems(servers.map(s => {
@@ -174,25 +177,25 @@ function McpSection({ toast }) {
           desc: s.description || (s.transport === 'http' ? `HTTP · ${s.url || s.endpoint || '—'}` : `stdio · ${s.command || '—'}`),
           tag: s.transport || (s.url || s.endpoint ? 'http' : 'stdio'),
           on: isOn,
-          status: isRunning ? '已连接' : (isOn ? '未连接' : '未启用'),
+          status: isRunning ? t('mobile.caps.mcp.status.connected') : (isOn ? t('mobile.caps.mcp.status.disconnected') : t('common.disabled')),
           _raw: s,
         };
       }));
     } catch (e) {
-      setErr(e?.message || '加载失败');
+      setErr(e?.message || t('mobile.caps.error.load_failed'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => { load(); }, [load]);
 
   const handleToggle = async (it, next) => {
     const prev = it.on;
-    setItems(list => list.map(x => x.id === it.id ? { ...x, on: next, status: next ? '未连接' : '未启用' } : x));
+    setItems(list => list.map(x => x.id === it.id ? { ...x, on: next, status: next ? t('mobile.caps.mcp.status.disconnected') : t('common.disabled') } : x));
     try {
       await window.api.mcp.enabled({ id: it.id, server_id: it.id, enabled: next });
-      toast(next ? '已启用' : '已停用', 'ok');
+      toast(next ? t('mobile.caps.mcp.toast.enabled') : t('mobile.caps.mcp.toast.disabled'), 'ok');
       if (next) {
         try { await window.api.mcp.start({ id: it.id, server_id: it.id }); } catch (_) {}
       } else {
@@ -201,18 +204,18 @@ function McpSection({ toast }) {
       load();
     } catch (e) {
       setItems(list => list.map(x => x.id === it.id ? { ...x, on: prev } : x));
-      toast('切换失败', 'danger');
+      toast(t('mobile.caps.mcp.toast.toggle_failed'), 'danger');
     }
   };
 
   const handleDelete = async (it) => {
-    if (!window.confirm(`删除 MCP 服务器「${it.name}」?`)) return;
+    if (!window.confirm(t('mobile.caps.mcp.confirm.delete', { name: it.name }))) return;
     try {
       await window.api.mcp.remove({ id: it.id, server_id: it.id });
-      toast('已删除', 'ok');
+      toast(t('mobile.caps.toast.deleted'), 'ok');
       load();
     } catch (e) {
-      toast('删除失败: ' + (e?.message || ''), 'danger');
+      toast(t('mobile.caps.toast.delete_failed', { msg: e?.message || '' }), 'danger');
     }
   };
 
@@ -236,7 +239,7 @@ function McpSection({ toast }) {
 
   const handleSubmit = async () => {
     if (!form.name.trim() || !form.command.trim()) {
-      toast('名称和命令/URL 不能为空', 'warn');
+      toast(t('mobile.caps.mcp.form.name_command_required'), 'warn');
       return;
     }
     setFormBusy(true);
@@ -256,14 +259,14 @@ function McpSection({ toast }) {
       else body.command = form.command;
       if (Object.keys(envObj).length) body.env = envObj;
       await window.api.mcp.upsert(body);
-      toast(editTarget ? '已保存' : 'MCP 服务器已添加 · 正在校验', 'ok');
+      toast(editTarget ? t('mobile.caps.mcp.toast.saved') : t('mobile.caps.mcp.toast.added'), 'ok');
       if (!editTarget) {
         try { await window.api.mcp.validate({ name: form.name }); } catch (_) {}
       }
       setAddOpen(false);
       load();
     } catch (e) {
-      toast((editTarget ? '保存失败: ' : '添加失败: ') + (e?.message || ''), 'danger');
+      toast((editTarget ? t('mobile.caps.toast.save_failed') : t('mobile.caps.mcp.toast.add_failed')) + (e?.message ? ': ' + e.message : ''), 'danger');
     } finally {
       setFormBusy(false);
     }
@@ -275,9 +278,9 @@ function McpSection({ toast }) {
     <>
       <div className="pl-pad">
         <div className="pl-sec-head" style={{ marginBottom: 14 }}>
-          <h2 style={{ margin: 0 }}>MCP 服务器</h2>
+          <h2 style={{ margin: 0 }}>{t('mobile.caps.mcp.title')}</h2>
           <button className="pl-btn-primary" style={{ height: 36, width: 'auto', padding: '0 16px', fontSize: 13 }} onClick={openAdd}>
-            <Icon name="plus" size={14} />新增
+            <Icon name="plus" size={14} />{t('mobile.caps.mcp.add_btn')}
           </button>
         </div>
         {err && (
@@ -286,12 +289,12 @@ function McpSection({ toast }) {
           </div>
         )}
         {loading && items.length === 0 ? (
-          <div style={{ textAlign: 'center', color: 'var(--muted)', padding: '40px 0' }}>加载中…</div>
+          <div style={{ textAlign: 'center', color: 'var(--muted)', padding: '40px 0' }}>{t('common.loading')}</div>
         ) : items.length === 0 ? (
           <div className="pl-empty">
             <div className="ic"><Icon name="diamond" size={22} /></div>
-            <h3>尚未配置 MCP 服务器</h3>
-            <p>点击「新增」添加第一个 MCP 端点。</p>
+            <h3>{t('mobile.caps.mcp.empty_title')}</h3>
+            <p>{t('mobile.caps.mcp.empty_desc')}</p>
           </div>
         ) : (
           <div style={{ display: 'grid', gap: 9 }}>
@@ -312,10 +315,10 @@ function McpSection({ toast }) {
                   <StatusPill on={it.on} label={it.status} />
                   <div style={{ display: 'flex', gap: 7 }}>
                     <button onClick={() => openEdit(it)} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 8, border: '1px solid var(--line-soft)', background: 'var(--panel-2)', color: 'var(--muted)', fontSize: 12 }}>
-                      <Icon name="edit" size={12} />编辑
+                      <Icon name="edit" size={12} />{t('common.edit')}
                     </button>
                     <button onClick={() => handleDelete(it)} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 8, border: '1px solid rgba(200,103,93,0.3)', background: 'var(--danger-soft)', color: 'var(--danger)', fontSize: 12 }}>
-                      <Icon name="trash" size={12} />删除
+                      <Icon name="trash" size={12} />{t('common.delete')}
                     </button>
                   </div>
                 </div>
@@ -325,27 +328,27 @@ function McpSection({ toast }) {
         )}
       </div>
 
-      <Sheet open={addOpen} title={isEdit ? '编辑 MCP 服务器' : '新增 MCP 服务器'} hint="POST /api/v1/mcp/server" onClose={() => setAddOpen(false)} zIndex={70} maxHeight="88%">
+      <Sheet open={addOpen} title={isEdit ? t('mobile.caps.mcp.sheet.edit_title') : t('mobile.caps.mcp.sheet.add_title')} hint="POST /api/v1/mcp/server" onClose={() => setAddOpen(false)} zIndex={70} maxHeight="88%">
         <div style={{ padding: '4px 4px 8px' }}>
-          <MField label="名称" desc="服务器显示名称">
-            <input className="pl-input" placeholder="例：filesystem · 本地" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} style={{ fontSize: 16 }} />
+          <MField label={t('mobile.caps.mcp.form.name_label')} desc={t('mobile.caps.mcp.form.name_desc')}>
+            <input className="pl-input" placeholder={t('mobile.caps.mcp.form.name_placeholder')} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} style={{ fontSize: 16 }} />
           </MField>
-          <MField label="传输">
+          <MField label={t('mobile.caps.mcp.form.transport_label')}>
             <div className="pl-seg2" style={{ marginTop: 4 }}>
-              <button className={form.transport === 'stdio' ? 'active' : ''} onClick={() => setForm(f => ({ ...f, transport: 'stdio' }))}>stdio · 本地</button>
-              <button className={form.transport === 'http' ? 'active' : ''} onClick={() => setForm(f => ({ ...f, transport: 'http' }))}>http · 远程</button>
+              <button className={form.transport === 'stdio' ? 'active' : ''} onClick={() => setForm(f => ({ ...f, transport: 'stdio' }))}>{t('mobile.caps.mcp.form.transport_stdio')}</button>
+              <button className={form.transport === 'http' ? 'active' : ''} onClick={() => setForm(f => ({ ...f, transport: 'http' }))}>{t('mobile.caps.mcp.form.transport_http')}</button>
             </div>
           </MField>
-          <MField label={form.transport === 'http' ? 'URL' : '命令'} desc={form.transport === 'http' ? 'https://host:port' : 'uvx my-mcp 或完整命令行'}>
+          <MField label={form.transport === 'http' ? 'URL' : t('mobile.caps.mcp.form.command_label')} desc={form.transport === 'http' ? 'https://host:port' : t('mobile.caps.mcp.form.command_desc')}>
             <input className="pl-input mono" placeholder={form.transport === 'http' ? 'https://localhost:7300' : 'uvx my-mcp'} value={form.command} onChange={e => setForm(f => ({ ...f, command: e.target.value }))} style={{ fontSize: 16 }} />
           </MField>
-          <MField label="环境变量" desc="可选,每行 KEY=VALUE">
-            <textarea className="pl-input" placeholder="例：API_KEY=sk-…" value={form.env} onChange={e => setForm(f => ({ ...f, env: e.target.value }))} style={{ minHeight: 72, fontSize: 16 }} />
+          <MField label={t('mobile.caps.mcp.form.env_label')} desc={t('mobile.caps.mcp.form.env_desc')}>
+            <textarea className="pl-input" placeholder={t('mobile.caps.mcp.form.env_placeholder')} value={form.env} onChange={e => setForm(f => ({ ...f, env: e.target.value }))} style={{ minHeight: 72, fontSize: 16 }} />
           </MField>
           <div className="sheet-actions" style={{ marginTop: 8 }}>
-            <button className="sheet-btn" onClick={() => setAddOpen(false)}>取消</button>
+            <button className="sheet-btn" onClick={() => setAddOpen(false)}>{t('common.cancel')}</button>
             <button className="sheet-btn primary" onClick={handleSubmit} disabled={formBusy}>
-              {formBusy ? '提交中…' : (isEdit ? '保存' : '校验并启用')}
+              {formBusy ? t('mobile.caps.mcp.form.submitting') : (isEdit ? t('common.save') : t('mobile.caps.mcp.form.validate_enable'))}
             </button>
           </div>
         </div>
@@ -358,6 +361,7 @@ function McpSection({ toast }) {
    SKILLS
    ────────────────────────────────────────────────────────────────── */
 function SkillsSection({ toast }) {
+  const { t } = useTranslation();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState('');
@@ -370,8 +374,8 @@ function SkillsSection({ toast }) {
     setLoading(true); setErr('');
     try {
       const r = await window.api.tools.list();
-      const t = (r && r.tools) || {};
-      setItems((t.skills || []).map(s => ({
+      const tl = (r && r.tools) || {};
+      setItems((tl.skills || []).map(s => ({
         id: s.id || s.slug || s.name,
         name: s.name || s.id,
         desc: s.description || s.summary || '',
@@ -379,25 +383,25 @@ function SkillsSection({ toast }) {
         on: s.enabled !== false,
       })));
     } catch (e) {
-      setErr(e?.message || '加载失败');
+      setErr(e?.message || t('mobile.caps.error.load_failed'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => { load(); }, [load]);
 
   const handleImport = async () => {
-    if (!file) { toast('请选择 Skill 包文件', 'warn'); return; }
+    if (!file) { toast(t('mobile.caps.skills.select_file_required'), 'warn'); return; }
     setImportBusy(true);
     try {
       await window.api.skills.importPack(file);
-      toast('Skill 已导入', 'ok');
+      toast(t('mobile.caps.skills.toast.imported'), 'ok');
       setImportOpen(false);
       setFile(null);
       load();
     } catch (e) {
-      toast('导入失败: ' + (e?.message || ''), 'danger');
+      toast(t('mobile.caps.skills.toast.import_failed', { msg: e?.message || '' }), 'danger');
     } finally {
       setImportBusy(false);
     }
@@ -407,9 +411,9 @@ function SkillsSection({ toast }) {
     <>
       <div className="pl-pad">
         <div className="pl-sec-head" style={{ marginBottom: 14 }}>
-          <h2 style={{ margin: 0 }}>Skill 包</h2>
+          <h2 style={{ margin: 0 }}>{t('mobile.caps.skills.title')}</h2>
           <button className="pl-btn-primary" style={{ height: 36, width: 'auto', padding: '0 16px', fontSize: 13 }} onClick={() => setImportOpen(true)}>
-            <Icon name="upload" size={14} />导入
+            <Icon name="upload" size={14} />{t('mobile.caps.skills.import_btn')}
           </button>
         </div>
         {err && (
@@ -418,12 +422,12 @@ function SkillsSection({ toast }) {
           </div>
         )}
         {loading && items.length === 0 ? (
-          <div style={{ textAlign: 'center', color: 'var(--muted)', padding: '40px 0' }}>加载中…</div>
+          <div style={{ textAlign: 'center', color: 'var(--muted)', padding: '40px 0' }}>{t('common.loading')}</div>
         ) : items.length === 0 ? (
           <div className="pl-empty">
             <div className="ic"><Icon name="spark" size={22} /></div>
-            <h3>尚未导入 Skill 包</h3>
-            <p>点击「导入」上传 .zip / .tar.gz Skill 包。</p>
+            <h3>{t('mobile.caps.skills.empty_title')}</h3>
+            <p>{t('mobile.caps.skills.empty_desc')}</p>
           </div>
         ) : (
           <div style={{ display: 'grid', gap: 9 }}>
@@ -437,19 +441,19 @@ function SkillsSection({ toast }) {
                     <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.name}</div>
                     <div className="mono" style={{ fontSize: 10.5, color: 'var(--muted-2)' }}>{it.tag}</div>
                   </div>
-                  <Toggle on={it.on} onChange={() => toast('Skill 默认全部启用 · 暂不支持单独停用', 'warn')} />
+                  <Toggle on={it.on} onChange={() => toast(t('mobile.caps.skills.all_enabled_notice'), 'warn')} />
                 </div>
                 {it.desc ? <div style={{ fontSize: 12.5, color: 'var(--muted)', lineHeight: 1.55 }}>{it.desc}</div> : null}
-                <StatusPill on={it.on} label={it.on ? '已部署' : '未启用'} />
+                <StatusPill on={it.on} label={it.on ? t('mobile.caps.skills.status.deployed') : t('common.disabled')} />
               </div>
             ))}
           </div>
         )}
       </div>
 
-      <Sheet open={importOpen} title="导入 Skill 包" hint="POST /api/v1/skills/import" onClose={() => setImportOpen(false)} zIndex={70} maxHeight="88%">
+      <Sheet open={importOpen} title={t('mobile.caps.skills.sheet.title')} hint="POST /api/v1/skills/import" onClose={() => setImportOpen(false)} zIndex={70} maxHeight="88%">
         <div style={{ padding: '4px 4px 8px' }}>
-          <MField label="Skill 包文件" desc=".zip / .tar.gz 格式">
+          <MField label={t('mobile.caps.skills.form.file_label')} desc={t('mobile.caps.skills.form.file_desc')}>
             <input
               ref={fileRef}
               type="file"
@@ -463,13 +467,13 @@ function SkillsSection({ toast }) {
               onClick={() => fileRef.current?.click()}
             >
               <Icon name="upload" size={16} />
-              {file ? file.name : '选择文件…'}
+              {file ? file.name : t('mobile.caps.skills.form.select_file')}
             </button>
           </MField>
           <div className="sheet-actions" style={{ marginTop: 8 }}>
-            <button className="sheet-btn" onClick={() => setImportOpen(false)}>取消</button>
+            <button className="sheet-btn" onClick={() => setImportOpen(false)}>{t('common.cancel')}</button>
             <button className="sheet-btn primary" onClick={handleImport} disabled={importBusy || !file}>
-              {importBusy ? '导入中…' : '导入并部署'}
+              {importBusy ? t('mobile.caps.skills.form.importing') : t('mobile.caps.skills.form.import_deploy')}
             </button>
           </div>
         </div>
@@ -482,6 +486,7 @@ function SkillsSection({ toast }) {
    APIS — BYOK 凭证管理
    ────────────────────────────────────────────────────────────────── */
 function ApisSection({ toast }) {
+  const { t } = useTranslation();
   const [creds, setCreds] = useState({});       // api_id → { key_set, key_hint }
   const [providers, setProviders] = useState([]); // from /api/models catalog
   const [loading, setLoading] = useState(false);
@@ -507,11 +512,11 @@ function ApisSection({ toast }) {
       const apis = (modelsRes && modelsRes.apis) || [];
       setProviders(apis.filter(a => a.id !== 'local' && a.id !== 'builtin'));
     } catch (e) {
-      setErr(e?.message || '加载失败');
+      setErr(e?.message || t('mobile.caps.error.load_failed'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -522,28 +527,28 @@ function ApisSection({ toast }) {
   };
 
   const handleSave = async () => {
-    if (!keyVal.trim()) { toast('请填写 API Key', 'warn'); return; }
+    if (!keyVal.trim()) { toast(t('mobile.caps.apis.form.key_required'), 'warn'); return; }
     setSaveBusy(true);
     try {
       await window.api.credentials.set({ api_id: editProv.id, api_key: keyVal.trim() });
-      toast('API Key 已保存', 'ok');
+      toast(t('mobile.caps.apis.toast.key_saved'), 'ok');
       setEditProv(null);
       load();
     } catch (e) {
-      toast('保存失败: ' + (e?.message || ''), 'danger');
+      toast(t('mobile.caps.toast.save_failed') + ': ' + (e?.message || ''), 'danger');
     } finally {
       setSaveBusy(false);
     }
   };
 
   const handleRemove = async (prov) => {
-    if (!window.confirm(`删除「${prov.name || prov.id}」的 API Key?`)) return;
+    if (!window.confirm(t('mobile.caps.apis.confirm.delete_key', { name: prov.name || prov.id }))) return;
     try {
       await window.api.credentials.remove({ api_id: prov.id });
-      toast('已删除', 'ok');
+      toast(t('mobile.caps.toast.deleted'), 'ok');
       load();
     } catch (e) {
-      toast('删除失败: ' + (e?.message || ''), 'danger');
+      toast(t('mobile.caps.toast.delete_failed', { msg: e?.message || '' }), 'danger');
     }
   };
 
@@ -551,9 +556,9 @@ function ApisSection({ toast }) {
     setTestResult({ id: prov.id, busy: true });
     try {
       const r = await window.api.credentials.test({ api_id: prov.id });
-      setTestResult({ id: prov.id, ok: r?.ok !== false, message: r?.message || (r?.ok !== false ? '连通' : '失败') });
+      setTestResult({ id: prov.id, ok: r?.ok !== false, message: r?.message || (r?.ok !== false ? t('mobile.caps.apis.test.ok') : t('mobile.caps.apis.test.failed')) });
     } catch (e) {
-      setTestResult({ id: prov.id, ok: false, message: e?.message || '请求失败' });
+      setTestResult({ id: prov.id, ok: false, message: e?.message || t('mobile.caps.apis.test.request_failed') });
     }
   };
 
@@ -564,10 +569,10 @@ function ApisSection({ toast }) {
     <>
       <div className="pl-pad">
         <div className="pl-sec-head" style={{ marginBottom: 4 }}>
-          <h2 style={{ margin: 0 }}>API 凭证 (BYOK)</h2>
+          <h2 style={{ margin: 0 }}>{t('mobile.caps.apis.title')}</h2>
         </div>
         <div style={{ fontSize: 12.5, color: 'var(--muted)', lineHeight: 1.6, marginBottom: 16 }}>
-          填写各供应商 API Key,系统将优先使用你的密钥调用对应模型。
+          {t('mobile.caps.apis.description')}
         </div>
         {err && (
           <div style={{ marginBottom: 14, padding: '12px 14px', borderRadius: 12, background: 'var(--danger-soft)', border: '1px solid rgba(200,103,93,0.3)', color: 'var(--danger)', fontSize: 13 }}>
@@ -575,12 +580,12 @@ function ApisSection({ toast }) {
           </div>
         )}
         {loading && providers.length === 0 ? (
-          <div style={{ textAlign: 'center', color: 'var(--muted)', padding: '40px 0' }}>加载中…</div>
+          <div style={{ textAlign: 'center', color: 'var(--muted)', padding: '40px 0' }}>{t('common.loading')}</div>
         ) : providers.length === 0 ? (
           <div className="pl-empty">
             <div className="ic"><Icon name="braces" size={22} /></div>
-            <h3>无可用供应商</h3>
-            <p>暂无已配置的 API 供应商。</p>
+            <h3>{t('mobile.caps.apis.empty_title')}</h3>
+            <p>{t('mobile.caps.apis.empty_desc')}</p>
           </div>
         ) : (
           <div className="pl-group">
@@ -596,16 +601,16 @@ function ApisSection({ toast }) {
                     </div>
                     <div className="pl-prov-id" style={{ flex: 1, minWidth: 0 }}>
                       <strong>{prov.name || prov.id}</strong>
-                      <div className="key mono">{set ? (cred?.key_hint ? `…${cred.key_hint}` : '已设置') : '未设置'}</div>
+                      <div className="key mono">{set ? (cred?.key_hint ? `…${cred.key_hint}` : t('mobile.caps.apis.key_set')) : t('mobile.caps.apis.key_unset')}</div>
                     </div>
                     <div style={{ display: 'flex', gap: 6, flex: 'none' }}>
                       {set && (
                         <button onClick={() => handleTest(prov)} style={{ padding: '5px 9px', borderRadius: 8, border: '1px solid var(--line-soft)', background: 'var(--panel-2)', color: 'var(--muted)', fontSize: 11.5 }}>
-                          {tr?.busy ? '…' : '测试'}
+                          {tr?.busy ? '…' : t('mobile.caps.apis.test_btn')}
                         </button>
                       )}
                       <button onClick={() => openEdit(prov)} style={{ padding: '5px 9px', borderRadius: 8, border: '1px solid var(--accent-edge)', background: 'var(--accent-soft)', color: 'var(--accent)', fontSize: 11.5 }}>
-                        {set ? '更换' : '设置'}
+                        {set ? t('mobile.caps.apis.replace_btn') : t('mobile.caps.apis.set_btn')}
                       </button>
                     </div>
                   </div>
@@ -616,7 +621,7 @@ function ApisSection({ toast }) {
                   )}
                   {set && (
                     <button onClick={() => handleRemove(prov)} style={{ alignSelf: 'start', fontSize: 11.5, color: 'var(--danger)', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}>
-                      删除密钥
+                      {t('mobile.caps.apis.delete_key_btn')}
                     </button>
                   )}
                 </div>
@@ -627,13 +632,13 @@ function ApisSection({ toast }) {
       </div>
 
       {/* Edit Key Sheet */}
-      <Sheet open={!!editProv} title={`设置 API Key · ${editProv?.name || editProv?.id || ''}`} hint="POST /api/v1/me/credentials" onClose={() => setEditProv(null)} zIndex={70} maxHeight="88%">
+      <Sheet open={!!editProv} title={t('mobile.caps.apis.sheet.title', { name: editProv?.name || editProv?.id || '' })} hint="POST /api/v1/me/credentials" onClose={() => setEditProv(null)} zIndex={70} maxHeight="88%">
         <div style={{ padding: '4px 4px 8px' }}>
-          <MField label="API Key" desc={isSet(editProv || {}) ? '留空则保留现有密钥' : '填写供应商提供的 API Key'}>
+          <MField label="API Key" desc={isSet(editProv || {}) ? t('mobile.caps.apis.form.key_desc_existing') : t('mobile.caps.apis.form.key_desc_new')}>
             <input
               className="pl-input"
               type="password"
-              placeholder={isSet(editProv || {}) ? '不修改则留空' : 'sk-…'}
+              placeholder={isSet(editProv || {}) ? t('mobile.caps.apis.form.key_placeholder_existing') : 'sk-…'}
               autoComplete="new-password"
               value={keyVal}
               onChange={e => setKeyVal(e.target.value)}
@@ -641,9 +646,9 @@ function ApisSection({ toast }) {
             />
           </MField>
           <div className="sheet-actions" style={{ marginTop: 8 }}>
-            <button className="sheet-btn" onClick={() => setEditProv(null)}>取消</button>
+            <button className="sheet-btn" onClick={() => setEditProv(null)}>{t('common.cancel')}</button>
             <button className="sheet-btn primary" onClick={handleSave} disabled={saveBusy || !keyVal.trim()}>
-              {saveBusy ? '保存中…' : '保存'}
+              {saveBusy ? t('mobile.caps.apis.form.saving') : t('common.save')}
             </button>
           </div>
         </div>
@@ -667,6 +672,7 @@ function fmtTime(ts) {
 }
 
 function FeedbackSection({ toast }) {
+  const { t } = useTranslation();
   // Submit form state
   const [freeText, setFreeText] = useState('');
   const [includeRuntime, setIncludeRuntime] = useState(true);
@@ -694,10 +700,10 @@ function FeedbackSection({ toast }) {
       const res = await fetch('/api/me/feedback?limit=50', { credentials: 'include' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      if (!data || !data.ok) throw new Error(data?.error || '读取反馈记录失败');
+      if (!data || !data.ok) throw new Error(data?.error || t('mobile.caps.feedback.history.load_error'));
       setHistory(Array.isArray(data.items) ? data.items : []);
     } catch (e) {
-      setHistErr(e?.message || '读取失败');
+      setHistErr(e?.message || t('mobile.caps.feedback.history.load_error'));
     } finally {
       setHistLoading(false);
     }
@@ -731,7 +737,7 @@ function FeedbackSection({ toast }) {
         const turns = recent.slice(-6).map((n, i) => ({
           idx: i, session_id: saveId, range: String(n.turn_index ?? n.turn ?? i),
           plaintext: ((n.content || n.text || '') + '').slice(0, 200),
-          label: n.role === 'user' ? '玩家' : 'GM',
+          label: n.role === 'user' ? t('mobile.caps.feedback.turn_label.player') : 'GM',
         }));
         if (!cancelled) setRecentTurns(turns);
       } catch (_) { if (!cancelled) setRecentTurns([]); }
@@ -770,24 +776,24 @@ function FeedbackSection({ toast }) {
       if (!res.ok || !data.ok) throw new Error(data.detail || data.error || `HTTP ${res.status}`);
       setSubmitDone(true);
       setFreeText(''); setConsent(false); setIncludeExcerpts(false); setSelectedExcerpts([]);
-      toast('已收到你的反馈', 'ok');
+      toast(t('mobile.caps.feedback.toast.submitted'), 'ok');
       loadHistory();
     } catch (e) {
-      setSubmitErr(e?.message || '提交失败,请稍后重试');
+      setSubmitErr(e?.message || t('mobile.caps.feedback.submit_error'));
     } finally {
       setSubmitBusy(false);
     }
   };
 
   const handleWithdraw = async (id) => {
-    if (!window.confirm(`撤回反馈 #${id}?`)) return;
+    if (!window.confirm(t('mobile.caps.feedback.confirm.withdraw', { id }))) return;
     try {
       const res = await fetch(`/api/feedback/${id}`, { method: 'DELETE', credentials: 'include' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      toast('已撤回', 'ok');
+      toast(t('mobile.caps.feedback.toast.withdrawn'), 'ok');
       loadHistory();
     } catch (e) {
-      toast('撤回失败', 'danger');
+      toast(t('mobile.caps.feedback.toast.withdraw_failed'), 'danger');
     }
   };
 
@@ -808,9 +814,9 @@ function FeedbackSection({ toast }) {
     <div className="pl-pad">
       {/* View toggle */}
       <div className="pl-seg2" style={{ marginBottom: 18 }}>
-        <button className={view === 'form' ? 'active' : ''} onClick={() => setView('form')}>提交反馈</button>
+        <button className={view === 'form' ? 'active' : ''} onClick={() => setView('form')}>{t('mobile.caps.feedback.tab.submit')}</button>
         <button className={view === 'history' ? 'active accent' : ''} onClick={() => setView('history')}>
-          我的记录{counts.total > 0 ? ` (${counts.total})` : ''}
+          {t('mobile.caps.feedback.tab.history')}{counts.total > 0 ? ` (${counts.total})` : ''}
         </button>
       </div>
 
@@ -818,15 +824,15 @@ function FeedbackSection({ toast }) {
         <div style={{ display: 'grid', gap: 14 }}>
           {/* Warning */}
           <div style={{ padding: '11px 13px', borderRadius: 12, background: 'var(--warn-soft)', border: '1px solid rgba(212,179,102,0.3)', fontSize: 12.5, color: 'var(--text-quiet)', lineHeight: 1.6 }}>
-            <strong style={{ color: 'var(--warn)' }}>内容限制</strong> 反馈渠道不得包含 NSFW 等成人材料,违规将永久封号。
-            详见 <a href={AUP_LINK} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)' }}>AUP §2.J</a>
+            <strong style={{ color: 'var(--warn)' }}>{t('mobile.caps.feedback.warning.title')}</strong> {t('mobile.caps.feedback.warning.body')}
+            {t('mobile.caps.feedback.warning.see')} <a href={AUP_LINK} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)' }}>AUP §2.J</a>
           </div>
 
           {submitDone && (
             <div style={{ padding: '11px 13px', borderRadius: 12, background: 'var(--ok-soft)', border: '1px solid rgba(126,184,142,0.3)', fontSize: 12.5, color: 'var(--ok)', display: 'flex', alignItems: 'center', gap: 8 }}>
               <Icon name="check" size={14} />
-              已收到你的反馈!可在「我的记录」跟进处理进度。
-              <button onClick={() => setSubmitDone(false)} style={{ marginLeft: 'auto', color: 'var(--ok)', fontSize: 11 }}>关闭</button>
+              {t('mobile.caps.feedback.submit_done')}
+              <button onClick={() => setSubmitDone(false)} style={{ marginLeft: 'auto', color: 'var(--ok)', fontSize: 11 }}>{t('common.close')}</button>
             </div>
           )}
           {submitErr && (
@@ -835,17 +841,17 @@ function FeedbackSection({ toast }) {
             </div>
           )}
 
-          <MField label="问题 / 建议" desc={`最多 ${MAX_FREE_TEXT} 字`}>
+          <MField label={t('mobile.caps.feedback.form.label')} desc={t('mobile.caps.feedback.form.max_chars', { max: MAX_FREE_TEXT })}>
             <textarea
               className="pl-input"
-              placeholder="请描述你遇到的问题或建议…(复现步骤 / 期望 / 实际 越具体越好)"
+              placeholder={t('mobile.caps.feedback.form.placeholder')}
               value={freeText}
               onChange={e => setFreeText(e.target.value)}
               style={{ minHeight: 120, fontSize: 16, lineHeight: 1.6 }}
               disabled={submitBusy}
             />
             {freeText.length > MAX_FREE_TEXT && (
-              <span style={{ fontSize: 11, color: 'var(--danger)' }}>超过 {MAX_FREE_TEXT} 字限制</span>
+              <span style={{ fontSize: 11, color: 'var(--danger)' }}>{t('mobile.caps.feedback.form.over_limit', { max: MAX_FREE_TEXT })}</span>
             )}
           </MField>
 
@@ -853,27 +859,27 @@ function FeedbackSection({ toast }) {
           <div style={{ display: 'grid', gap: 10 }}>
             <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, fontSize: 13, color: 'var(--text-quiet)', lineHeight: 1.5, cursor: 'pointer' }}>
               <input type="checkbox" checked={includeRuntime} onChange={e => setIncludeRuntime(e.target.checked)} disabled={submitBusy} style={{ marginTop: 2, accentColor: 'var(--accent)', width: 16, height: 16, flex: 'none' }} />
-              附带运行环境信息(页面 / 活动剧本存档 / 最近错误,仅管理员可见,强烈建议)
+              {t('mobile.caps.feedback.form.include_runtime')}
             </label>
             {includeRuntime && runtimePreview && (
               <div className="mono" style={{ fontSize: 11, color: 'var(--muted)', padding: '8px 10px', borderRadius: 8, background: 'var(--bg-deep)', border: '1px solid var(--line-soft)', lineHeight: 1.7 }}>
-                页面 {runtimePreview.hash || runtimePreview.url || '—'} · 存档 {String(runtimePreview.active?.save_id ?? '—')}
-                {'\n'}错误 {runtimePreview.errors?.length || 0} 条 · API失败 {runtimePreview.api_failures?.length || 0} 条
+                {t('mobile.caps.feedback.runtime_preview.page')} {runtimePreview.hash || runtimePreview.url || '—'} · {t('mobile.caps.feedback.runtime_preview.save')} {String(runtimePreview.active?.save_id ?? '—')}
+                {'\n'}{t('mobile.caps.feedback.runtime_preview.errors')} {runtimePreview.errors?.length || 0} · {t('mobile.caps.feedback.runtime_preview.api_failures')} {runtimePreview.api_failures?.length || 0}
               </div>
             )}
 
             <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, fontSize: 13, color: 'var(--text-quiet)', lineHeight: 1.5, cursor: 'pointer' }}>
               <input type="checkbox" checked={includeExcerpts} onChange={e => setIncludeExcerpts(e.target.checked)} disabled={submitBusy} style={{ marginTop: 2, accentColor: 'var(--accent)', width: 16, height: 16, flex: 'none' }} />
-              包含对话节选(最多 5 段)
+              {t('mobile.caps.feedback.form.include_excerpts')}
             </label>
             {includeExcerpts && (
               recentTurns.length === 0
-                ? <div style={{ fontSize: 12, color: 'var(--muted)', paddingLeft: 26 }}>暂无可用对话节选</div>
+                ? <div style={{ fontSize: 12, color: 'var(--muted)', paddingLeft: 26 }}>{t('mobile.caps.feedback.form.no_excerpts')}</div>
                 : <div style={{ paddingLeft: 26, display: 'grid', gap: 7 }}>
-                    {recentTurns.map(t => (
-                      <label key={t.idx} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12.5, color: 'var(--muted)', cursor: 'pointer' }}>
-                        <input type="checkbox" checked={selectedExcerpts.includes(t.idx)} onChange={() => setSelectedExcerpts(p => p.includes(t.idx) ? p.filter(i => i !== t.idx) : [...p, t.idx])} disabled={submitBusy} style={{ marginTop: 2, accentColor: 'var(--accent)', flex: 'none' }} />
-                        <span><strong style={{ color: 'var(--text-quiet)' }}>{t.label}</strong> {t.plaintext.slice(0, 60)}{t.plaintext.length > 60 ? '…' : ''}</span>
+                    {recentTurns.map(turn => (
+                      <label key={turn.idx} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12.5, color: 'var(--muted)', cursor: 'pointer' }}>
+                        <input type="checkbox" checked={selectedExcerpts.includes(turn.idx)} onChange={() => setSelectedExcerpts(p => p.includes(turn.idx) ? p.filter(i => i !== turn.idx) : [...p, turn.idx])} disabled={submitBusy} style={{ marginTop: 2, accentColor: 'var(--accent)', flex: 'none' }} />
+                        <span><strong style={{ color: 'var(--text-quiet)' }}>{turn.label}</strong> {turn.plaintext.slice(0, 60)}{turn.plaintext.length > 60 ? '…' : ''}</span>
                       </label>
                     ))}
                   </div>
@@ -892,17 +898,17 @@ function FeedbackSection({ toast }) {
             disabled={!canSubmit}
             style={{ opacity: !canSubmit ? 0.5 : 1 }}
           >
-            {submitBusy ? <><span>提交中…</span></> : <><Icon name="upload" size={17} />提交反馈</>}
+            {submitBusy ? <><span>{t('mobile.caps.feedback.form.submitting')}</span></> : <><Icon name="upload" size={17} />{t('mobile.caps.feedback.form.submit_btn')}</>}
           </button>
 
           {/* QQ group footer */}
           <div style={{ padding: '14px', borderRadius: 13, border: '1px solid var(--line-soft)', background: 'var(--panel)', marginTop: 4 }}>
-            <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.14em', color: 'var(--muted-2)', marginBottom: 8 }}>玩家交流群</div>
+            <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.14em', color: 'var(--muted-2)', marginBottom: 8 }}>{t('mobile.caps.feedback.qq.heading')}</div>
             <div style={{ fontSize: 12.5, color: 'var(--muted)', lineHeight: 1.6, marginBottom: 10 }}>
-              遇到问题欢迎加入玩家 QQ 群(群号 {QQ_GROUP_NUMBER})。
+              {t('mobile.caps.feedback.qq.body', { group: QQ_GROUP_NUMBER })}
             </div>
             <a href={QQ_JOIN_URL} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 7, height: 38, padding: '0 16px', borderRadius: 10, background: 'var(--accent)', color: '#fff8f3', fontSize: 13.5, fontWeight: 500, textDecoration: 'none' }}>
-              <Icon name="link" size={14} />加入 QQ 群
+              <Icon name="link" size={14} />{t('mobile.caps.feedback.qq.join_btn')}
             </a>
           </div>
         </div>
@@ -913,9 +919,9 @@ function FeedbackSection({ toast }) {
           {/* KPI row */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
             {[
-              { label: '全部', value: counts.total, color: '' },
-              { label: '处理中', value: counts.pending, color: 'var(--info)' },
-              { label: '已采纳', value: counts.ok, color: 'var(--ok)' },
+              { label: t('mobile.caps.feedback.kpi.total'), value: counts.total, color: '' },
+              { label: t('mobile.caps.feedback.kpi.pending'), value: counts.pending, color: 'var(--info)' },
+              { label: t('mobile.caps.feedback.kpi.accepted'), value: counts.ok, color: 'var(--ok)' },
             ].map(k => (
               <div key={k.label} style={{ border: '1px solid var(--line-soft)', borderRadius: 11, background: 'var(--panel)', padding: '11px 10px', textAlign: 'center' }}>
                 <div style={{ fontSize: 22, fontWeight: 700, fontFamily: 'var(--font-serif)', color: k.color || 'var(--text)', lineHeight: 1.1 }}>{k.value}</div>
@@ -927,10 +933,10 @@ function FeedbackSection({ toast }) {
           {/* Filter pills */}
           <div className="pl-seg-scroll" style={{ padding: '0 0 2px', gap: 7 }}>
             {[
-              { id: 'all', label: `全部 ${counts.total}` },
-              { id: 'pending', label: `待处理 ${counts.pending}` },
-              { id: 'ok', label: `已采纳 ${counts.ok}` },
-              { id: 'other', label: '其它' },
+              { id: 'all', label: `${t('common.all')} ${counts.total}` },
+              { id: 'pending', label: `${t('mobile.caps.feedback.filter.pending')} ${counts.pending}` },
+              { id: 'ok', label: `${t('mobile.caps.feedback.filter.accepted')} ${counts.ok}` },
+              { id: 'other', label: t('mobile.caps.feedback.filter.other') },
             ].map(opt => (
               <button key={opt.id} className={'pl-pill' + (filter === opt.id ? ' active' : '')} onClick={() => setFilter(opt.id)}>
                 {opt.label}
@@ -940,7 +946,7 @@ function FeedbackSection({ toast }) {
 
           {/* Refresh */}
           <button className="pl-btn-ghost" style={{ height: 40 }} onClick={loadHistory} disabled={histLoading}>
-            <Icon name="refresh" size={14} />{histLoading ? '加载中…' : '刷新'}
+            <Icon name="refresh" size={14} />{histLoading ? t('common.loading') : t('common.refresh')}
           </button>
 
           {/* List */}
@@ -949,11 +955,11 @@ function FeedbackSection({ toast }) {
           ) : history.length === 0 ? (
             <div className="pl-empty">
               <div className="ic"><Icon name="feedback" size={22} /></div>
-              <h3>还没有提交过反馈</h3>
-              <p>切换到「提交反馈」写两句。</p>
+              <h3>{t('mobile.caps.feedback.history.empty_title')}</h3>
+              <p>{t('mobile.caps.feedback.history.empty_desc')}</p>
             </div>
           ) : filtered.length === 0 ? (
-            <div style={{ textAlign: 'center', color: 'var(--muted)', fontSize: 13, padding: '24px 0' }}>该筛选下暂无反馈。</div>
+            <div style={{ textAlign: 'center', color: 'var(--muted)', fontSize: 13, padding: '24px 0' }}>{t('mobile.caps.feedback.history.filter_empty')}</div>
           ) : (
             <div style={{ display: 'grid', gap: 10 }}>
               {filtered.map(it => (
@@ -966,20 +972,20 @@ function FeedbackSection({ toast }) {
                     </span>
                     {!it.review_decision && (
                       <button onClick={() => handleWithdraw(it.id)} style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--danger)', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}>
-                        撤回
+                        {t('mobile.caps.feedback.history.withdraw_btn')}
                       </button>
                     )}
                   </div>
                   <div style={{ fontSize: 11.5, color: 'var(--muted)', fontFamily: 'var(--font-mono)' }}>
                     {fmtTime(it.created_at)}
-                    {it.reviewed_at ? ` · 处理 ${fmtTime(it.reviewed_at)}` : ''}
+                    {it.reviewed_at ? ` · ${t('mobile.caps.feedback.history.reviewed_at')} ${fmtTime(it.reviewed_at)}` : ''}
                   </div>
                   <div style={{ fontSize: 13, color: 'var(--text-quiet)', lineHeight: 1.6 }}>
-                    {it.free_text_preview || '(无文字内容)'}
+                    {it.free_text_preview || t('mobile.caps.feedback.history.no_text')}
                   </div>
                   {it.admin_reply && (
                     <div style={{ padding: '10px 12px', borderRadius: 9, background: 'var(--accent-soft)', borderLeft: '3px solid var(--accent)', fontSize: 13, lineHeight: 1.65 }}>
-                      <strong style={{ fontSize: 12, letterSpacing: '0.04em' }}>官方回复</strong>
+                      <strong style={{ fontSize: 12, letterSpacing: '0.04em' }}>{t('mobile.caps.feedback.history.official_reply')}</strong>
                       {it.replied_at && <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 400 }}> · {fmtTime(it.replied_at)}</span>}
                       <div style={{ marginTop: 5, whiteSpace: 'pre-wrap', color: 'var(--text-quiet)' }}>{it.admin_reply}</div>
                     </div>
@@ -998,10 +1004,11 @@ function FeedbackSection({ toast }) {
    Root Component
    ────────────────────────────────────────────────────────────────── */
 export function MobileCaps({ nav }) {
+  const { t } = useTranslation();
   // Derive initial section from nav.page
   const initial = (() => {
     const p = nav?.page || '';
-    if (TABS.find(t => t.id === p)) return p;
+    if (TABS.find(tab => tab.id === p)) return p;
     return 'plugins';
   })();
   const [section, setSection] = useState(initial);
@@ -1011,7 +1018,7 @@ export function MobileCaps({ nav }) {
   if (nav?.page !== prevPage.current) {
     prevPage.current = nav?.page;
     const p = nav?.page || '';
-    if (TABS.find(t => t.id === p) && p !== section) {
+    if (TABS.find(tab => tab.id === p) && p !== section) {
       setSection(p);
     }
   }
@@ -1024,11 +1031,11 @@ export function MobileCaps({ nav }) {
     <>
       {/* Header */}
       <div className="pl-head">
-        <button className="pl-back" onClick={() => nav?.pop?.() || nav?.switchTab?.('me')} aria-label="返回">
+        <button className="pl-back" onClick={() => nav?.pop?.() || nav?.switchTab?.('me')} aria-label={t('mobile.caps.header.back')}>
           <Icon name="chevron_left" size={18} />
         </button>
         <div className="pl-head-title">
-          <strong>能力与反馈</strong>
+          <strong>{t('mobile.caps.header.title')}</strong>
         </div>
       </div>
 
@@ -1042,7 +1049,7 @@ export function MobileCaps({ nav }) {
             style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
           >
             <Icon name={tab.icon} size={13} />
-            {tab.label}
+            {t(tab.labelKey)}
           </button>
         ))}
       </div>

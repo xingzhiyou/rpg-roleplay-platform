@@ -23,6 +23,8 @@
  * 这个文件没有 React 组件 — 只挂一段 helper + 注入一段 CSS。
  * Platform.html / Game Console.html 在 console-assistant-panel.jsx 之前 load。
  */
+import i18n from './i18n';
+
 // ESM 模块只执行一次,不需要幂等 guard
 window.__cap_navigation_installed = true;
 
@@ -188,13 +190,13 @@ function confirmDirtyNav(reason) {
     const mask = document.createElement("div");
     mask.className = "cap-nav-modal-mask";
     mask.innerHTML = `
-      <div class="cap-nav-modal" role="alertdialog" aria-label="未保存确认">
-        <h3>当前页面有未保存的修改</h3>
-        <p>跳转到目标页面会丢失这些修改。继续吗?</p>
-        ${reason ? `<div class="cap-nav-reason">原因: ${escapeHtml(reason)}</div>` : ""}
+      <div class="cap-nav-modal" role="alertdialog" aria-label="${i18n.t('console_assistant_nav.dirty_modal.aria_label')}">
+        <h3>${i18n.t('console_assistant_nav.dirty_modal.title')}</h3>
+        <p>${i18n.t('console_assistant_nav.dirty_modal.body')}</p>
+        ${reason ? `<div class="cap-nav-reason">${i18n.t('console_assistant_nav.dirty_modal.reason_prefix')} ${escapeHtml(reason)}</div>` : ""}
         <div class="cap-nav-actions">
-          <button data-cap-act="cancel">取消跳转</button>
-          <button class="primary" data-cap-act="confirm">放弃修改并跳转</button>
+          <button data-cap-act="cancel">${i18n.t('console_assistant_nav.dirty_modal.cancel')}</button>
+          <button class="primary" data-cap-act="confirm">${i18n.t('console_assistant_nav.dirty_modal.confirm')}</button>
         </div>
       </div>
     `;

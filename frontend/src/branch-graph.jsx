@@ -25,6 +25,7 @@
 
 import React from 'react';
 import { useMemo as useMemoB, useState as useStateB, useEffect as useEffectB } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Icon } from './game-icons.jsx';
 
 // 颜色调色板:column index → CSS 变量。循环复用。
@@ -173,6 +174,7 @@ function _filterToHeadAncestors(rawNodes, refs, activeId) {
 // ── 主组件 ──────────────────────────────────────────────────────
 
 function BranchGraph({ data, variant = "full", headOnly, selectedId, onActivate, onContinue, onDelete, onSelect }) {
+  const { t } = useTranslation();
   const rawNodes = (data && data.nodes) || [];
   const refs = (data && data.refs) || [];
   const activeId = data && (data.active_commit_id ?? data.active_id);
@@ -201,7 +203,7 @@ function BranchGraph({ data, variant = "full", headOnly, selectedId, onActivate,
     return (
       <div className={`bg-empty bg-empty-${variant}`}>
         <Icon name="branch" size={20} />
-        <div className="bg-empty-text">暂无分支节点。发出第一条指令后会自动生成。</div>
+        <div className="bg-empty-text">{t('branch_graph.empty')}</div>
       </div>
     );
   }
@@ -310,7 +312,7 @@ function BranchGraph({ data, variant = "full", headOnly, selectedId, onActivate,
           const isActive = cid === activeId;
           const isSelected = cid === selectedId;
           const turnIdx = n.turn_index ?? null;
-          const message = n.summary || n.message || n.title || `节点 #${cid}`;
+          const message = n.summary || n.message || n.title || t('branch_graph.node_fallback', { id: cid });
           const truncMessage = message.length > conf.msgMax
             ? message.slice(0, conf.msgMax) + "…"
             : message;
@@ -364,17 +366,17 @@ function BranchGraph({ data, variant = "full", headOnly, selectedId, onActivate,
                 {conf.showActions && (
                   <span className="bg-actions">
                     {onContinue && (
-                      <button className="iconbtn" data-tip="从此继续" onClick={(e) => { e.stopPropagation(); onContinue(cid); }}>
+                      <button className="iconbtn" data-tip={t('branch_graph.action.continue')} onClick={(e) => { e.stopPropagation(); onContinue(cid); }}>
                         <Icon name="play" size={11} />
                       </button>
                     )}
                     {onActivate && !isActive && (
-                      <button className="iconbtn" data-tip="切到此分支" onClick={(e) => { e.stopPropagation(); onActivate(cid); }}>
+                      <button className="iconbtn" data-tip={t('branch_graph.action.activate')} onClick={(e) => { e.stopPropagation(); onActivate(cid); }}>
                         <Icon name="check" size={11} />
                       </button>
                     )}
                     {onDelete && (
-                      <button className="iconbtn" data-tip="删除子树" onClick={(e) => { e.stopPropagation(); onDelete(cid); }}>
+                      <button className="iconbtn" data-tip={t('branch_graph.action.delete_subtree')} onClick={(e) => { e.stopPropagation(); onDelete(cid); }}>
                         <Icon name="trash" size={11} />
                       </button>
                     )}

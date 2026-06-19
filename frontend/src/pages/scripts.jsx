@@ -493,6 +493,7 @@ function SharingModeSelector({ script, currentUserId, onChanged }) {
    世界书 / NPC 角色卡 / 时间线锚点按需懒加载。 */
 // 剧本封面:宽高比自适应海报(模糊填充 + contain),竖/方/横封面都完整显示;悬停更换 + 点击放大。
 function CoverFrame({ src, title, isOwner, onEdit }) {
+  const { t } = useTranslation();
   const [aspect, setAspect] = React.useState(null);
   const [light, setLight] = React.useState(false);
   React.useEffect(() => { setAspect(null); }, [src]);
@@ -514,13 +515,13 @@ function CoverFrame({ src, title, isOwner, onEdit }) {
       <div className="mh-hero__meta"><div className="mh-hero__name" style={{ fontSize: 20 }}>{title}</div></div>
       {isOwner && (
         <div className="mh-hero__actions">
-          <span className="mh-chip" onClick={(e) => { e.stopPropagation(); onEdit && onEdit(); }}>✦ 更换封面</span>
+          <span className="mh-chip" onClick={(e) => { e.stopPropagation(); onEdit && onEdit(); }}>{t('scripts.page.change_cover')}</span>
         </div>
       )}
       {light && (
         <div className="mlb-backdrop" onClick={() => setLight(false)} role="dialog" aria-modal="true">
           <img src={src} alt={title} style={{ maxWidth: '92vw', maxHeight: '90vh', objectFit: 'contain', borderRadius: 10, boxShadow: '0 12px 60px rgba(0,0,0,.7)' }} onClick={(e) => e.stopPropagation()} />
-          <button onClick={() => setLight(false)} aria-label="关闭" style={{ position: 'absolute', top: 20, right: 24, width: 38, height: 38, borderRadius: 99, border: 0, background: 'rgba(255,255,255,.14)', color: '#fff', fontSize: 19, cursor: 'pointer' }}>×</button>
+          <button onClick={() => setLight(false)} aria-label={t('common.close')} style={{ position: 'absolute', top: 20, right: 24, width: 38, height: 38, borderRadius: 99, border: 0, background: 'rgba(255,255,255,.14)', color: '#fff', fontSize: 19, cursor: 'pointer' }}>×</button>
         </div>
       )}
     </div>
@@ -600,7 +601,7 @@ function ScriptDetailPanel({ script: s, savesCount, scriptSaves = [], embedStatu
         unnamed: t('scripts.editor.unnamed_npc', { defaultValue: '无名角色' }),
       });
       const r = await window.api.cards.myUpsert(body);
-      if (r && r.ok === false) throw new Error(r.error || r.detail || '转换失败');
+      if (r && r.ok === false) throw new Error(r.error || r.detail || t('scripts.page.promote_fail'));
       window.__apiToast?.(t('scripts.toast.npc_promoted', { name: body.name, defaultValue: `已把「${body.name}」转为你的用户角色卡` }),
         { kind: 'ok', duration: 2600, detail: t('scripts.toast.npc_promoted_detail', { defaultValue: '在「角色卡 · 我的」里可编辑/挂到任意剧本' }) });
     } catch (e) {
@@ -630,10 +631,10 @@ function ScriptDetailPanel({ script: s, savesCount, scriptSaves = [], embedStatu
       }
       const sm = (r && r.summary) || {};
       const parts = [];
-      if (sm.protagonist) parts.push(`主角→${sm.protagonist}`);
-      if (Array.isArray(sm.merged) && sm.merged.length) parts.push(`合并 ${sm.merged.length} 组`);
-      if (Array.isArray(sm.dropped) && sm.dropped.length) parts.push(`删非人名 ${sm.dropped.length} 张`);
-      window.__apiToast?.(parts.length ? ('AI 复核完成:' + parts.join('、')) : 'AI 复核完成:无需改动', { kind: 'ok' });
+      if (sm.protagonist) parts.push(t('scripts.page.audit_protagonist_set', { name: sm.protagonist }));
+      if (Array.isArray(sm.merged) && sm.merged.length) parts.push(t('scripts.page.audit_merged', { n: sm.merged.length }));
+      if (Array.isArray(sm.dropped) && sm.dropped.length) parts.push(t('scripts.page.audit_dropped', { n: sm.dropped.length }));
+      window.__apiToast?.(parts.length ? t('scripts.page.audit_done_detail', { detail: parts.join('、') }) : t('scripts.page.audit_done_no_changes'), { kind: 'ok' });
       setAuditOpen(false);
       setNpc(null); // 触发 NPC 列表重新拉取
     } catch (e) {
@@ -646,7 +647,7 @@ function ScriptDetailPanel({ script: s, savesCount, scriptSaves = [], embedStatu
   const doFork = async () => {
     setForkBusy(true);
     try {
-      const newTitle = `${s.title} (副本)`;
+      const newTitle = t('scripts.page.fork_title_suffix', { title: s.title });
       const r = await window.api.scripts.fork(s.id, { title: newTitle });
       if (!r || r.ok === false) throw new Error(r?.error || t('scripts.share.fork_fail'));
       window.__apiToast?.(t('scripts.toast.fork_ok'), { kind: 'ok' });
@@ -746,7 +747,7 @@ function ScriptDetailPanel({ script: s, savesCount, scriptSaves = [], embedStatu
         actions={
           <CSSpaceBetween direction="horizontal" size="xs">
             {isOwner && (
-              <CSButton iconName="gen-ai" onClick={() => setCoverStudioOpen(true)}>✦ 更换封面</CSButton>
+              <CSButton iconName="gen-ai" onClick={() => setCoverStudioOpen(true)}>{t('scripts.page.change_cover')}</CSButton>
             )}
             {/* 反馈#3:开始游戏改下拉——可选继续某个存档 / 开新游戏,不再有存档就直接进后台 */}
             <CSButtonDropdown variant="primary" expandToViewport disabled={!!playBlock}
@@ -855,7 +856,7 @@ function ScriptDetailPanel({ script: s, savesCount, scriptSaves = [], embedStatu
                   <div className="mh-empty__inner">
                     <div className="mh-empty__icon">🎬</div>
                     <div className="mh-empty__title">{s.title}</div>
-                    <div className="mh-empty__hint">{isOwner ? '点击：生成 / 上传 / 选图库' : '暂无封面'}</div>
+                    <div className="mh-empty__hint">{isOwner ? t('scripts.page.cover_empty_hint_owner') : t('scripts.page.cover_empty_hint')}</div>
                   </div>
                 </div>
               )}
@@ -980,7 +981,7 @@ function ScriptDetailPanel({ script: s, savesCount, scriptSaves = [], embedStatu
                       {/* 主角 badge — 后端 _stage_cards canon importance 第 1 名标记 */}
                       {c.metadata && c.metadata.is_protagonist && (
                         <CSBox display="inline" padding={{ left: 'xs' }}>
-                          <CSBadge color="severity-high">主角</CSBadge>
+                          <CSBadge color="severity-high">{t('scripts.page.badge_protagonist')}</CSBadge>
                         </CSBox>
                       )}
                     </CSBox>
@@ -1091,7 +1092,7 @@ function ScriptDetailPanel({ script: s, savesCount, scriptSaves = [], embedStatu
           /* KbExtractPanel 现仅承担"一键全量 LLM 抽取"(scope=full);单模块重做下放到上述各 tab */
           <KbExtractPanel script={s} onDone={onExtractDone} />
         ) },
-        { id: 'gm-style', label: '叙事风格', content: (
+        { id: 'gm-style', label: t('scripts.page.tab_gm_style'), content: (
           /* GM 倾向性 6 滑块(剧本级):篇幅/镜头/戏剧密度/心理/悬念/引导,仅 owner 可写 */
           <GmStyleEditor scope="script" scriptId={s.id} canWrite={!!isOwner} />
         ) },
@@ -1501,7 +1502,7 @@ function ScriptsListView() {
     if (next) {
       // 发布到公开库前的设定核对闸:未核对直接引导去「设定核对」,不发请求。
       if ((s.review_status || 'unreviewed') !== 'reviewed') {
-        window.__apiToast?.('分享前需先核对剧本设定', { kind: 'warn', detail: '已为你打开「设定核对」,确认 AI 提取的人物/世界观/时间线无误后点「确认设定无误」,再回来分享。', duration: 5500 });
+        window.__apiToast?.(t('scripts.page.publish_review_required'), { kind: 'warn', detail: t('scripts.page.publish_review_required_detail'), duration: 5500 });
         setReviewScript(s);
         return;
       }
@@ -1515,7 +1516,7 @@ function ScriptsListView() {
     } catch (e) {
       // 后端核对闸兜底(前端 review_status 陈旧时返回 409 REVIEW_REQUIRED)
       if (e?.payload?.error === 'REVIEW_REQUIRED') {
-        window.__apiToast?.('分享前需先核对剧本设定', { kind: 'warn', detail: e?.payload?.message || '请先在「设定核对」确认设定无误。', duration: 5500 });
+        window.__apiToast?.(t('scripts.page.publish_review_required'), { kind: 'warn', detail: e?.payload?.message || t('scripts.page.publish_review_required_fallback'), duration: 5500 });
         setReviewScript(s);
         return;
       }
@@ -1571,11 +1572,11 @@ function ScriptsListView() {
       <CSContainer header={<CSHeader variant="h2">{selected.title}</CSHeader>}>
         <div style={{ padding: '36px 20px', textAlign: 'center' }}>
           <div style={{ fontSize: 32, marginBottom: 12, opacity: 0.7 }}>🚧</div>
-          <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>敬请期待</div>
+          <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>{t('scripts.page.placeholder_coming_soon')}</div>
           <div style={{ fontSize: 13.5, color: 'var(--muted)', maxWidth: 480, margin: '0 auto 8px' }}>
-            我们正在开发 D&amp;D 5E 规则模组容器，提供骰子裁定 / 法术 / 物品 / 角色升级 / 战斗回合等结构化游玩。
+            {t('scripts.page.placeholder_dnd_desc')}
           </div>
-          <div style={{ fontSize: 12, color: 'var(--muted-2)', marginTop: 16 }}>预计公测后开放 · 如有建议请通过右上"提交反馈"告知我们</div>
+          <div style={{ fontSize: 12, color: 'var(--muted-2)', marginTop: 16 }}>{t('scripts.page.placeholder_eta')}</div>
         </div>
       </CSContainer>
     ) : (
@@ -1627,9 +1628,9 @@ function ScriptsListView() {
             <div style={{ opacity: 0.55 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <CSBox fontWeight="bold" color="text-status-inactive">{s.title}</CSBox>
-                <CSBadge color="grey">敬请期待</CSBadge>
+                <CSBadge color="grey">{t('scripts.page.placeholder_coming_soon')}</CSBadge>
               </div>
-              <CSBox fontSize="body-s" color="text-status-inactive">{s.uid} · 开发中功能预告，暂不可用</CSBox>
+              <CSBox fontSize="body-s" color="text-status-inactive">{s.uid} · {t('scripts.page.placeholder_unavailable')}</CSBox>
             </div>
           ) : (
             <div>
@@ -1648,7 +1649,7 @@ function ScriptsListView() {
         { id: 'words', header: t('scripts.my.words'), cell: (s) => isInternalPlaceholder(s) ? <CSBox color="text-status-inactive">—</CSBox> : `${((s.word_count || 0) / 10000).toFixed(1)} ${t('scripts.my.wan')}` },
         { id: 'mode', header: t('scripts.my.split_mode'), cell: (s) => isInternalPlaceholder(s) ? <CSBox color="text-status-inactive">—</CSBox> : (s.import_report?.mode_label || '—') },
         { id: 'problem', header: t('scripts.my.problem'), cell: (s) => {
-          if (isInternalPlaceholder(s)) return <CSStatusIndicator type="pending">开发中</CSStatusIndicator>;
+          if (isInternalPlaceholder(s)) return <CSStatusIndicator type="pending">{t('scripts.page.placeholder_in_dev')}</CSStatusIndicator>;
           const r = s.readiness || null;
           // phase_rebuild_panel: 没 readiness 字段就不撒谎"就绪",改返 unknown 占位 — 别让破壳数据冒充 ready
           if (!r) {
@@ -2272,7 +2273,7 @@ function ScriptsImportView({ embedded = false, onClose } = {}) {
     // task 141: 测试期只允许 .txt / .md 剧本文本,前端二次校验(配合后端 ext 白名单)
     const name = (file.name || "").toLowerCase();
     if (!/\.(txt|md)$/.test(name)) {
-      window.__apiToast?.("仅支持 .txt / .md 剧本文件", { kind: "danger", detail: "测试阶段已禁用其他文件类型上传", duration: 2800 });
+      window.__apiToast?.(t('scripts.page.file_type_unsupported'), { kind: "danger", detail: t('scripts.page.file_type_unsupported_detail'), duration: 2800 });
       return;
     }
     if (file.size > 50 * 1024 * 1024) {
@@ -2444,7 +2445,7 @@ function ScriptsImportView({ embedded = false, onClose } = {}) {
       // 一个无解的「Failed to fetch」。
       const isNetErr = (e && (e.code === 'network' || e.status === 0)) || /Failed to fetch|NetworkError|网络异常/i.test(String(detail));
       if (isNetErr) {
-        detail = `${detail} —— 若为自建/反向代理部署,请检查后端是否在运行,以及 nginx/caddy 的 client_max_body_size(建议 ≥ 50m)。`;
+        detail = `${detail} —— ${t('scripts.page.upload_net_error_hint')}`;
       }
       window.__apiToast?.(t('scripts.toast.preview_fail'), { kind: "danger", detail, duration: 8000 });
       setEstimate({
@@ -2473,7 +2474,7 @@ function ScriptsImportView({ embedded = false, onClose } = {}) {
     const warnings = [];
     if (Array.isArray(result.warnings)) warnings.push(...result.warnings);
     if (result.report && result.report.mode_label) {
-      warnings.push(`切分模式：${result.report.mode_label}（置信 ${result.report.confidence ?? "—"}）`);
+      warnings.push(t('scripts.page.split_mode_warn', { mode: result.report.mode_label, conf: result.report.confidence ?? "—" }));
     }
     setEstimate({
       file: { name: selectedFile.name, size: selectedFile.size, chapters, words },
@@ -3019,7 +3020,7 @@ function ScriptsImportView({ embedded = false, onClose } = {}) {
           )}
 
           {/* 拆书流水线 LLM 选择 — 写入 user prefs.extractor.*,可在「设置 → 模块模型」覆盖 */}
-          <CSContainer header={<CSHeader variant="h2" description="提取章节摘要 / NPC 角色卡 / 世界书所用的 LLM。仅在导入这一步生效;玩游戏时的主 GM 在另一处配置。这里改完会保存到你的「设置 → 模型管理 → 提取器」偏好(import-pipeline 后端读 prefs,不是当场传参)。">提取模型</CSHeader>}>
+          <CSContainer header={<CSHeader variant="h2" description={t('scripts.page.extractor_model_desc')}>{t('scripts.page.extractor_model_title')}</CSHeader>}>
             {/* 统一共享组件:Provider+Model 选择 + 「未配 key」警告 + 写 user prefs.extractor.*,
                 与「设置 → 按模块分配模型」的提取器、cards 的 card_import 同一实现。
                 后端 import-pipeline 读 extractor.* prefs(不当场传参),所以这里只需持久化偏好。 */}

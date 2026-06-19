@@ -3,6 +3,8 @@
 // 本文件是页面壳 + 状态编排;CodeMirror 包在 components/CodeMirrorEditor.jsx(P3),
 // 序列化在 lib/md-serialize.js(P2),agent 面板在 components/MdEditorAgent.jsx(P5)。
 import React from 'react';
+import { useTranslation } from 'react-i18next';
+import i18n from '../i18n';
 import './md-editor.css';
 import { lsGet, lsSet, lsGetJSON } from '../lib/storage.js';
 import CodeMirrorEditor from '../components/CodeMirrorEditor.jsx';
@@ -68,22 +70,22 @@ function ContextMenu({ x, y, items, onClose }) {
   );
 }
 
-// 文件树节点类型 → 中文标签 + 排序。
+// 文件树节点类型 → 排序。label 由 t('md_editor.tree.group.KIND') 在组件内动态取。
 const NODE_GROUPS = [
-  { kind: 'chapter',   label: '章节正文', icon: '§' },
-  { kind: 'card',      label: '角色卡',   icon: '@' },
-  { kind: 'worldbook', label: '世界书',   icon: '#' },
-  { kind: 'anchor',    label: '时间线',   icon: '~' },
-  { kind: 'canon',     label: '知识库人物', icon: '*' },
+  { kind: 'chapter',   icon: '§' },
+  { kind: 'card',      icon: '@' },
+  { kind: 'worldbook', icon: '#' },
+  { kind: 'anchor',    icon: '~' },
+  { kind: 'canon',     icon: '*' },
 ];
 
 const api = () => (typeof window !== 'undefined' ? window.api : null);
 const toast = (msg, opts) => { try { window.__apiToast?.(msg, opts); } catch (_) {} };
 // 章节标题存「裸标题」(不含「第N章」),显示时由前端加序号前缀。剥掉任何已混入的前缀,防重命名/重建出现「第5章 第5章 …」双序号。
 const stripChapterPrefix = (s) => String(s || '').replace(/^\s*第\s*[0-9一二三四五六七八九十百千零〇两]+\s*章\s*/, '');
-// Canon 实体类型 → 中文(与剧本管理「知识库人物」标签同步:i18n scripts.edit.canon.type_*)。含常见同义词回退。
-const CANON_TYPE_ZH = { character: '人物', person: '人物', faction: '势力', organization: '势力', org: '势力', location: '地点', place: '地点', item: '物品', concept: '概念', event: '事件' };
-const canonTypeZh = (tp) => CANON_TYPE_ZH[String(tp || '').toLowerCase()] || (tp || '概念');
+// Canon 实体类型本地化 → i18n md_editor.canon_type.* 键。含常见同义词回退。
+const CANON_TYPE_KEYS = { character: 'character', person: 'character', faction: 'faction', organization: 'faction', org: 'faction', location: 'location', place: 'location', item: 'item', concept: 'concept', event: 'event' };
+const canonTypeZh = (tp) => { const k = CANON_TYPE_KEYS[String(tp || '').toLowerCase()]; return k ? i18n.t(`md_editor.canon_type.${k}`) : (tp || i18n.t('md_editor.canon_type.concept')); };
 
 // 每类实体图标 + 能力。章节删除走后端 delete_chapters(删一批 → 单次重排,与 merge/split 同语义:
 // 结构改动后 RAG(chunks/facts/锚点按 chapter_index 外键)需重新提取对齐)。
@@ -96,12 +98,12 @@ const CAN_DRAG = { worldbook: true };
 // ── 实体 CRUD(树内增删改) ─────────────────────────────────────────────
 async function createNode(kind, sid, name) {
   const A = api(); const nm = (name || '').trim();
-  if (kind === 'chapter')   { const r = await A.scripts.addChapter(sid, nm); return { id: r.chapter_index, label: `第${r.chapter_index}章 ${r.title || ''}`.trim() }; }
-  if (kind === 'worldbook') { const r = await A.scripts.worldbookCreate(sid, { title: nm || '新条目', content: '' }); const e = r?.entry || r; return { id: e.id, label: e.title || nm || '新条目' }; }
-  if (kind === 'card')      { const r = await A.scripts.cardUpsert(sid, { name: nm || '新角色' }); const c = r?.card || r; return { id: c.id, label: c.name || nm || '新角色' }; }
-  if (kind === 'canon')     { const r = await A.scripts.canonUpsert(sid, { name: nm || '新实体', type: 'concept' }); const e = r?.entity || r; return { id: e.logical_key, label: `${e.name || nm || '新实体'}（${canonTypeZh(e.type || 'concept')}）` }; }
-  if (kind === 'anchor')    { const r = await A.scripts.anchorCreate(sid, { story_time_label: nm || '新时点', chapter_min: 1, chapter_max: 1 }); const a = r?.anchor || r; return { id: a.id, label: nm || '新时点' }; }
-  throw new Error('不支持新建');
+  if (kind === 'chapter')   { const r = await A.scripts.addChapter(sid, nm); return { id: r.chapter_index, label: `${i18n.t('md_editor.chapter_prefix', { index: r.chapter_index })} ${r.title || ''}`.trim() }; }
+  if (kind === 'worldbook') { const _def = i18n.t('md_editor.node_defaults.worldbook'); const r = await A.scripts.worldbookCreate(sid, { title: nm || _def, content: '' }); const e = r?.entry || r; return { id: e.id, label: e.title || nm || _def }; }
+  if (kind === 'card')      { const _def = i18n.t('md_editor.node_defaults.card'); const r = await A.scripts.cardUpsert(sid, { name: nm || _def }); const c = r?.card || r; return { id: c.id, label: c.name || nm || _def }; }
+  if (kind === 'canon')     { const _def = i18n.t('md_editor.node_defaults.canon'); const r = await A.scripts.canonUpsert(sid, { name: nm || _def, type: 'concept' }); const e = r?.entity || r; return { id: e.logical_key, label: `${e.name || nm || _def} (${canonTypeZh(e.type || 'concept')})` }; }
+  if (kind === 'anchor')    { const _def = i18n.t('md_editor.node_defaults.anchor'); const r = await A.scripts.anchorCreate(sid, { story_time_label: nm || _def, chapter_min: 1, chapter_max: 1 }); const a = r?.anchor || r; return { id: a.id, label: nm || _def }; }
+  throw new Error(i18n.t('md_editor.errors.create_unsupported'));
 }
 async function renameNode(kind, sid, id, name) {
   const A = api(); const nm = (name || '').trim(); if (!nm) return;
@@ -119,11 +121,13 @@ async function deleteNode(kind, sid, id) {
   if (kind === 'card')      return A.scripts.cardDelete(sid, id);
   if (kind === 'anchor')    return A.scripts.anchorDelete(sid, id);
   if (kind === 'canon')     return A.scripts.canonDelete(sid, id);
-  throw new Error('该类型不支持删除');
+  throw new Error(i18n.t('md_editor.errors.delete_unsupported'));
 }
 
 // ── 文件树:VSCode 风资源管理器(多组展开 / 搜索 / 图标 / 工具栏 / 键盘 / 右键 / 增删改 / 拖拽)──
 function FileTree({ scriptId, openNode, activeKey, reloadKey, onMutate }) {
+  const { t } = useTranslation();
+  const groupLabel = (kind) => t(`md_editor.tree.group.${kind}`);
   const [expanded, setExpanded] = useState(() => new Set(lsGet('mde.tree.expanded2', ['chapter']) || ['chapter']));
   const [lists, setLists] = useState({});   // kind → {loading, error, items}
   const [filter, setFilter] = useState('');
@@ -194,25 +198,25 @@ function FileTree({ scriptId, openNode, activeKey, reloadKey, onMutate }) {
         await loadGroup(e.kind);
         onMutate?.('create', e.kind, created.id, created.label);
         openNode({ kind: e.kind, id: created.id, label: created.label });
-        toast('已新建', { kind: 'ok', duration: 1100 });
+        toast(t('md_editor.toast.created'), { kind: 'ok', duration: 1100 });
       } else {
         await renameNode(e.kind, scriptId, e.id, nm);
         await loadGroup(e.kind);
-        const disp = e.kind === 'chapter' ? `第${e.id}章 ${nm}`.trim() : nm;
+        const disp = e.kind === 'chapter' ? `${t('md_editor.chapter_prefix', { index: e.id })} ${nm}`.trim() : nm;
         onMutate?.('rename', e.kind, e.id, disp);
-        toast('已重命名', { kind: 'ok', duration: 1100 });
+        toast(t('md_editor.toast.renamed'), { kind: 'ok', duration: 1100 });
       }
-    } catch (err) { toast('操作失败', { kind: 'danger', detail: err?.message }); }
+    } catch (err) { toast(t('md_editor.toast.op_failed'), { kind: 'danger', detail: err?.message }); }
     finally { setBusy(false); setEditing(null); submittingRef.current = false; }
   };
 
   const doDelete = async (kind, it) => {
     setCtx(null);
-    if (!CAN_DELETE[kind]) { toast('该类型不支持删除', { kind: 'warning' }); return; }
-    const extra = kind === 'chapter' ? '\n删除后本剧本会重新连续编号(与合并/拆分一致);RAG 索引需重新提取才能完全对齐。' : '';
+    if (!CAN_DELETE[kind]) { toast(t('md_editor.toast.delete_unsupported'), { kind: 'warning' }); return; }
+    const extra = kind === 'chapter' ? '\n' + t('md_editor.confirm.chapter_delete_extra') : '';
     const ok = await (window.__confirm
-      ? window.__confirm({ title: '删除该条目?', message: `${it.label}\n此操作不可恢复。${extra}`, danger: true, confirmText: '删除' })
-      : Promise.resolve(confirm(`删除「${it.label}」?`)));
+      ? window.__confirm({ title: t('md_editor.confirm.delete_item'), message: `${it.label}\n${t('md_editor.confirm.irreversible')}${extra}`, danger: true, confirmText: t('common.delete') })
+      : Promise.resolve(confirm(t('md_editor.confirm.delete_item_plain', { label: it.label }))));
     if (!ok) return;
     setBusy(true);
     try {
@@ -220,8 +224,8 @@ function FileTree({ scriptId, openNode, activeKey, reloadKey, onMutate }) {
       await loadGroup(kind);
       onMutate?.('delete', kind, it.id);
       setSelSet(new Set());
-      toast('已删除', { kind: 'ok', duration: 1100 });
-    } catch (err) { toast('删除失败', { kind: 'danger', detail: err?.message }); }
+      toast(t('md_editor.toast.deleted'), { kind: 'ok', duration: 1100 });
+    } catch (err) { toast(t('md_editor.toast.delete_failed'), { kind: 'danger', detail: err?.message }); }
     finally { setBusy(false); }
   };
 
@@ -234,12 +238,12 @@ function FileTree({ scriptId, openNode, activeKey, reloadKey, onMutate }) {
       if (keys.has(k) && CAN_DELETE[g.kind]) (byKind[g.kind] = byKind[g.kind] || []).push(it);
     }
     const total = Object.values(byKind).reduce((n, a) => n + a.length, 0);
-    if (!total) { toast('所选项没有可删除的', { kind: 'warning' }); return; }
+    if (!total) { toast(t('md_editor.toast.nothing_to_delete'), { kind: 'warning' }); return; }
     const hasChapter = (byKind.chapter || []).length > 0;
-    const extra = hasChapter ? '\n含章节:删除后会重新连续编号,RAG 索引需重新提取对齐。' : '';
+    const extra = hasChapter ? '\n' + t('md_editor.confirm.chapter_batch_delete_extra') : '';
     const ok = await (window.__confirm
-      ? window.__confirm({ title: `删除选中的 ${total} 项?`, message: `此操作不可恢复。${extra}`, danger: true, confirmText: '删除' })
-      : Promise.resolve(confirm(`删除选中的 ${total} 项?`)));
+      ? window.__confirm({ title: t('md_editor.confirm.delete_selected', { count: total }), message: `${t('md_editor.confirm.irreversible')}${extra}`, danger: true, confirmText: t('common.delete') })
+      : Promise.resolve(confirm(t('md_editor.confirm.delete_selected', { count: total }))));
     if (!ok) return;
     setBusy(true);
     let failed = 0;
@@ -247,7 +251,7 @@ function FileTree({ scriptId, openNode, activeKey, reloadKey, onMutate }) {
     try {
       if ((byKind.chapter || []).length) {
         try { await A.scripts.deleteChapters(scriptId, byKind.chapter.map((it) => it.id)); byKind.chapter.forEach((it) => onMutate?.('delete', 'chapter', it.id)); }
-        catch (e) { failed += byKind.chapter.length; toast('章节批量删除失败', { kind: 'danger', detail: e?.message }); }
+        catch (e) { failed += byKind.chapter.length; toast(t('md_editor.toast.chapter_batch_delete_failed'), { kind: 'danger', detail: e?.message }); }
       }
       for (const kind of Object.keys(byKind)) {
         if (kind === 'chapter') continue;
@@ -258,7 +262,7 @@ function FileTree({ scriptId, openNode, activeKey, reloadKey, onMutate }) {
       }
       await Promise.all(Object.keys(byKind).map((k) => loadGroup(k)));
     } finally { setSelSet(new Set()); setBusy(false); }
-    toast(failed ? `删除完成,${failed} 项失败` : `已删除 ${total} 项`, { kind: failed ? 'warn' : 'ok', duration: 1500 });
+    toast(failed ? t('md_editor.toast.delete_partial', { failed }) : t('md_editor.toast.deleted_count', { count: total }), { kind: failed ? 'warn' : 'ok', duration: 1500 });
   };
 
   // 文件树条目点击:普通=单选并打开;Cmd/Ctrl=切换多选(不打开);Shift=从锚点到此的范围选(不打开)。
@@ -282,13 +286,13 @@ function FileTree({ scriptId, openNode, activeKey, reloadKey, onMutate }) {
 
   const duplicate = async (kind, it) => {
     setCtx(null);
-    if (!CAN_RENAME[kind] || kind === 'chapter') { toast('该类型不支持复制', { kind: 'warning' }); return; }
+    if (!CAN_RENAME[kind] || kind === 'chapter') { toast(t('md_editor.toast.copy_unsupported'), { kind: 'warning' }); return; }
     setBusy(true);
     try {
-      const created = await createNode(kind, scriptId, `${it.label} 副本`);
+      const created = await createNode(kind, scriptId, `${it.label} ${t('md_editor.copy_suffix')}`);
       await loadGroup(kind); onMutate?.('create', kind, created.id, created.label);
-      toast('已复制', { kind: 'ok', duration: 1100 });
-    } catch (err) { toast('复制失败', { kind: 'danger', detail: err?.message }); }
+      toast(t('md_editor.toast.copied'), { kind: 'ok', duration: 1100 });
+    } catch (err) { toast(t('md_editor.toast.copy_failed'), { kind: 'danger', detail: err?.message }); }
     finally { setBusy(false); }
   };
 
@@ -332,18 +336,18 @@ function FileTree({ scriptId, openNode, activeKey, reloadKey, onMutate }) {
         return (it.meta?.priority === np) ? null : A.scripts.worldbookUpdate(scriptId, it.id, { priority: np });
       }).filter(Boolean));
       await loadGroup('worldbook'); onMutate?.('reorder', 'worldbook');
-      toast('已重排序', { kind: 'ok', duration: 1000 });
-    } catch (err) { toast('重排失败', { kind: 'danger', detail: err?.message }); }
+      toast(t('md_editor.toast.reordered'), { kind: 'ok', duration: 1000 });
+    } catch (err) { toast(t('md_editor.toast.reorder_failed'), { kind: 'danger', detail: err?.message }); }
     finally { setBusy(false); }
   };
 
   return (
     <div className="mde-tree" tabIndex={0} ref={bodyRef} onKeyDown={onKeyDown} onClick={() => ctx && setCtx(null)}>
       <div className="mde-tree-toolbar">
-        <input className="mde-tree-filter" value={filter} placeholder="搜索全部资源…" onChange={(e) => setFilter(e.target.value)} />
+        <input className="mde-tree-filter" value={filter} placeholder={t('md_editor.tree.search_placeholder')} onChange={(e) => setFilter(e.target.value)} />
         <NewMenu onPick={startNew} />
-        <button className="mde-tree-tbbtn" title="折叠全部" onClick={collapseAll}>⊟</button>
-        <button className="mde-tree-tbbtn" title="刷新" onClick={() => [...expanded].forEach(loadGroup)}>⟳</button>
+        <button className="mde-tree-tbbtn" title={t('md_editor.tree.collapse_all')} onClick={collapseAll}>⊟</button>
+        <button className="mde-tree-tbbtn" title={t('common.refresh')} onClick={() => [...expanded].forEach(loadGroup)}>⟳</button>
       </div>
       <div className="mde-tree-body">
         {NODE_GROUPS.map((g) => {
@@ -357,23 +361,23 @@ function FileTree({ scriptId, openNode, activeKey, reloadKey, onMutate }) {
                 <button className={'mde-tree-grouphead' + (open ? ' open' : '')} onClick={() => toggle(g.kind)}>
                   <span className="mde-tree-caret">{open ? '▾' : '▸'}</span>
                   <span className="mde-tree-gicon">{g.icon}</span>
-                  <span className="mde-tree-glabel">{g.label}</span>
+                  <span className="mde-tree-glabel">{groupLabel(g.kind)}</span>
                   {st.items && <span className="mde-tree-count">{q ? items.length : st.items.length}</span>}
                 </button>
-                {CAN_CREATE_KIND(g.kind) && <button className="mde-tree-additem" title={`新建${g.label}`} onClick={(e) => { e.stopPropagation(); startNew(g.kind); }}>＋</button>}
+                {CAN_CREATE_KIND(g.kind) && <button className="mde-tree-additem" title={t('md_editor.tree.new_item', { label: groupLabel(g.kind) })} onClick={(e) => { e.stopPropagation(); startNew(g.kind); }}>＋</button>}
               </div>
               {open && (
                 <div className="mde-tree-children">
-                  {st.loading && <div className="mde-tree-hint">加载中…</div>}
-                  {st.error && <div className="mde-tree-hint err">加载失败:{st.error}</div>}
+                  {st.loading && <div className="mde-tree-hint">{t('common.loading')}</div>}
+                  {st.error && <div className="mde-tree-hint err">{t('md_editor.tree.load_failed', { error: st.error })}</div>}
                   {editing && editing.kind === g.kind && editing.id === '__new__' && (
                     <input className="mde-tree-edit" autoFocus value={editing.value}
-                      placeholder={`新${g.label}名称`} disabled={busy}
+                      placeholder={t('md_editor.tree.new_name_placeholder', { label: groupLabel(g.kind) })} disabled={busy}
                       onChange={(e) => setEditing((s) => ({ ...s, value: e.target.value }))}
                       onKeyDown={(e) => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') setEditing(null); }}
                       onBlur={commitEdit} />
                   )}
-                  {!st.loading && !st.error && items.length === 0 && !(editing && editing.id === '__new__' && editing.kind === g.kind) && <div className="mde-tree-hint">（空）</div>}
+                  {!st.loading && !st.error && items.length === 0 && !(editing && editing.id === '__new__' && editing.kind === g.kind) && <div className="mde-tree-hint">{t('md_editor.tree.empty')}</div>}
                   {items.map((it) => {
                     const k = nodeKey(g.kind, it.id);
                     if (editing && editing.kind === g.kind && editing.id === it.id) {
@@ -411,21 +415,21 @@ function FileTree({ scriptId, openNode, activeKey, reloadKey, onMutate }) {
       {ctx && (() => {
         const k = ctx.item ? nodeKey(ctx.kind, ctx.item.id) : null;
         const multi = selSet.size > 1 && k && selSet.has(k);
-        const gLabel = NODE_GROUPS.find((g) => g.kind === ctx.kind)?.label;
+        const gLabel = groupLabel(ctx.kind);
         const items = multi ? [
-          { label: `打开 ${selSet.size} 项`, onClick: () => { for (const g of NODE_GROUPS) for (const it of groupItems(g.kind)) { if (selSet.has(nodeKey(g.kind, it.id))) openNode({ kind: g.kind, id: it.id, label: it.label, meta: it }); } } },
+          { label: t('md_editor.ctx.open_count', { count: selSet.size }), onClick: () => { for (const g of NODE_GROUPS) for (const it of groupItems(g.kind)) { if (selSet.has(nodeKey(g.kind, it.id))) openNode({ kind: g.kind, id: it.id, label: it.label, meta: it }); } } },
           { sep: true },
-          { label: `删除选中的 ${selSet.size} 项`, kbd: 'Del', danger: true, onClick: () => doDeleteSelected(selSet) },
+          { label: t('md_editor.ctx.delete_selected', { count: selSet.size }), kbd: 'Del', danger: true, onClick: () => doDeleteSelected(selSet) },
         ] : ctx.item ? [
-          { label: '打开', onClick: () => openNode({ kind: ctx.kind, id: ctx.item.id, label: ctx.item.label, meta: ctx.item }) },
-          CAN_RENAME[ctx.kind] && { label: '重命名', kbd: 'F2', onClick: () => startRename(ctx.kind, ctx.item) },
-          (CAN_RENAME[ctx.kind] && ctx.kind !== 'chapter') && { label: '复制', onClick: () => duplicate(ctx.kind, ctx.item) },
+          { label: t('common.open'), onClick: () => openNode({ kind: ctx.kind, id: ctx.item.id, label: ctx.item.label, meta: ctx.item }) },
+          CAN_RENAME[ctx.kind] && { label: t('md_editor.ctx.rename'), kbd: 'F2', onClick: () => startRename(ctx.kind, ctx.item) },
+          (CAN_RENAME[ctx.kind] && ctx.kind !== 'chapter') && { label: t('md_editor.ctx.duplicate'), onClick: () => duplicate(ctx.kind, ctx.item) },
           CAN_CREATE_KIND(ctx.kind) && { sep: true },
-          CAN_CREATE_KIND(ctx.kind) && { label: `新建${gLabel}`, onClick: () => startNew(ctx.kind) },
+          CAN_CREATE_KIND(ctx.kind) && { label: t('md_editor.ctx.new_item', { label: gLabel }), onClick: () => startNew(ctx.kind) },
           { sep: true },
-          { label: '删除', kbd: 'Del', danger: true, disabled: !CAN_DELETE[ctx.kind], onClick: () => doDelete(ctx.kind, ctx.item) },
+          { label: t('common.delete'), kbd: 'Del', danger: true, disabled: !CAN_DELETE[ctx.kind], onClick: () => doDelete(ctx.kind, ctx.item) },
         ] : [
-          CAN_CREATE_KIND(ctx.kind) && { label: `新建${gLabel}`, onClick: () => startNew(ctx.kind) },
+          CAN_CREATE_KIND(ctx.kind) && { label: t('md_editor.ctx.new_item', { label: gLabel }), onClick: () => startNew(ctx.kind) },
         ];
         return <ContextMenu x={ctx.x} y={ctx.y} items={items} onClose={() => setCtx(null)} />;
       })()}
@@ -435,15 +439,16 @@ function FileTree({ scriptId, openNode, activeKey, reloadKey, onMutate }) {
 
 const CAN_CREATE_KIND = () => true; // 5 类都支持新建
 function NewMenu({ onPick }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   return (
     <div className="mde-newmenu">
-      <button className="mde-tree-tbbtn" title="新建" onClick={() => setOpen((o) => !o)}>＋</button>
+      <button className="mde-tree-tbbtn" title={t('md_editor.tree.new')} onClick={() => setOpen((o) => !o)}>＋</button>
       {open && (
         <div className="mde-newmenu-pop" onMouseLeave={() => setOpen(false)}>
           {NODE_GROUPS.map((g) => (
             <button key={g.kind} onClick={() => { setOpen(false); onPick(g.kind); }}>
-              <span className="mde-tree-gicon">{g.icon}</span> {g.label}
+              <span className="mde-tree-gicon">{g.icon}</span> {t(`md_editor.tree.group.${g.kind}`)}
             </button>
           ))}
         </div>
@@ -460,7 +465,7 @@ async function fetchGroupList(kind, sid) {
   if (kind === 'chapter') {
     const r = await A.scripts.chapters(sid, { limit: 5000 });
     const arr = r?.chapters || r?.items || [];
-    return arr.map((c) => ({ id: c.chapter_index, title: stripChapterPrefix(c.title || ''), label: `第${c.chapter_index}章 ${stripChapterPrefix(c.title || '')}`.trim(), word_count: c.word_count }));
+    return arr.map((c) => ({ id: c.chapter_index, title: stripChapterPrefix(c.title || ''), label: `${i18n.t('md_editor.chapter_prefix', { index: c.chapter_index })} ${stripChapterPrefix(c.title || '')}`.trim(), word_count: c.word_count }));
   }
   if (kind === 'card') {
     const r = await A.cards.scriptList(sid);
@@ -470,14 +475,14 @@ async function fetchGroupList(kind, sid) {
   if (kind === 'worldbook') {
     const r = await A.scripts.worldbook(sid);
     const arr = r?.entries || r?.items || (Array.isArray(r) ? r : []);
-    return arr.map((w) => ({ id: w.id, label: w.title || `(条目 ${w.id})` }));
+    return arr.map((w) => ({ id: w.id, label: w.title || i18n.t('md_editor.tree.entry_fallback', { id: w.id }) }));
   }
   if (kind === 'anchor') {
     const r = await A.scripts.timeline(sid);
     const phases = r?.phases || [];
     const out = [];
     for (const ph of phases) for (const a of (ph.anchors || [])) {
-      out.push({ id: a.anchor_id || a.id, label: `${a.story_time_label || ph.phase_label || ''}（${a.chapter_min}-${a.chapter_max}）` });
+      out.push({ id: a.anchor_id || a.id, label: `${a.story_time_label || ph.phase_label || ''} (${a.chapter_min}-${a.chapter_max})` });
     }
     return out;
   }
@@ -486,12 +491,12 @@ async function fetchGroupList(kind, sid) {
     if (A.scripts.canonList) {
       const r = await A.scripts.canonList(sid);
       const arr = r?.entities || r?.items || [];
-      return arr.map((e) => ({ id: e.logical_key, label: `${e.name}（${canonTypeZh(e.type)}）` }));
+      return arr.map((e) => ({ id: e.logical_key, label: `${e.name} (${canonTypeZh(e.type)})` }));
     }
     try {
       const r = await A.scripts.graph(sid);
       const arr = r?.entities || [];
-      return arr.map((e) => ({ id: e.logical_key, label: `${e.name}（${canonTypeZh(e.type)}）` }));
+      return arr.map((e) => ({ id: e.logical_key, label: `${e.name} (${canonTypeZh(e.type)})` }));
     } catch (_) { return []; }
   }
   return [];
@@ -499,11 +504,12 @@ async function fetchGroupList(kind, sid) {
 
 // ── 标签编辑器(P0:textarea;P3 替换为 CodeMirror)──────────────────────
 function EditorPane({ tab, onChange, scriptId, onViewReady, onContinueAccept, chapterIndex }) {
+  const { t } = useTranslation();
   if (!tab) {
-    return <div className="mde-empty">从左侧选择一个文件开始编辑<br /><span className="muted">章节正文 / 角色卡 / 世界书 / 时间线 / Canon</span></div>;
+    return <div className="mde-empty">{t('md_editor.editor.empty_hint')}<br /><span className="muted">{t('md_editor.editor.empty_kinds')}</span></div>;
   }
-  if (tab.loading) return <div className="mde-empty">加载中…</div>;
-  if (tab.error) return <div className="mde-empty err">加载失败:{tab.error}</div>;
+  if (tab.loading) return <div className="mde-empty">{t('common.loading')}</div>;
+  if (tab.error) return <div className="mde-empty err">{t('md_editor.editor.load_failed', { error: tab.error })}</div>;
   return (
     <CodeMirrorEditor
       value={tab.content}
@@ -519,6 +525,7 @@ function EditorPane({ tab, onChange, scriptId, onViewReady, onContinueAccept, ch
 
 // ── 主页面 ───────────────────────────────────────────────────────────
 export default function MdEditorPage() {
+  const { t } = useTranslation();
   const [scripts, setScripts] = useState(null);
   // lsGet 返回裸字符串;剧本 id 是整数 → 必须 Number 化,否则 `s.id === scriptId`(数===串)恒不等 → 刷新后工作区显示「未选择」。
   const [scriptId, setScriptId] = useState(() => { const v = lsGet('mde.scriptId', null); return (v == null || v === '') ? null : (Number(v) || v); });
@@ -539,7 +546,7 @@ export default function MdEditorPage() {
         const owned = arr.filter((s) => s.is_owner !== false && s.role !== 'subscriber');
         setScripts(owned);
         if (!scriptId && owned[0]) { setScriptId(owned[0].id); lsSet('mde.scriptId', owned[0].id); }
-      } catch (e) { setScripts([]); toast('剧本列表加载失败', { kind: 'danger', detail: e?.message }); }
+      } catch (e) { setScripts([]); toast(t('md_editor.toast.scripts_load_failed'), { kind: 'danger', detail: e?.message }); }
     })();
     // eslint-disable-next-line
   }, []);
@@ -584,34 +591,34 @@ export default function MdEditorPage() {
   };
 
   // 顶栏「编辑」操作:全部作用于当前 CodeMirror 视图(activeViewRef)。
-  const withView = useCallback((fn) => { const v = activeViewRef.current; if (!v) { toast('请先打开一个文件', { kind: 'warn', duration: 1400 }); return; } v.focus(); fn(v); }, []);
+  const withView = useCallback((fn) => { const v = activeViewRef.current; if (!v) { toast(t('md_editor.toast.open_file_first'), { kind: 'warn', duration: 1400 }); return; } v.focus(); fn(v); }, [t]);
   const doUndo = useCallback(() => withView((v) => undo(v)), [withView]);
   const doRedo = useCallback(() => withView((v) => redo(v)), [withView]);
   const doSelectAll = useCallback(() => withView((v) => selectAll(v)), [withView]);
   const doFind = useCallback(() => withView((v) => openSearchPanel(v)), [withView]);
-  const doCopy = useCallback(() => withView(async (v) => { const s = v.state.sliceDoc(v.state.selection.main.from, v.state.selection.main.to); if (!s) return; try { await navigator.clipboard.writeText(s); } catch (_) { toast('复制失败,请用 ⌘C', { kind: 'warn' }); } }), [withView]);
-  const doCut = useCallback(() => withView(async (v) => { const sel = v.state.selection.main; const s = v.state.sliceDoc(sel.from, sel.to); if (!s) return; try { await navigator.clipboard.writeText(s); v.dispatch({ changes: { from: sel.from, to: sel.to } }); } catch (_) { toast('剪切失败,请用 ⌘X', { kind: 'warn' }); } }), [withView]);
-  const doPaste = useCallback(() => withView(async (v) => { try { const txt = await navigator.clipboard.readText(); if (!txt) return; const sel = v.state.selection.main; v.dispatch({ changes: { from: sel.from, to: sel.to, insert: txt }, selection: { anchor: sel.from + txt.length } }); } catch (_) { toast('粘贴失败,请用 ⌘V', { kind: 'warn' }); } }), [withView]);
-  const doGotoLine = useCallback(() => withView((v) => { const raw = window.prompt('转到行号:'); const n = Number(raw); if (!n || n < 1) return; const line = v.state.doc.line(Math.min(Math.floor(n), v.state.doc.lines)); v.dispatch({ selection: { anchor: line.from }, scrollIntoView: true }); }), [withView]);
+  const doCopy = useCallback(() => withView(async (v) => { const s = v.state.sliceDoc(v.state.selection.main.from, v.state.selection.main.to); if (!s) return; try { await navigator.clipboard.writeText(s); } catch (_) { toast(t('md_editor.toast.copy_failed_kbd', { kbd: '⌘C' }), { kind: 'warn' }); } }), [withView, t]);
+  const doCut = useCallback(() => withView(async (v) => { const sel = v.state.selection.main; const s = v.state.sliceDoc(sel.from, sel.to); if (!s) return; try { await navigator.clipboard.writeText(s); v.dispatch({ changes: { from: sel.from, to: sel.to } }); } catch (_) { toast(t('md_editor.toast.cut_failed_kbd', { kbd: '⌘X' }), { kind: 'warn' }); } }), [withView, t]);
+  const doPaste = useCallback(() => withView(async (v) => { try { const txt = await navigator.clipboard.readText(); if (!txt) return; const sel = v.state.selection.main; v.dispatch({ changes: { from: sel.from, to: sel.to, insert: txt }, selection: { anchor: sel.from + txt.length } }); } catch (_) { toast(t('md_editor.toast.paste_failed_kbd', { kbd: '⌘V' }), { kind: 'warn' }); } }), [withView, t]);
+  const doGotoLine = useCallback(() => withView((v) => { const raw = window.prompt(t('md_editor.prompt.goto_line')); const n = Number(raw); if (!n || n < 1) return; const line = v.state.doc.line(Math.min(Math.floor(n), v.state.doc.lines)); v.dispatch({ selection: { anchor: line.from }, scrollIntoView: true }); }), [withView, t]);
 
   // 文件菜单:重命名 / 删除当前剧本(严格 owner,后端 403 兜底)。
   const renameScript = useCallback(async () => {
     setMenu(null);
     if (!scriptId) return;
     const cur = (scripts || []).find((s) => s.id === scriptId);
-    const name = window.prompt('重命名剧本:', cur?.title || '');
+    const name = window.prompt(t('md_editor.prompt.rename_script'), cur?.title || '');
     if (name == null) return;
-    const t = name.trim(); if (!t) return;
-    try { await api().scripts.rename(scriptId, t); setScripts((prev) => (prev || []).map((s) => s.id === scriptId ? { ...s, title: t } : s)); toast('已重命名', { kind: 'ok', duration: 1200 }); }
-    catch (e) { toast('重命名失败', { kind: 'danger', detail: e?.message }); }
+    const nm = name.trim(); if (!nm) return;
+    try { await api().scripts.rename(scriptId, nm); setScripts((prev) => (prev || []).map((s) => s.id === scriptId ? { ...s, title: nm } : s)); toast(t('md_editor.toast.renamed'), { kind: 'ok', duration: 1200 }); }
+    catch (e) { toast(t('md_editor.toast.rename_failed'), { kind: 'danger', detail: e?.message }); }
   }, [scriptId, scripts]);
   const deleteScript = useCallback(async () => {
     setMenu(null);
     if (!scriptId) return;
     const cur = (scripts || []).find((s) => s.id === scriptId);
     const ok = await (window.__confirm
-      ? window.__confirm({ title: '删除整个剧本?', message: `「${cur?.title || scriptId}」及其下所有存档都会被永久删除,不可恢复。`, danger: true, confirmText: '删除' })
-      : Promise.resolve(window.confirm('删除整个剧本?(连带其下所有存档,不可恢复)')));
+      ? window.__confirm({ title: t('md_editor.confirm.delete_script'), message: t('md_editor.confirm.delete_script_msg', { title: cur?.title || scriptId }), danger: true, confirmText: t('common.delete') })
+      : Promise.resolve(window.confirm(t('md_editor.confirm.delete_script_plain'))));
     if (!ok) return;
     try {
       await api().scripts.delete(scriptId, { force: true });
@@ -619,8 +626,8 @@ export default function MdEditorPage() {
       setScripts(rest);
       if (rest[0]) pickScript(rest[0].id);
       else { setScriptId(null); lsSet('mde.scriptId', null); setTabs([]); setActiveKey(null); }
-      toast('已删除剧本', { kind: 'ok', duration: 1400 });
-    } catch (e) { toast('删除失败', { kind: 'danger', detail: e?.message }); }
+      toast(t('md_editor.toast.script_deleted'), { kind: 'ok', duration: 1400 });
+    } catch (e) { toast(t('md_editor.toast.delete_failed'), { kind: 'danger', detail: e?.message }); }
   }, [scriptId, scripts]);
 
   // 顶栏菜单:点击外部关闭。
@@ -634,23 +641,23 @@ export default function MdEditorPage() {
   // 作者优先:从零新建空白剧本 → 切到它(自动带第1章)。
   const createBlankScript = async () => {
     try {
-      const r = await api().scripts.createBlank('新剧本');
-      if (!r?.script_id) throw new Error(r?.error || '创建失败');
+      const r = await api().scripts.createBlank(t('md_editor.node_defaults.script'));
+      if (!r?.script_id) throw new Error(r?.error || t('md_editor.errors.create_failed'));
       setScripts((prev) => [{ id: r.script_id, title: r.title }, ...(prev || [])]);
       pickScript(r.script_id);
-      toast('已新建空白剧本', { kind: 'ok', duration: 1400 });
-    } catch (e) { toast('新建剧本失败', { kind: 'danger', detail: e?.message }); }
+      toast(t('md_editor.toast.blank_script_created'), { kind: 'ok', duration: 1400 });
+    } catch (e) { toast(t('md_editor.toast.script_create_failed'), { kind: 'danger', detail: e?.message }); }
   };
   // 给当前剧本追加一章并打开。
   const addChapter = async () => {
     if (!scriptId) return;
     try {
       const r = await api().scripts.addChapter(scriptId, '');
-      if (!r?.chapter_index) throw new Error(r?.error || '创建失败');
+      if (!r?.chapter_index) throw new Error(r?.error || t('md_editor.errors.create_failed'));
       setTreeReloadKey((x) => x + 1);
-      openNode({ kind: 'chapter', id: r.chapter_index, label: `第${r.chapter_index}章 ${r.title || ''}`.trim() });
-      toast('已新建章节', { kind: 'ok', duration: 1200 });
-    } catch (e) { toast('新建章节失败', { kind: 'danger', detail: e?.message }); }
+      openNode({ kind: 'chapter', id: r.chapter_index, label: `${t('md_editor.chapter_prefix', { index: r.chapter_index })} ${r.title || ''}`.trim() });
+      toast(t('md_editor.toast.chapter_created'), { kind: 'ok', duration: 1200 });
+    } catch (e) { toast(t('md_editor.toast.chapter_create_failed'), { kind: 'danger', detail: e?.message }); }
   };
 
   // 打开节点 → 新标签(或激活已开)。
@@ -700,7 +707,7 @@ export default function MdEditorPage() {
   const closeTab = useCallback(async (key) => {
     const t = tabs.find((x) => x.key === key);
     if (t?.dirty) {
-      const ok = await (window.__confirm ? window.__confirm({ title: '放弃未保存的修改?', message: t.label, danger: true, confirmText: '放弃' }) : Promise.resolve(confirm('放弃未保存的修改?')));
+      const ok = await (window.__confirm ? window.__confirm({ title: t('md_editor.confirm.discard_changes'), message: tab.label, danger: true, confirmText: t('md_editor.confirm.discard') }) : Promise.resolve(confirm(t('md_editor.confirm.discard_changes'))));
       if (!ok) return;
     }
     setTabs((cur) => {
@@ -719,8 +726,8 @@ export default function MdEditorPage() {
     const dirtyCnt = targets.filter((t) => t.dirty).length;
     if (dirtyCnt) {
       const ok = await (window.__confirm
-        ? window.__confirm({ title: `放弃 ${dirtyCnt} 个未保存的标签?`, message: '这些标签的未保存修改会丢失。', danger: true, confirmText: '放弃并关闭' })
-        : Promise.resolve(confirm(`放弃 ${dirtyCnt} 个未保存的修改?`)));
+        ? window.__confirm({ title: t('md_editor.confirm.discard_tabs', { count: dirtyCnt }), message: t('md_editor.confirm.discard_tabs_msg'), danger: true, confirmText: t('md_editor.confirm.discard_and_close') })
+        : Promise.resolve(confirm(t('md_editor.confirm.discard_tabs_plain', { count: dirtyCnt }))));
       if (!ok) return;
     }
     setTabs((cur) => {
@@ -731,32 +738,32 @@ export default function MdEditorPage() {
   }, [tabs, activeKey]);
 
   const saveTab = useCallback(async (key) => {
-    const t = tabs.find((x) => x.key === key);
-    if (!t || !t.dirty) return;
+    const tab = tabs.find((x) => x.key === key);
+    if (!tab || !tab.dirty) return;
     setTabs((cur) => cur.map((x) => x.key === key ? { ...x, saving: true } : x));
     try {
-      await saveNodeContent(t.kind, scriptId, t.id, t.content, t.original);
-      setTabs((cur) => cur.map((x) => x.key === key ? { ...x, original: t.content, dirty: false, saving: false } : x));
-      toast('已保存', { kind: 'ok', duration: 1200 });
+      await saveNodeContent(tab.kind, scriptId, tab.id, tab.content, tab.original);
+      setTabs((cur) => cur.map((x) => x.key === key ? { ...x, original: tab.content, dirty: false, saving: false } : x));
+      toast(t('md_editor.toast.saved'), { kind: 'ok', duration: 1200 });
     } catch (e) {
       setTabs((cur) => cur.map((x) => x.key === key ? { ...x, saving: false } : x));
-      toast('保存失败', { kind: 'danger', detail: e?.message });
+      toast(t('md_editor.toast.save_failed'), { kind: 'danger', detail: e?.message });
     }
-  }, [tabs, scriptId]);
+  }, [tabs, scriptId, t]);
 
   // agent 写库后:重载受影响的标签(若打开且无未保存改动)+ 刷新文件树。
   const refreshTab = useCallback(async (kind, id) => {
     setTreeReloadKey((x) => x + 1);
     const key = nodeKey(kind, id);
-    const t = tabs.find((x) => x.key === key);
-    if (!t) return;
-    if (t.dirty) { toast('AI 改了这条,但你有未保存修改,未自动刷新', { kind: 'warn', duration: 2600 }); return; }
+    const tab = tabs.find((x) => x.key === key);
+    if (!tab) return;
+    if (tab.dirty) { toast(t('md_editor.toast.ai_edited_has_unsaved'), { kind: 'warn', duration: 2600 }); return; }
     try {
       const content = await loadNodeContent(kind, scriptId, id);
       setTabs((cur) => cur.map((x) => x.key === key ? { ...x, content, original: content, dirty: false } : x));
-      toast('AI 已修改,已刷新', { kind: 'ok', duration: 1400 });
+      toast(t('md_editor.toast.ai_refreshed'), { kind: 'ok', duration: 1400 });
     } catch (_) { /* 静默 */ }
-  }, [tabs, scriptId]);
+  }, [tabs, scriptId, t]);
 
   // 资源管理器增删改后:同步已打开的标签(删→关、改名→更新标题),并触发树重载。
   const onTreeMutate = useCallback((action, kind, id, label) => {
@@ -776,15 +783,15 @@ export default function MdEditorPage() {
   // 接受一段续写/改写后的桥接:够长就提示「要不要让助手把新设定同步进知识库」。
   // (续写引擎只产纯文本不落库,知识同步只能由右栏 agent 触发 —— 这条桥接把两路打通。)
   const onProseAccepted = useCallback((text, info) => {
-    const t = (text || '').trim();
-    if (t.length < 12) return;   // 太短(单词级)不打扰
-    setSyncNudge({ text: t, label: activeRef.current?.label || '正文', rewrite: !!(info && info.rewrite) });
-  }, []);
+    const tx = (text || '').trim();
+    if (tx.length < 12) return;   // 太短(单词级)不打扰
+    setSyncNudge({ text: tx, label: activeRef.current?.label || t('md_editor.sync.prose_label'), rewrite: !!(info && info.rewrite) });
+  }, [t]);
 
   // 侧栏「续写到正文」:对当前打开的章节正文,在光标处(或选中段)用 AI 续写/改写。
   const onContinue = useCallback((instruction) => {
     const view = activeViewRef.current;
-    if (!view) { toast('请先打开一个文件再续写', { kind: 'warn' }); return; }
+    if (!view) { toast(t('md_editor.toast.open_file_first_continue'), { kind: 'warn' }); return; }
     const _a = activeRef.current;
     const _ci = (_a && _a.kind === 'chapter') ? _a.id : null;   // 章号→后端装配相关设定+防剧透
     runContinue(view, { scriptId, instruction, onAccept: onProseAccepted, chapterIndex: _ci });
@@ -819,92 +826,92 @@ export default function MdEditorPage() {
       <div className="mde-topbar">
         {/* 工作区切换(剧本) */}
         <div className="mde-menuwrap">
-          <button className="mde-ws" onClick={() => setMenu(menu === 'ws' ? null : 'ws')} title="切换工作区(剧本)">
-            <span className="mde-ws-kicker">工作区</span>
-            <span className="mde-ws-name">{(scripts || []).find((s) => s.id === scriptId)?.title || (scripts === null ? '加载中…' : '未选择')}</span>
+          <button className="mde-ws" onClick={() => setMenu(menu === 'ws' ? null : 'ws')} title={t('md_editor.ws.switch_title')}>
+            <span className="mde-ws-kicker">{t('md_editor.ws.label')}</span>
+            <span className="mde-ws-name">{(scripts || []).find((s) => s.id === scriptId)?.title || (scripts === null ? t('common.loading') : t('md_editor.ws.none_selected'))}</span>
             <span className="mde-ws-caret">▾</span>
           </button>
           {menu === 'ws' && (
             <div className="mde-menu mde-ws-menu">
-              {scripts === null && <div className="mde-menu-hint">加载剧本…</div>}
-              {scripts && scripts.length === 0 && <div className="mde-menu-hint">（无可编辑剧本）</div>}
+              {scripts === null && <div className="mde-menu-hint">{t('md_editor.ws.loading')}</div>}
+              {scripts && scripts.length === 0 && <div className="mde-menu-hint">{t('md_editor.ws.no_scripts')}</div>}
               {(scripts || []).map((s) => (
-                <button key={s.id} className={'mde-menu-item' + (s.id === scriptId ? ' on' : '')} onClick={() => pickScript(s.id)}>{s.title || `剧本 ${s.id}`}</button>
+                <button key={s.id} className={'mde-menu-item' + (s.id === scriptId ? ' on' : '')} onClick={() => pickScript(s.id)}>{s.title || t('md_editor.ws.script_fallback', { id: s.id })}</button>
               ))}
               <div className="mde-menu-sep" />
-              <button className="mde-menu-item" onClick={() => { setMenu(null); createBlankScript(); }}>＋ 新建空白剧本</button>
+              <button className="mde-menu-item" onClick={() => { setMenu(null); createBlankScript(); }}>＋ {t('md_editor.menu.new_blank_script')}</button>
             </div>
           )}
         </div>
 
         {/* 编辑操作图标组 */}
         <div className="mde-tb-icons">
-          <button className="mde-tb-ic" data-tip="撤销 ⌘Z" title="撤销 ⌘Z" onClick={doUndo}><TbIcon name="undo" /></button>
-          <button className="mde-tb-ic" data-tip="重做 ⌘⇧Z" title="重做 ⌘⇧Z" onClick={doRedo}><TbIcon name="redo" /></button>
+          <button className="mde-tb-ic" data-tip={t('md_editor.toolbar.undo')} title={t('md_editor.toolbar.undo')} onClick={doUndo}><TbIcon name="undo" /></button>
+          <button className="mde-tb-ic" data-tip={t('md_editor.toolbar.redo')} title={t('md_editor.toolbar.redo')} onClick={doRedo}><TbIcon name="redo" /></button>
           <span className="mde-tb-divider" />
-          <button className="mde-tb-ic" data-tip="复制 ⌘C" title="复制 ⌘C" onClick={doCopy}><TbIcon name="copy" /></button>
-          <button className="mde-tb-ic" data-tip="剪切 ⌘X" title="剪切 ⌘X" onClick={doCut}><TbIcon name="cut" /></button>
-          <button className="mde-tb-ic" data-tip="粘贴 ⌘V" title="粘贴 ⌘V" onClick={doPaste}><TbIcon name="paste" /></button>
+          <button className="mde-tb-ic" data-tip={t('md_editor.toolbar.copy')} title={t('md_editor.toolbar.copy')} onClick={doCopy}><TbIcon name="copy" /></button>
+          <button className="mde-tb-ic" data-tip={t('md_editor.toolbar.cut')} title={t('md_editor.toolbar.cut')} onClick={doCut}><TbIcon name="cut" /></button>
+          <button className="mde-tb-ic" data-tip={t('md_editor.toolbar.paste')} title={t('md_editor.toolbar.paste')} onClick={doPaste}><TbIcon name="paste" /></button>
         </div>
 
         {/* 文件菜单 */}
         <div className="mde-menuwrap">
-          <button className={'mde-menubtn' + (menu === 'file' ? ' on' : '')} onClick={() => setMenu(menu === 'file' ? null : 'file')}>文件</button>
+          <button className={'mde-menubtn' + (menu === 'file' ? ' on' : '')} onClick={() => setMenu(menu === 'file' ? null : 'file')}>{t('md_editor.menu.file')}</button>
           {menu === 'file' && (
             <div className="mde-menu">
-              <button className="mde-menu-item" disabled={!scriptId} onClick={() => { setMenu(null); addChapter(); }}>新建章节</button>
-              <button className="mde-menu-item" onClick={() => { setMenu(null); createBlankScript(); }}>新建空白剧本</button>
-              <button className="mde-menu-item" disabled={!scriptId} onClick={renameScript}>重命名剧本…</button>
+              <button className="mde-menu-item" disabled={!scriptId} onClick={() => { setMenu(null); addChapter(); }}>{t('md_editor.menu.new_chapter')}</button>
+              <button className="mde-menu-item" onClick={() => { setMenu(null); createBlankScript(); }}>{t('md_editor.menu.new_blank_script')}</button>
+              <button className="mde-menu-item" disabled={!scriptId} onClick={renameScript}>{t('md_editor.menu.rename_script')}</button>
               <div className="mde-menu-sep" />
-              <button className="mde-menu-item danger" disabled={!scriptId} onClick={deleteScript}>删除当前剧本</button>
+              <button className="mde-menu-item danger" disabled={!scriptId} onClick={deleteScript}>{t('md_editor.menu.delete_script')}</button>
             </div>
           )}
         </div>
 
         {/* 编辑菜单 */}
         <div className="mde-menuwrap">
-          <button className={'mde-menubtn' + (menu === 'edit' ? ' on' : '')} onClick={() => setMenu(menu === 'edit' ? null : 'edit')}>编辑</button>
+          <button className={'mde-menubtn' + (menu === 'edit' ? ' on' : '')} onClick={() => setMenu(menu === 'edit' ? null : 'edit')}>{t('md_editor.menu.edit')}</button>
           {menu === 'edit' && (
             <div className="mde-menu">
-              <button className="mde-menu-item" onClick={() => { setMenu(null); doUndo(); }}>撤销<span className="mde-menu-kbd">⌘Z</span></button>
-              <button className="mde-menu-item" onClick={() => { setMenu(null); doRedo(); }}>重做<span className="mde-menu-kbd">⌘⇧Z</span></button>
+              <button className="mde-menu-item" onClick={() => { setMenu(null); doUndo(); }}>{t('md_editor.menu.undo')}<span className="mde-menu-kbd">⌘Z</span></button>
+              <button className="mde-menu-item" onClick={() => { setMenu(null); doRedo(); }}>{t('md_editor.menu.redo')}<span className="mde-menu-kbd">⌘⇧Z</span></button>
               <div className="mde-menu-sep" />
-              <button className="mde-menu-item" onClick={() => { setMenu(null); doCopy(); }}>复制<span className="mde-menu-kbd">⌘C</span></button>
-              <button className="mde-menu-item" onClick={() => { setMenu(null); doCut(); }}>剪切<span className="mde-menu-kbd">⌘X</span></button>
-              <button className="mde-menu-item" onClick={() => { setMenu(null); doPaste(); }}>粘贴<span className="mde-menu-kbd">⌘V</span></button>
+              <button className="mde-menu-item" onClick={() => { setMenu(null); doCopy(); }}>{t('md_editor.menu.copy')}<span className="mde-menu-kbd">⌘C</span></button>
+              <button className="mde-menu-item" onClick={() => { setMenu(null); doCut(); }}>{t('md_editor.menu.cut')}<span className="mde-menu-kbd">⌘X</span></button>
+              <button className="mde-menu-item" onClick={() => { setMenu(null); doPaste(); }}>{t('md_editor.menu.paste')}<span className="mde-menu-kbd">⌘V</span></button>
               <div className="mde-menu-sep" />
-              <button className="mde-menu-item" onClick={() => { setMenu(null); doFind(); }}>查找<span className="mde-menu-kbd">⌘F</span></button>
-              <button className="mde-menu-item" onClick={() => { setMenu(null); doSelectAll(); }}>全选<span className="mde-menu-kbd">⌘A</span></button>
-              <button className="mde-menu-item" onClick={() => { setMenu(null); doGotoLine(); }}>转到行…</button>
+              <button className="mde-menu-item" onClick={() => { setMenu(null); doFind(); }}>{t('md_editor.menu.find')}<span className="mde-menu-kbd">⌘F</span></button>
+              <button className="mde-menu-item" onClick={() => { setMenu(null); doSelectAll(); }}>{t('md_editor.menu.select_all')}<span className="mde-menu-kbd">⌘A</span></button>
+              <button className="mde-menu-item" onClick={() => { setMenu(null); doGotoLine(); }}>{t('md_editor.menu.goto_line')}</button>
               <div className="mde-menu-sep" />
-              <button className="mde-menu-item" disabled={!active || !active.dirty} onClick={() => { setMenu(null); if (active) saveTab(active.key); }}>保存<span className="mde-menu-kbd">⌘S</span></button>
+              <button className="mde-menu-item" disabled={!active || !active.dirty} onClick={() => { setMenu(null); if (active) saveTab(active.key); }}>{t('common.save')}<span className="mde-menu-kbd">⌘S</span></button>
             </div>
           )}
         </div>
 
         <div className="mde-tb-spacer" />
-        {active && active.dirty && <button className="mde-save" onClick={() => saveTab(active.key)} disabled={active.saving}>{active.saving ? '保存中…' : '保存 ⌘S'}</button>}
-        <button className={'mde-tb-ic' + (rightOpen ? ' on' : '')} data-tip={rightOpen ? '隐藏 AI 助手栏' : '显示 AI 助手栏'} title={rightOpen ? '隐藏 AI 助手栏' : '显示 AI 助手栏'} onClick={toggleRight}><TbIcon name="panelRight" /></button>
+        {active && active.dirty && <button className="mde-save" onClick={() => saveTab(active.key)} disabled={active.saving}>{active.saving ? t('md_editor.save_btn.saving') : t('md_editor.save_btn.save')}</button>}
+        <button className={'mde-tb-ic' + (rightOpen ? ' on' : '')} data-tip={rightOpen ? t('md_editor.panel.hide_ai') : t('md_editor.panel.show_ai')} title={rightOpen ? t('md_editor.panel.hide_ai') : t('md_editor.panel.show_ai')} onClick={toggleRight}><TbIcon name="panelRight" /></button>
       </div>
 
       <div className={'mde-panes' + (rightOpen ? '' : ' right-collapsed')} ref={panesRef} style={{ '--mde-left-w': leftW + 'px', '--mde-right-w': rightW + 'px' }}>
         {/* 左:文件树 */}
         <aside className="mde-left">
-          {scriptId ? <FileTree scriptId={scriptId} openNode={openNode} activeKey={activeKey} reloadKey={treeReloadKey} onMutate={onTreeMutate} /> : <div className="mde-tree-hint">先选剧本</div>}
+          {scriptId ? <FileTree scriptId={scriptId} openNode={openNode} activeKey={activeKey} reloadKey={treeReloadKey} onMutate={onTreeMutate} /> : <div className="mde-tree-hint">{t('md_editor.ws.select_first')}</div>}
         </aside>
 
-        <div className="mde-splitter mde-splitter-left" onPointerDown={onSplitDown('left')} title="拖拽调整左栏宽度" />
+        <div className="mde-splitter mde-splitter-left" onPointerDown={onSplitDown('left')} title={t('md_editor.splitter.left')} />
 
         {/* 中:标签 + 编辑器 */}
         <main className="mde-center">
           <div className="mde-tabs">
-            {tabs.map((t) => (
-              <div key={t.key} className={'mde-tab' + (t.key === activeKey ? ' active' : '')} onClick={() => setActiveKey(t.key)}
-                title={t.label}
-                onContextMenu={(e) => { e.preventDefault(); setTabCtx({ x: e.clientX, y: e.clientY, key: t.key }); }}
-                onMouseDown={(e) => { if (e.button === 1) { e.preventDefault(); closeTab(t.key); } /* 中键关闭(VSCode) */ }}>
-                <span className="mde-tab-label">{t.dirty ? '● ' : ''}{t.label}</span>
-                <span className="mde-tab-close" title="关闭" onClick={(e) => { e.stopPropagation(); closeTab(t.key); }}>×</span>
+            {tabs.map((tb) => (
+              <div key={tb.key} className={'mde-tab' + (tb.key === activeKey ? ' active' : '')} onClick={() => setActiveKey(tb.key)}
+                title={tb.label}
+                onContextMenu={(e) => { e.preventDefault(); setTabCtx({ x: e.clientX, y: e.clientY, key: tb.key }); }}
+                onMouseDown={(e) => { if (e.button === 1) { e.preventDefault(); closeTab(tb.key); } /* 中键关闭(VSCode) */ }}>
+                <span className="mde-tab-label">{tb.dirty ? '● ' : ''}{tb.label}</span>
+                <span className="mde-tab-close" title={t('common.close')} onClick={(e) => { e.stopPropagation(); closeTab(tb.key); }}>×</span>
               </div>
             ))}
           </div>
@@ -917,45 +924,45 @@ export default function MdEditorPage() {
             const toRight = tabs.slice(idx + 1).map((t) => t.key);
             const saved = tabs.filter((t) => !t.dirty).map((t) => t.key);
             const items = [
-              { label: '关闭', kbd: '⌘W', onClick: () => closeTab(tabCtx.key) },
-              { label: '关闭其他', disabled: others.length === 0, onClick: () => { setActiveKey(tabCtx.key); closeTabs(others); } },
-              { label: '关闭右侧标签页', disabled: toRight.length === 0, onClick: () => closeTabs(toRight) },
+              { label: t('common.close'), kbd: '⌘W', onClick: () => closeTab(tabCtx.key) },
+              { label: t('md_editor.tab_ctx.close_others'), disabled: others.length === 0, onClick: () => { setActiveKey(tabCtx.key); closeTabs(others); } },
+              { label: t('md_editor.tab_ctx.close_to_right'), disabled: toRight.length === 0, onClick: () => closeTabs(toRight) },
               { sep: true },
-              { label: '关闭已保存', disabled: saved.length === 0, onClick: () => closeTabs(saved) },
-              { label: '全部关闭', disabled: tabs.length === 0, onClick: () => closeTabs(tabs.map((t) => t.key)) },
+              { label: t('md_editor.tab_ctx.close_saved'), disabled: saved.length === 0, onClick: () => closeTabs(saved) },
+              { label: t('md_editor.tab_ctx.close_all'), disabled: tabs.length === 0, onClick: () => closeTabs(tabs.map((tb) => tb.key)) },
             ];
             return <ContextMenu x={tabCtx.x} y={tabCtx.y} items={items} onClose={() => setTabCtx(null)} />;
           })()}
           {editorCtx && (
             <ContextMenu x={editorCtx.x} y={editorCtx.y} onClose={() => setEditorCtx(null)} items={[
-              { label: '剪切', kbd: '⌘X', onClick: doCut },
-              { label: '复制', kbd: '⌘C', onClick: doCopy },
-              { label: '粘贴', kbd: '⌘V', onClick: doPaste },
+              { label: t('md_editor.menu.cut'), kbd: '⌘X', onClick: doCut },
+              { label: t('md_editor.menu.copy'), kbd: '⌘C', onClick: doCopy },
+              { label: t('md_editor.menu.paste'), kbd: '⌘V', onClick: doPaste },
               { sep: true },
-              { label: '全选', kbd: '⌘A', onClick: doSelectAll },
+              { label: t('md_editor.menu.select_all'), kbd: '⌘A', onClick: doSelectAll },
               { sep: true },
-              { label: '撤销', kbd: '⌘Z', onClick: doUndo },
-              { label: '重做', kbd: '⌘⇧Z', onClick: doRedo },
+              { label: t('md_editor.menu.undo'), kbd: '⌘Z', onClick: doUndo },
+              { label: t('md_editor.menu.redo'), kbd: '⌘⇧Z', onClick: doRedo },
             ]} />
           )}
           {syncNudge && (
             <div className="mde-syncbar">
               <span className="mde-syncbar-text">
-                刚{syncNudge.rewrite ? '改写' : '续写'}的内容若引入或改变了设定,要让助手同步进角色卡 / 世界书 / 时间线吗?
+                {syncNudge.rewrite ? t('md_editor.sync.nudge_rewrite') : t('md_editor.sync.nudge_continue')}
               </span>
-              <button className="mde-syncbar-go" onClick={doSync}>同步设定</button>
-              <button className="mde-syncbar-no" onClick={() => setSyncNudge(null)}>忽略</button>
+              <button className="mde-syncbar-go" onClick={doSync}>{t('md_editor.sync.sync_btn')}</button>
+              <button className="mde-syncbar-no" onClick={() => setSyncNudge(null)}>{t('md_editor.sync.ignore_btn')}</button>
             </div>
           )}
         </main>
 
-        <div className="mde-splitter mde-splitter-right" onPointerDown={onSplitDown('right')} title="拖拽调整右栏宽度" />
+        <div className="mde-splitter mde-splitter-right" onPointerDown={onSplitDown('right')} title={t('md_editor.splitter.right')} />
 
         {/* 右:agent 直写面板(console_assistant SSE)+ 续写到正文 */}
         <aside className="mde-right">
           {scriptId
             ? <MdEditorAgent ref={agentRef} scriptId={scriptId} activeTab={active} onWriteComplete={refreshTab} onContinue={onContinue} />
-            : <div className="mde-tree-hint">先选剧本</div>}
+            : <div className="mde-tree-hint">{t('md_editor.ws.select_first')}</div>}
         </aside>
       </div>
     </div>
@@ -1021,9 +1028,9 @@ async function saveNodeContent(kind, sid, id, content, original) {
         const added = kb.filter((k) => !ka.includes(k));
         const removed = ka.filter((k) => !kb.includes(k));
         const parts = [];
-        if (added.length) parts.push('新增了字段「' + added.join('、') + '」');
-        if (removed.length) parts.push('删除/改名了字段「' + removed.join('、') + '」');
-        throw new Error('front-matter 字段被冻结,只能改值不能增删字段:你' + parts.join(';') + '。请改回字段名,只编辑冒号后的值。');
+        if (added.length) parts.push(i18n.t('md_editor.errors.fm_added', { fields: added.join(', ') }));
+        if (removed.length) parts.push(i18n.t('md_editor.errors.fm_removed', { fields: removed.join(', ') }));
+        throw new Error(i18n.t('md_editor.errors.fm_frozen', { parts: parts.join(';') }));
       }
     } catch (e) {
       if (e instanceof Error && /front-matter/.test(e.message)) throw e;
@@ -1052,16 +1059,16 @@ async function saveNodeContent(kind, sid, id, content, original) {
     return;
   }
   if (kind === 'anchor') {
-    if (!A.scripts.anchorUpdate) throw new Error('时间线写端点未就绪(需后端 P1)');
+    if (!A.scripts.anchorUpdate) throw new Error(i18n.t('md_editor.errors.anchor_write_not_ready'));
     await A.scripts.anchorUpdate(sid, id, diff);
     return;
   }
   if (kind === 'canon') {
-    if (!A.scripts.canonUpsert) throw new Error('canon 写端点未就绪(需后端 P1)');
+    if (!A.scripts.canonUpsert) throw new Error(i18n.t('md_editor.errors.canon_write_not_ready'));
     await A.scripts.canonUpsert(sid, { logical_key: id, ...diff });
     return;
   }
-  throw new Error(`未知实体类型:${kind}`);
+  throw new Error(i18n.t('md_editor.errors.unknown_kind', { kind }));
 }
 
 // 浅 diff:返回 cur 中与 orig 不同(深比较值)的键。

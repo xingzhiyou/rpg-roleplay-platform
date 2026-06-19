@@ -15,6 +15,7 @@
 import React from 'react';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
+import { useTranslation } from 'react-i18next';
 
 import { Icon } from './game-icons.jsx';
 import Modal from './components/Modal.jsx';
@@ -44,16 +45,17 @@ export function relTime(ts) {
 /* ── 确认弹窗 ──────────────────────────────────────────────────────
    收口到共享 components/ConfirmDialog.jsx(建在 Modal 之上)。导出契约与产出 DOM
    完全不变:eyebrow 危险操作/请确认、宽 420、行高 1.7、createPortal、确认钮无图标。 */
-export function ConfirmModal({ open, title, body, confirmLabel = '确认', danger, onClose, onConfirm }) {
+export function ConfirmModal({ open, title, body, confirmLabel, danger, onClose, onConfirm }) {
+  const { t } = useTranslation();
   return (
     <ConfirmDialog
       open={open}
       title={title}
       body={body}
-      eyebrow={danger ? '危险操作' : '请确认'}
+      eyebrow={danger ? t('tavern_app.confirm_modal.eyebrow_danger') : t('tavern_app.confirm_modal.eyebrow_default')}
       danger={danger}
-      confirmLabel={confirmLabel}
-      cancelLabel="取消"
+      confirmLabel={confirmLabel ?? t('common.confirm')}
+      cancelLabel={t('common.cancel')}
       icons={false}
       width={420}
       bodyLineHeight={1.7}
@@ -66,12 +68,13 @@ export function ConfirmModal({ open, title, body, confirmLabel = '确认', dange
 
 /* ── 单条对话行(标题 + last_snippet + 相对时间 + hover ⋯ 菜单)──────── */
 export function TavernChatItem({ chat, active, onOpen, onRename, onArchive, onDelete, archived }) {
+  const { t: tl } = useTranslation();
   const [menuOpen, setMenuOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
   const inputRef = useRef(null);
   const initial = (chat.character_name || chat.title || '?').trim().slice(0, 1);
-  const curTitle = chat.title || chat.character_name || `对话 #${chat.id}`;
+  const curTitle = chat.title || chat.character_name || tl('tavern_app.chat_item.default_title', { id: chat.id });
 
   // 类 Claude:双击标题 / 菜单「重命名」→ 原地变输入框,Enter 或失焦保存,Esc 取消。
   const startEdit = () => { setMenuOpen(false); setDraft(chat.title || chat.character_name || ''); setEditing(true); };
@@ -111,7 +114,7 @@ export function TavernChatItem({ chat, active, onOpen, onRename, onArchive, onDe
           ) : (
             <span
               className="tv-chat-title"
-              title="双击重命名"
+              title={tl('tavern_app.chat_item.dblclick_rename')}
               onDoubleClick={(e) => { e.stopPropagation(); startEdit(); }}
             >{curTitle}</span>
           )}
@@ -119,10 +122,10 @@ export function TavernChatItem({ chat, active, onOpen, onRename, onArchive, onDe
         </div>
         {chat.last_snippet
           ? <div className="tv-chat-snippet muted-2">{chat.last_snippet}</div>
-          : <div className="tv-chat-snippet muted-2" style={{ fontStyle: 'italic' }}>{chat.character_name || '酒馆角色'}</div>}
+          : <div className="tv-chat-snippet muted-2" style={{ fontStyle: 'italic' }}>{chat.character_name || tl('tavern_app.chat_item.fallback_char')}</div>}
       </div>
       <div className="tv-chat-menu-wrap" onClick={(e) => e.stopPropagation()}>
-        <button className="iconbtn tv-chat-menu-btn" onClick={() => setMenuOpen((v) => !v)} data-tip="更多">
+        <button className="iconbtn tv-chat-menu-btn" onClick={() => setMenuOpen((v) => !v)} data-tip={tl('tavern_app.chat_item.menu_more')}>
           <Icon name="more" size={14} />
         </button>
         {menuOpen && (
@@ -130,13 +133,13 @@ export function TavernChatItem({ chat, active, onOpen, onRename, onArchive, onDe
             <div className="tv-menu-scrim" onClick={() => setMenuOpen(false)} />
             <div className="tv-menu">
               <button onClick={startEdit}>
-                <Icon name="edit" size={13} /> 重命名
+                <Icon name="edit" size={13} /> {tl('tavern_app.chat_item.menu_rename')}
               </button>
               <button onClick={() => { setMenuOpen(false); onArchive(chat, !archived); }}>
-                <Icon name="folder" size={13} /> {archived ? '取消归档' : '归档'}
+                <Icon name="folder" size={13} /> {archived ? tl('tavern_app.chat_item.menu_unarchive') : tl('tavern_app.chat_item.menu_archive')}
               </button>
               <button className="tv-menu-danger" onClick={() => { setMenuOpen(false); onDelete(chat); }}>
-                <Icon name="trash" size={13} /> 删除
+                <Icon name="trash" size={13} /> {tl('common.delete')}
               </button>
             </div>
           </>
@@ -151,6 +154,7 @@ function TavernSidebar({
   chats, archivedChats, activeId, loading, collapsed, railW, dragHandleProps,
   onNewChat, onOpenChat, onRename, onArchive, onDelete, onDropCard, mobileOpen,
 }) {
+  const { t } = useTranslation();
   const [showArchived, setShowArchived] = useState(false);
   const [dragOver, setDragOver] = useState(false);
 
@@ -169,10 +173,10 @@ function TavernSidebar({
         <div className="tv-rail-head">
           <div className="tv-rail-brand">
             <Icon name="message_square" size={16} style={{ color: 'var(--accent)' }} />
-            <strong>酒馆</strong>
+            <strong>{t('tavern_app.sidebar.brand')}</strong>
           </div>
           <button className="btn primary tv-new-btn" onClick={onNewChat}>
-            <Icon name="plus" size={13} /> 新对话
+            <Icon name="plus" size={13} /> {t('tavern_app.sidebar.new_chat')}
           </button>
         </div>
 
@@ -182,12 +186,12 @@ function TavernSidebar({
           onDragLeave={() => setDragOver(false)}
           onDrop={onDrop}
         >
-          {loading && <div className="tv-rail-empty muted-2">加载中…</div>}
+          {loading && <div className="tv-rail-empty muted-2">{t('common.loading')}</div>}
           {!loading && chats.length === 0 && (
             <div className="tv-rail-empty muted-2">
               <Icon name="upload" size={20} style={{ opacity: 0.5, marginBottom: 6 }} />
-              <div>还没有对话</div>
-              <div style={{ fontSize: 11.5, marginTop: 4 }}>点「新对话」或拖入一张酒馆角色卡</div>
+              <div>{t('tavern_app.sidebar.empty_title')}</div>
+              <div style={{ fontSize: 11.5, marginTop: 4 }}>{t('tavern_app.sidebar.empty_hint')}</div>
             </div>
           )}
           {chats.map((c) => (
@@ -202,7 +206,7 @@ function TavernSidebar({
             <div className="tv-archived-section">
               <button className="tv-archived-toggle" onClick={() => setShowArchived((v) => !v)}>
                 <Icon name={showArchived ? 'chevron_down' : 'chevron_right'} size={12} />
-                已归档 ({archivedChats.length})
+                {t('tavern_app.sidebar.archived_label', { count: archivedChats.length })}
               </button>
               {showArchived && archivedChats.map((c) => (
                 <TavernChatItem
@@ -215,40 +219,41 @@ function TavernSidebar({
           )}
         </div>
       </div>
-      <div className="gc-rail-resize-handle" title="拖动调整宽度" {...dragHandleProps} />
+      <div className="gc-rail-resize-handle" title={t('tavern_app.sidebar.drag_resize')} {...dragHandleProps} />
     </aside>
   );
 }
 
 /* ── 顶栏:persona ⇄ character 两枚 chip + 操作 ─────────────────────── */
 function TavernHeader({ chat, character, persona, onOpenDrawer, onExport, onOpenNav, railCollapsed, onExpandRail }) {
+  const { t } = useTranslation();
   const charName = (character && character.name) || (chat && chat.character_name) || '';
   return (
     <header className="tv-header">
-      <button className="iconbtn tv-mobile-nav" onClick={onOpenNav} data-tip="对话列表">
+      <button className="iconbtn tv-mobile-nav" onClick={onOpenNav} data-tip={t('tavern_app.header.chat_list')}>
         <Icon name="menu" size={16} />
       </button>
       {railCollapsed && (
-        <button className="iconbtn" onClick={onExpandRail} data-tip="展开列表">
+        <button className="iconbtn" onClick={onExpandRail} data-tip={t('tavern_app.header.expand_rail')}>
           <Icon name="chevron_right" size={16} />
         </button>
       )}
       {charName ? (
-        <button className="tv-title" onClick={onOpenDrawer} data-tip="查看 / 编辑角色 · persona">
+        <button className="tv-title" onClick={onOpenDrawer} data-tip={t('tavern_app.header.view_edit_char')}>
           <span className="tv-title-name">{charName}</span>
           <Icon name="chevron_down" size={13} style={{ opacity: 0.45 }} />
         </button>
       ) : (
-        <span className="tv-title tv-title-empty">酒馆</span>
+        <span className="tv-title tv-title-empty">{t('tavern_app.sidebar.brand')}</span>
       )}
       <div className="tv-header-actions">
         {chat && onExport && (
-          <a className="iconbtn" href={onExport} target="_blank" rel="noopener" data-tip="导出 JSONL">
+          <a className="iconbtn" href={onExport} target="_blank" rel="noopener" data-tip={t('tavern_app.header.export_jsonl')}>
             <Icon name="download" size={15} />
           </a>
         )}
         {charName && (
-          <button className="iconbtn" onClick={onOpenDrawer} data-tip="角色卡 / persona">
+          <button className="iconbtn" onClick={onOpenDrawer} data-tip={t('tavern_app.header.char_persona')}>
             <Icon name="cards" size={15} />
           </button>
         )}
@@ -270,13 +275,14 @@ function _fmtToolValue(v) {
 }
 
 export function ToolCallBlock({ ops }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   if (!Array.isArray(ops) || ops.length === 0) return null;
   const n = ops.length;
-  const firstName = (ops[0] && ops[0].tool) || '工具';
+  const firstName = (ops[0] && ops[0].tool) || t('tavern_app.tool_block.tool_fallback');
   const summary = n === 1
-    ? `调用工具 · ${firstName}`
-    : `调用 ${n} 个工具 · ${firstName}…`;
+    ? t('tavern_app.tool_block.summary_one', { name: firstName })
+    : t('tavern_app.tool_block.summary_many', { count: n, name: firstName });
   return (
     <div className={`tvp-tools${open ? ' open' : ''}`}>
       <button
@@ -295,7 +301,7 @@ export function ToolCallBlock({ ops }) {
             <div className="tvp-tool-item" key={i}>
               <div className="tvp-tool-name">
                 <span className={`tvp-tool-dot${op && op.ok === false ? ' err' : ''}`} aria-hidden="true" />
-                {(op && op.tool) || '工具'}
+                {(op && op.tool) || t('tavern_app.tool_block.tool_fallback')}
               </div>
               {op && op.args != null && (
                 <pre className="tvp-tool-kv"><span className="tvp-tool-kv-k">args</span>{_fmtToolValue(op.args)}</pre>
@@ -321,6 +327,7 @@ export function ToolCallBlock({ ops }) {
  * 到达就把 spinner 收掉、退回可折叠条。流结束(streaming=false)绝不再显示 spinner。
  * 复用 mobile ThinkingBlock 的同构形态(分区共存),非 NarrativeBlock 的互斥旧逻辑。 */
 export function TavernThinkingBlock({ text, thinking }) {
+  const { t: tr } = useTranslation();
   const [open, setOpen] = useState(false);
   const t = (text == null ? '' : String(text));
   if (!t.trim() && !thinking) return null;
@@ -335,7 +342,7 @@ export function TavernThinkingBlock({ text, thinking }) {
         {thinking
           ? <span className="gc-spinner spin" aria-hidden="true" />
           : <Icon name={open ? 'chevron_down' : 'chevron_right'} size={11} />}
-        <span className="tvp-thinking-label">{thinking ? '思考中…' : '思考过程'}</span>
+        <span className="tvp-thinking-label">{thinking ? tr('tavern_app.thinking.in_progress') : tr('tavern_app.thinking.label')}</span>
       </button>
       {open && t.trim() && (
         <div className="tvp-thinking-body">{t}</div>
@@ -345,6 +352,7 @@ export function TavernThinkingBlock({ text, thinking }) {
 }
 
 export function TavernChatArea({ history, running, saveId, charName, charInitial, charAvatar, personaName, personaAvatar, hasError, errorMsg, onRetry, lastMeta, elapsedLabel }) {
+  const { t } = useTranslation();
   const ref = useRef(null);
 
   // 内嵌聊天图片:最后一条助手消息绝对索引 + 图片按消息分发(复用游戏端 hook)
@@ -374,7 +382,7 @@ export function TavernChatArea({ history, running, saveId, charName, charInitial
         {total === 0 && !running && (
           <div className="tv-chat-empty muted-2">
             <Icon name="message_square" size={28} style={{ opacity: 0.4, marginBottom: 8 }} />
-            <div>对话尚未开始。</div>
+            <div>{t('tavern_app.chat_area.empty')}</div>
           </div>
         )}
         {history.map((m, i) => {
@@ -423,7 +431,7 @@ export function TavernChatArea({ history, running, saveId, charName, charInitial
           // 等待首 token:复用「思考过程」折叠条的克制样式(标签 + 右侧转圈),
           // 不再用突兀的大圆角浮条。正文/思考流一到达就由 TavernThinkingBlock 接管。
           <div className="tvp-thinking tvp-thinking-waiting" aria-live="polite" role="status">
-            <span className="tvp-thinking-label">{charName ? `${charName} ` : ''}思考中…</span>
+            <span className="tvp-thinking-label">{charName ? t('tavern_app.chat_area.waiting_named', { name: charName }) : t('tavern_app.thinking.in_progress')}</span>
             <span className="gc-spinner spin" aria-hidden="true" />
             {elapsedLabel ? <span className="gc-waiting-gm-elapsed mono muted-2">{elapsedLabel}</span> : null}
           </div>
@@ -432,12 +440,12 @@ export function TavernChatArea({ history, running, saveId, charName, charInitial
           <div className="gc-error">
             <Icon name="warn" size={14} style={{ color: 'var(--danger)' }} />
             <div>
-              <strong>生成失败</strong>
+              <strong>{t('tavern_app.chat_area.error_title')}</strong>
               <p className="muted" style={{ margin: '4px 0 0', fontSize: 12.5 }}>
-                {(typeof hasError === 'string' && hasError) || errorMsg || '请求中断,已保留你的上一条输入,可重试。'}
+                {(typeof hasError === 'string' && hasError) || errorMsg || t('tavern_app.chat_area.error_default')}
               </p>
               <div className="gc-error-actions">
-                <button className="btn" onClick={onRetry} disabled={!onRetry}>重试</button>
+                <button className="btn" onClick={onRetry} disabled={!onRetry}>{t('tavern_app.chat_area.retry')}</button>
               </div>
             </div>
           </div>
@@ -451,9 +459,9 @@ export function TavernChatArea({ history, running, saveId, charName, charInitial
             onClick={jumpToBottom}
             className="btn"
             style={{ position: 'sticky', bottom: 16, justifySelf: 'end', marginLeft: 'auto', width: 'fit-content', background: 'var(--panel)', border: '1px solid var(--line)', borderRadius: 999, padding: '6px 14px', fontSize: 12.5, boxShadow: 'var(--shadow-3, 0 6px 18px -6px rgba(0,0,0,0.5))', zIndex: 5, cursor: 'pointer' }}
-            data-tip="跳到最新"
+            data-tip={t('tavern_app.chat_area.jump_tip')}
           >
-            <Icon name="chevron_down" size={12} /> 回到最新
+            <Icon name="chevron_down" size={12} /> {t('tavern_app.chat_area.jump_btn')}
           </button>
         )}
       </div>
@@ -467,6 +475,7 @@ export function TavernChatArea({ history, running, saveId, charName, charInitial
  * 新增「系统提示」tab —— 编辑本对话 system_prompt(onSaveSystemPrompt 持久化)。 */
 export function TwoCardDrawer({ open, character, persona, onClose, onSavePersona,
                                 inline = false, systemPrompt = '', onSaveSystemPrompt }) {
+  const { t } = useTranslation();
   const [form, setForm] = useState(() => cardFormInit(persona));
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -481,7 +490,7 @@ export function TwoCardDrawer({ open, character, persona, onClose, onSavePersona
 
   // 非 inline(独立页 portal):open=false 不渲染。inline:始终渲染,靠 collapsed 类收起。
   if (!inline && !open) return null;
-  const personaName = (persona && persona.name) || '你的 persona';
+  const personaName = (persona && persona.name) || t('tavern_app.drawer.persona_fallback');
 
   const doSave = async () => {
     setSaving(true);
@@ -498,16 +507,16 @@ export function TwoCardDrawer({ open, character, persona, onClose, onSavePersona
     <header className="tv-drawer-head">
       <div className="seg" style={{ display: 'flex' }}>
         <button className={tab === 'character' ? 'active' : ''} onClick={() => setTab('character')}>
-          <Icon name="cards" size={12} /> AI 角色
+          <Icon name="cards" size={12} /> {t('tavern_app.drawer.tab_character')}
         </button>
         <button className={tab === 'persona' ? 'active' : ''} onClick={() => setTab('persona')}>
-          <Icon name="user" size={12} /> 我的 persona
+          <Icon name="user" size={12} /> {t('tavern_app.drawer.tab_persona')}
         </button>
         <button className={tab === 'system' ? 'active' : ''} onClick={() => setTab('system')}>
-          <Icon name="settings" size={12} /> 系统提示
+          <Icon name="settings" size={12} /> {t('tavern_app.drawer.tab_system')}
         </button>
       </div>
-      <button className="iconbtn" onClick={onClose} data-tip={inline ? '折叠' : '关闭'}>
+      <button className="iconbtn" onClick={onClose} data-tip={inline ? t('tavern_app.drawer.collapse') : t('common.close')}>
         <Icon name={inline ? 'chevron_right' : 'close'} size={15} />
       </button>
     </header>
@@ -518,7 +527,7 @@ export function TwoCardDrawer({ open, character, persona, onClose, onSavePersona
       {tab === 'character' && (
         character
           ? <CardSheet card={character} kind="user" />
-          : <div className="muted-2" style={{ padding: 24, textAlign: 'center' }}>未找到该对话的角色卡。</div>
+          : <div className="muted-2" style={{ padding: 24, textAlign: 'center' }}>{t('tavern_app.drawer.char_not_found')}</div>
       )}
       {tab === 'persona' && (
         !editing ? (
@@ -526,20 +535,20 @@ export function TwoCardDrawer({ open, character, persona, onClose, onSavePersona
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
               <strong style={{ fontSize: 14 }}>{personaName}</strong>
               {persona && (
-                <button className="btn ghost" onClick={() => setEditing(true)}><Icon name="edit" size={12} /> 编辑</button>
+                <button className="btn ghost" onClick={() => setEditing(true)}><Icon name="edit" size={12} /> {t('common.edit')}</button>
               )}
             </div>
             {persona
               ? <CardSheet card={persona} kind="persona" />
-              : <div className="muted-2" style={{ padding: 24, textAlign: 'center' }}>本对话未设置 persona 卡。</div>}
+              : <div className="muted-2" style={{ padding: 24, textAlign: 'center' }}>{t('tavern_app.drawer.persona_not_set')}</div>}
           </>
         ) : (
           <>
             <CardEditFields form={form} u={u} kind="persona" />
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
-              <button className="btn ghost" onClick={() => setEditing(false)} disabled={saving}>取消</button>
+              <button className="btn ghost" onClick={() => setEditing(false)} disabled={saving}>{t('common.cancel')}</button>
               <button className="btn primary" onClick={doSave} disabled={saving}>
-                <Icon name="check" size={12} /> {saving ? '保存中…' : '保存'}
+                <Icon name="check" size={12} /> {saving ? t('tavern_app.drawer.saving') : t('common.save')}
               </button>
             </div>
           </>
@@ -548,26 +557,26 @@ export function TwoCardDrawer({ open, character, persona, onClose, onSavePersona
       {tab === 'system' && (
         <div className="tv-sysprompt">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-            <strong style={{ fontSize: 14 }}>系统提示词</strong>
+            <strong style={{ fontSize: 14 }}>{t('tavern_app.drawer.sysprompt_title')}</strong>
             {!spEditing && onSaveSystemPrompt && (
-              <button className="btn ghost" onClick={() => setSpEditing(true)}><Icon name="edit" size={12} /> 编辑</button>
+              <button className="btn ghost" onClick={() => setSpEditing(true)}><Icon name="edit" size={12} /> {t('common.edit')}</button>
             )}
           </div>
           {!spEditing ? (
             (spVal || '').trim()
               ? <div className="tv-sysprompt-view" style={{ whiteSpace: 'pre-wrap', fontSize: 13, lineHeight: 1.7 }}>{spVal}</div>
-              : <div className="muted-2" style={{ padding: 16, lineHeight: 1.7 }}>本对话未设置系统提示词。点「编辑」自定义 AI 的行为/人设/越狱(仅影响本对话)。</div>
+              : <div className="muted-2" style={{ padding: 16, lineHeight: 1.7 }}>{t('tavern_app.drawer.sysprompt_empty')}</div>
           ) : (
             <>
               <textarea
                 value={spVal} onChange={(e) => setSpVal(e.target.value)} rows={14}
-                placeholder="输入系统提示词(人设 / 行为约束 / 越狱指令等)…"
+                placeholder={t('tavern_app.drawer.sysprompt_placeholder')}
                 style={{ width: '100%', resize: 'vertical', fontSize: 13, lineHeight: 1.6 }}
               />
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
-                <button className="btn ghost" onClick={() => { setSpVal(systemPrompt || ''); setSpEditing(false); }} disabled={spSaving}>取消</button>
+                <button className="btn ghost" onClick={() => { setSpVal(systemPrompt || ''); setSpEditing(false); }} disabled={spSaving}>{t('common.cancel')}</button>
                 <button className="btn primary" onClick={doSaveSP} disabled={spSaving}>
-                  <Icon name="check" size={12} /> {spSaving ? '保存中…' : '保存'}
+                  <Icon name="check" size={12} /> {spSaving ? t('tavern_app.drawer.saving') : t('common.save')}
                 </button>
               </div>
             </>
@@ -596,6 +605,7 @@ export function TwoCardDrawer({ open, character, persona, onClose, onSavePersona
  *  TavernApp — 顶层
  * ══════════════════════════════════════════════════════════════════ */
 export default function TavernApp() {
+  const { t } = useTranslation();
   const [chats, setChats] = useState([]);
   const [archivedChats, setArchivedChats] = useState([]);
   const [loadingList, setLoadingList] = useState(true);
@@ -658,9 +668,9 @@ export default function TavernApp() {
       const data = await window.api.game.state();
       applyState(data);
     } catch (e) {
-      window.__apiToast?.('打开对话失败', { kind: 'danger', detail: e?.message });
+      window.__apiToast?.(t('tavern_app.toast.open_failed'), { kind: 'danger', detail: e?.message });
     }
-  }, [applyState]);
+  }, [applyState, t]);
 
   useEffect(() => { reloadList(); }, [reloadList]);
 
@@ -678,49 +688,49 @@ export default function TavernApp() {
   /* ── 新对话:导入卡 / 现有卡 → 拿 save_id 后打开 ───────────────────── */
   const openSaveId = useCallback(async (saveId, fallbackName) => {
     await reloadList();
-    await openChat({ id: saveId, title: fallbackName || `对话 #${saveId}`, character_name: fallbackName || '' });
-  }, [reloadList, openChat]);
+    await openChat({ id: saveId, title: fallbackName || t('tavern_app.chat_item.default_title', { id: saveId }), character_name: fallbackName || '' });
+  }, [reloadList, openChat, t]);
 
   const onImportConfirm = useCallback(async (payload) => {
     setImportOpen(false);
     try {
       if (payload.type === 'card') {
         const r = await window.api.tavern.importCharacter(payload.file);
-        if (r && r.ok === false) throw new Error(r.error || '导入失败');
+        if (r && r.ok === false) throw new Error(r.error || t('tavern_app.toast.import_failed'));
         await openSaveId(r.save_id, r.character_name);
-        window.__apiToast?.(`已导入「${r.character_name || '角色'}」`, { kind: 'ok', duration: 2000 });
+        window.__apiToast?.(t('tavern_app.toast.imported_char', { name: r.character_name || t('tavern_app.toast.char_fallback') }), { kind: 'ok', duration: 2000 });
       } else if (payload.type === 'card_json') {
         const r = await window.api.tavern.importCharacter({ json_string: payload.json_string });
-        if (r && r.ok === false) throw new Error(r.error || '导入失败');
+        if (r && r.ok === false) throw new Error(r.error || t('tavern_app.toast.import_failed'));
         await openSaveId(r.save_id, r.character_name);
-        window.__apiToast?.(`已导入「${r.character_name || '角色'}」`, { kind: 'ok', duration: 2000 });
+        window.__apiToast?.(t('tavern_app.toast.imported_char', { name: r.character_name || t('tavern_app.toast.char_fallback') }), { kind: 'ok', duration: 2000 });
       } else if (payload.type === 'chat') {
         const r = await window.api.tavern.importJsonl(payload.jsonl, payload.charName);
-        if (r && r.ok === false) throw new Error(r.error || '导入失败');
+        if (r && r.ok === false) throw new Error(r.error || t('tavern_app.toast.import_failed'));
         await openSaveId(r.save_id, payload.charName);
-        window.__apiToast?.(`已导入聊天记录(${r.commits_imported || 0} 条)`, { kind: 'ok', duration: 2200 });
+        window.__apiToast?.(t('tavern_app.toast.imported_chat', { count: r.commits_imported || 0 }), { kind: 'ok', duration: 2200 });
       }
     } catch (e) {
-      window.__apiToast?.('导入失败', { kind: 'danger', detail: e?.message });
+      window.__apiToast?.(t('tavern_app.toast.import_failed'), { kind: 'danger', detail: e?.message });
     }
-  }, [openSaveId]);
+  }, [openSaveId, t]);
 
   // 拖卡进 sidebar / 空状态 → 直接走角色卡导入
   const onDropCard = useCallback(async (file) => {
     if (!file) return;
     if (!/\.(png|json|webp)$/i.test(file.name || '')) {
-      window.__apiToast?.('仅支持 .png / .json / .webp 角色卡', { kind: 'warn', duration: 2400 });
+      window.__apiToast?.(t('tavern_app.toast.drop_unsupported'), { kind: 'warn', duration: 2400 });
       return;
     }
     try {
       const r = await window.api.tavern.importCharacter(file);
-      if (r && r.ok === false) throw new Error(r.error || '导入失败');
+      if (r && r.ok === false) throw new Error(r.error || t('tavern_app.toast.import_failed'));
       await openSaveId(r.save_id, r.character_name);
-      window.__apiToast?.(`已导入「${r.character_name || '角色'}」`, { kind: 'ok', duration: 2000 });
+      window.__apiToast?.(t('tavern_app.toast.imported_char', { name: r.character_name || t('tavern_app.toast.char_fallback') }), { kind: 'ok', duration: 2000 });
     } catch (e) {
-      window.__apiToast?.('导入失败', { kind: 'danger', detail: e?.message });
+      window.__apiToast?.(t('tavern_app.toast.import_failed'), { kind: 'danger', detail: e?.message });
     }
-  }, [openSaveId]);
+  }, [openSaveId, t]);
 
   /* ── 流式发送(收口到 useTavernChatRun;折叠语义见 lib/tavern-chat-run.js)──────── */
   const startRun = useCallback(async (playerText) => {
@@ -752,7 +762,7 @@ export default function TavernApp() {
         if (history[i]?.role === 'user' && (history[i].content || '').trim()) { t2 = history[i].content.trim(); break; }
       }
     }
-    if (!t2) { window.__apiToast?.('没有可重试的输入', { kind: 'warn', duration: 2000 }); return; }
+    if (!t2) { window.__apiToast?.(t('tavern_app.toast.no_retry_input'), { kind: 'warn', duration: 2000 }); return; }
     setHasError(false);
     setHistory((h) => {
       const out = [...h];
@@ -767,49 +777,49 @@ export default function TavernApp() {
   const doRename = useCallback(async (chat, title) => {
     try {
       await window.api.tavern.rename(chat.id, title);
-      window.__apiToast?.('已重命名', { kind: 'ok', duration: 1500 });
+      window.__apiToast?.(t('tavern_app.toast.renamed'), { kind: 'ok', duration: 1500 });
       reloadList();
       if (String(chat.id) === String(activeId)) setActiveChat((p) => ({ ...(p || {}), title }));
-    } catch (e) { window.__apiToast?.('重命名失败', { kind: 'danger', detail: e?.message }); }
-  }, [reloadList, activeId]);
+    } catch (e) { window.__apiToast?.(t('tavern_app.toast.rename_failed'), { kind: 'danger', detail: e?.message }); }
+  }, [reloadList, activeId, t]);
 
   const doArchive = useCallback(async (chat, archived) => {
     try {
       await window.api.tavern.archive(chat.id, archived);
-      window.__apiToast?.(archived ? '已归档' : '已取消归档', { kind: 'ok', duration: 1500 });
+      window.__apiToast?.(archived ? t('tavern_app.toast.archived') : t('tavern_app.toast.unarchived'), { kind: 'ok', duration: 1500 });
       reloadList();
-    } catch (e) { window.__apiToast?.('归档失败', { kind: 'danger', detail: e?.message }); }
-  }, [reloadList]);
+    } catch (e) { window.__apiToast?.(t('tavern_app.toast.archive_failed'), { kind: 'danger', detail: e?.message }); }
+  }, [reloadList, t]);
 
   const doDelete = useCallback(async (chat) => {
     setDeleteTarget(null);
     try {
       await window.api.tavern.remove(chat.id);
-      window.__apiToast?.('已删除', { kind: 'ok', duration: 1500 });
+      window.__apiToast?.(t('tavern_app.toast.deleted'), { kind: 'ok', duration: 1500 });
       if (String(chat.id) === String(activeId)) {
         setActiveId(null); setActiveChat(null); setHistory([]); setCharacter(null); setPersona(null);
       }
       reloadList();
-    } catch (e) { window.__apiToast?.('删除失败', { kind: 'danger', detail: e?.message }); }
-  }, [reloadList, activeId]);
+    } catch (e) { window.__apiToast?.(t('tavern_app.toast.delete_failed'), { kind: 'danger', detail: e?.message }); }
+  }, [reloadList, activeId, t]);
 
   const onSavePersona = useCallback(async (payload) => {
     try {
       const saved = await window.api.cards.myUpsert(payload);
-      window.__apiToast?.('persona 已保存', { kind: 'ok', duration: 1500 });
+      window.__apiToast?.(t('tavern_app.toast.persona_saved'), { kind: 'ok', duration: 1500 });
       // 重新读 state 让 player 镜像刷新(persona 编辑可能立即影响下一轮)
       try { const d = await window.api.game.state(); applyState(d); } catch (_) {}
       return saved;
     } catch (e) {
-      window.__apiToast?.('保存失败', { kind: 'danger', detail: e?.message });
+      window.__apiToast?.(t('tavern_app.toast.save_failed'), { kind: 'danger', detail: e?.message });
       throw e;
     }
-  }, [applyState]);
+  }, [applyState, t]);
 
-  const charName = (character && character.name) || (activeChat && activeChat.character_name) || '角色';
+  const charName = (character && character.name) || (activeChat && activeChat.character_name) || t('tavern_app.toast.char_fallback');
   const charInitial = charName.trim().slice(0, 1);
   const charAvatar = (character && character.avatar_path) || (activeChat && activeChat.avatar_path) || null;
-  const personaName = (persona && persona.name) || '你';
+  const personaName = (persona && persona.name) || t('tavern_app.persona.you');
   const personaAvatar = (persona && persona.avatar_path) || null;
   const exportUrl = activeId != null ? window.api.tavern.exportJsonl(activeId) : null;
 
@@ -844,8 +854,8 @@ export default function TavernApp() {
           <div className="tv-hero">
             <div className="tv-hero-inner">
               <div className="tv-hero-mark" aria-hidden="true">✻</div>
-              <h1 className="tv-hero-title serif">想和谁聊聊？</h1>
-              <p className="tv-hero-sub muted">拖入一张酒馆角色卡，立刻开始一段对话。</p>
+              <h1 className="tv-hero-title serif">{t('tavern_app.hero.title')}</h1>
+              <p className="tv-hero-sub muted">{t('tavern_app.hero.subtitle')}</p>
               <div
                 className="tv-hero-drop"
                 onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('drop-active'); }}
@@ -855,8 +865,8 @@ export default function TavernApp() {
                 role="button" tabIndex={0}
               >
                 <Icon name="upload" size={24} style={{ color: 'var(--accent)' }} />
-                <div className="tv-hero-drop-main">把角色卡拖到这里</div>
-                <div className="tv-hero-drop-sub muted-2">支持 .png（嵌入元数据）/ .json / .webp，或点此选择</div>
+                <div className="tv-hero-drop-main">{t('tavern_app.hero.drop_main')}</div>
+                <div className="tv-hero-drop-sub muted-2">{t('tavern_app.hero.drop_sub')}</div>
               </div>
             </div>
           </div>
@@ -876,7 +886,7 @@ export default function TavernApp() {
               onSendRaw={onSendRaw}
               model={model} setModel={setModel}
               composerMode="writing"
-              placeholder={`给 ${charName} 写点什么…`}
+              placeholder={t('tavern_app.composer.placeholder', { name: charName })}
               hideSlash hidePermission hideContinue hideAttach
               attachments={[]} removeAttachment={() => {}}
               showSlash={false} showPlus={false} showModel={false} showPerm={false}
@@ -906,9 +916,9 @@ export default function TavernApp() {
 
       <ConfirmModal
         open={!!deleteTarget}
-        title="删除对话?"
-        body={<>这将永久删除「<strong>{deleteTarget?.title || deleteTarget?.character_name || ''}</strong>」及其全部聊天记录,无法恢复。</>}
-        confirmLabel="删除"
+        title={t('tavern_app.delete_dialog.title')}
+        body={<>{t('tavern_app.delete_dialog.body_prefix')}<strong>{deleteTarget?.title || deleteTarget?.character_name || ''}</strong>{t('tavern_app.delete_dialog.body_suffix')}</>}
+        confirmLabel={t('common.delete')}
         danger
         onClose={() => setDeleteTarget(null)}
         onConfirm={() => deleteTarget && doDelete(deleteTarget)}
@@ -919,21 +929,22 @@ export default function TavernApp() {
 
 /* ── 重命名输入弹窗 ───────────────────────────────────────────────── */
 export function RenameModal({ target, onClose, onConfirm }) {
+  const { t } = useTranslation();
   const [val, setVal] = useState('');
   useEffect(() => { setVal(target?.title || target?.character_name || ''); }, [target]);
   if (!target) return null;
   const node = (
     <Modal
       open
-      eyebrow="重命名对话"
-      title="新标题"
+      eyebrow={t('tavern_app.rename_modal.eyebrow')}
+      title={t('tavern_app.rename_modal.title')}
       width={420}
       onClose={onClose}
       footer={<>
         <span />
         <div style={{ display: 'flex', gap: 8 }}>
-          <button className="btn ghost" onClick={onClose}>取消</button>
-          <button className="btn primary" onClick={() => val.trim() && onConfirm(val.trim())} disabled={!val.trim()}>保存</button>
+          <button className="btn ghost" onClick={onClose}>{t('common.cancel')}</button>
+          <button className="btn primary" onClick={() => val.trim() && onConfirm(val.trim())} disabled={!val.trim()}>{t('common.save')}</button>
         </div>
       </>}
     >
@@ -941,7 +952,7 @@ export function RenameModal({ target, onClose, onConfirm }) {
         <input
           autoFocus value={val} onChange={(e) => setVal(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter' && val.trim()) onConfirm(val.trim()); }}
-          placeholder="对话标题"
+          placeholder={t('tavern_app.rename_modal.placeholder')}
           style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid var(--line-soft)', background: 'var(--bg-deep)', color: 'var(--text)' }}
         />
       </div>

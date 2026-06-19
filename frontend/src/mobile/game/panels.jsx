@@ -3,19 +3,21 @@
    读同一份真实 `state`,但 UI 是移动原生(不复用电脑端 RightPanel)。
    字段防御性读取;空态明确提示。调试 tab 仅 devmode。 */
 import React from 'react';
+import { useTranslation } from 'react-i18next';
+import i18n from '../../i18n';
 import { Icon } from '../icons.jsx';
 import { lsGet } from '../../lib/storage.js';
 
 export const MOBILE_PANEL_TABS = [
-  { id: 'status', label: '状态', icon: 'status' },
-  { id: 'rules', label: '规则', icon: 'dice' },
-  { id: 'memory', label: '记忆', icon: 'memory' },
-  { id: 'worldbook', label: '世界书', icon: 'world' },
-  { id: 'cards', label: '人物', icon: 'cards' },
-  { id: 'timeline', label: '时间线', icon: 'timeline' },
-  { id: 'context', label: '上下文', icon: 'gauge' },
+  { id: 'status', label: i18n.t('mobile.game_panels.tab.status'), icon: 'status' },
+  { id: 'rules', label: i18n.t('mobile.game_panels.tab.rules'), icon: 'dice' },
+  { id: 'memory', label: i18n.t('mobile.game_panels.tab.memory'), icon: 'memory' },
+  { id: 'worldbook', label: i18n.t('mobile.game_panels.tab.worldbook'), icon: 'world' },
+  { id: 'cards', label: i18n.t('mobile.game_panels.tab.cards'), icon: 'cards' },
+  { id: 'timeline', label: i18n.t('mobile.game_panels.tab.timeline'), icon: 'timeline' },
+  { id: 'context', label: i18n.t('mobile.game_panels.tab.context'), icon: 'gauge' },
   ...(lsGet('rpg_devmode') === '1'
-    ? [{ id: 'debug', label: '调试', icon: 'braces' }] : []),
+    ? [{ id: 'debug', label: i18n.t('mobile.game_panels.tab.debug'), icon: 'braces' }] : []),
 ];
 
 const Empty = ({ children }) => <div className="mp-empty">{children}</div>;
@@ -30,27 +32,28 @@ const KV = ({ k, v }) => (v == null || v === '') ? null : (
 );
 
 function StatusPanel({ s }) {
+  const { t } = useTranslation();
   const p = s.player || {}; const w = s.world || {};
   const wl = s.worldline || {}; const vars = wl.variables || wl.vars || {};
   const varEntries = Object.entries(vars);
   return (
     <>
-      <Sec title="角色">
-        <KV k="姓名" v={p.name || p.display_name} />
-        <KV k="身份" v={p.role} />
-        <KV k="位置" v={p.current_location || p.location} />
+      <Sec title={t('mobile.game_panels.status.section_character')}>
+        <KV k={t('mobile.game_panels.status.kv_name')} v={p.name || p.display_name} />
+        <KV k={t('mobile.game_panels.status.kv_role')} v={p.role} />
+        <KV k={t('mobile.game_panels.status.kv_location')} v={p.current_location || p.location} />
         {p.background ? <div className="mp-para">{p.background}</div> : null}
-        {!p.name && !p.role ? <Empty>尚未建立角色</Empty> : null}
+        {!p.name && !p.role ? <Empty>{t('mobile.game_panels.status.empty_character')}</Empty> : null}
       </Sec>
-      <Sec title="世界">
-        <KV k="时刻" v={w.time} />
-        <KV k="天气" v={w.weather} />
+      <Sec title={t('mobile.game_panels.status.section_world')}>
+        <KV k={t('mobile.game_panels.status.kv_time')} v={w.time} />
+        <KV k={t('mobile.game_panels.status.kv_weather')} v={w.weather} />
         {Array.isArray(w.known_events) && w.known_events.length ? (
           <div className="mp-list">{w.known_events.slice(0, 8).map((e, i) => <div key={i} className="mp-li">· {typeof e === 'string' ? e : (e.text || e.title || JSON.stringify(e))}</div>)}</div>
         ) : null}
       </Sec>
       {varEntries.length > 0 && (
-        <Sec title="世界线变量" count={varEntries.length}>
+        <Sec title={t('mobile.game_panels.status.section_worldline_vars')} count={varEntries.length}>
           {varEntries.slice(0, 20).map(([k, v]) => <KV key={k} k={k} v={v} />)}
         </Sec>
       )}
@@ -59,23 +62,24 @@ function StatusPanel({ s }) {
 }
 
 function RulesPanel({ s }) {
+  const { t } = useTranslation();
   const rs = s.ruleset || {}; const sc = s.scene || {}; const enc = s.encounter || {};
   const pc = s.player_character || {}; const dice = Array.isArray(s.dice_log) ? s.dice_log : [];
   const hasRules = rs.id || rs.name || sc.module_id || enc.id || dice.length;
-  if (!hasRules) return <Empty>当前玩法非规则模式(无 5E 兼容模组)。</Empty>;
+  if (!hasRules) return <Empty>{t('mobile.game_panels.rules.empty')}</Empty>;
   return (
     <>
-      {(rs.id || rs.name) && <Sec title="规则集"><KV k="ruleset" v={rs.name || rs.id} /></Sec>}
+      {(rs.id || rs.name) && <Sec title={t('mobile.game_panels.rules.section_ruleset')}><KV k="ruleset" v={rs.name || rs.id} /></Sec>}
       {pc && (pc.hp != null || pc.level != null) && (
-        <Sec title="角色卡(PC)">
-          <KV k="等级" v={pc.level} /><KV k="HP" v={pc.hp != null ? `${pc.hp}/${pc.max_hp ?? '?'}` : null} />
+        <Sec title={t('mobile.game_panels.rules.section_pc')}>
+          <KV k={t('mobile.game_panels.rules.kv_level')} v={pc.level} /><KV k="HP" v={pc.hp != null ? `${pc.hp}/${pc.max_hp ?? '?'}` : null} />
           <KV k="AC" v={pc.ac} />
         </Sec>
       )}
-      {sc.module_id && <Sec title="场景"><KV k="模组" v={sc.module_id} /><KV k="位置" v={sc.location} /></Sec>}
-      {enc.id && <Sec title="遭遇"><KV k="encounter" v={enc.id} /><KV k="回合" v={enc.round} /></Sec>}
+      {sc.module_id && <Sec title={t('mobile.game_panels.rules.section_scene')}><KV k={t('mobile.game_panels.rules.kv_module')} v={sc.module_id} /><KV k={t('mobile.game_panels.rules.kv_location')} v={sc.location} /></Sec>}
+      {enc.id && <Sec title={t('mobile.game_panels.rules.section_encounter')}><KV k="encounter" v={enc.id} /><KV k={t('mobile.game_panels.rules.kv_round')} v={enc.round} /></Sec>}
       {dice.length > 0 && (
-        <Sec title="掷骰记录" count={dice.length}>
+        <Sec title={t('mobile.game_panels.rules.section_dice')} count={dice.length}>
           {dice.slice(-12).reverse().map((d, i) => <div key={i} className="mono mp-li">{typeof d === 'string' ? d : `${d.expr || ''} → ${d.total ?? d.result ?? ''}`}</div>)}
         </Sec>
       )}
@@ -84,17 +88,18 @@ function RulesPanel({ s }) {
 }
 
 function MemoryPanel({ s }) {
+  const { t } = useTranslation();
   const m = s.memory || {};
   const facts = Array.isArray(m.facts) ? m.facts : [];
   const updates = Array.isArray(m.last_structured_updates) ? m.last_structured_updates : [];
   return (
     <>
-      <Sec title="记忆模式"><KV k="mode" v={m.mode || 'normal'} />{m.current_objective ? <KV k="当前目标" v={m.current_objective} /> : null}</Sec>
-      <Sec title="固定记忆 / 事实" count={facts.length}>
-        {facts.length ? facts.slice(0, 30).map((f, i) => <div key={i} className="mp-li">· {typeof f === 'string' ? f : (f.text || f.content || JSON.stringify(f))}</div>) : <Empty>暂无固定记忆</Empty>}
+      <Sec title={t('mobile.game_panels.memory.section_mode')}><KV k="mode" v={m.mode || 'normal'} />{m.current_objective ? <KV k={t('mobile.game_panels.memory.kv_objective')} v={m.current_objective} /> : null}</Sec>
+      <Sec title={t('mobile.game_panels.memory.section_facts')} count={facts.length}>
+        {facts.length ? facts.slice(0, 30).map((f, i) => <div key={i} className="mp-li">· {typeof f === 'string' ? f : (f.text || f.content || JSON.stringify(f))}</div>) : <Empty>{t('mobile.game_panels.memory.empty_facts')}</Empty>}
       </Sec>
       {updates.length > 0 && (
-        <Sec title="本轮结构化更新" count={updates.length}>
+        <Sec title={t('mobile.game_panels.memory.section_updates')} count={updates.length}>
           {updates.map((u, i) => <div key={i} className="mono mp-li">{typeof u === 'string' ? u : (u.field ? `${u.field}: ${u.value ?? ''}` : JSON.stringify(u))}</div>)}
         </Sec>
       )}
@@ -103,14 +108,15 @@ function MemoryPanel({ s }) {
 }
 
 function WorldbookPanel({ s }) {
+  const { t } = useTranslation();
   const wb = s.worldbook || s.world_book || (s.content_pack && s.content_pack.worldbook) || [];
   const entries = Array.isArray(wb) ? wb : (wb.entries || []);
-  if (!entries.length) return <Empty>本档暂无激活的世界书条目(检索时按需注入)。</Empty>;
+  if (!entries.length) return <Empty>{t('mobile.game_panels.worldbook.empty')}</Empty>;
   return (
-    <Sec title="世界书" count={entries.length}>
+    <Sec title={t('mobile.game_panels.tab.worldbook')} count={entries.length}>
       {entries.slice(0, 40).map((e, i) => (
         <div key={i} className="mp-card">
-          <div className="mp-card-t">{e.key || e.title || e.name || ('条目 ' + i)}</div>
+          <div className="mp-card-t">{e.key || e.title || e.name || (t('mobile.game_panels.worldbook.entry_fallback', { index: i }))}</div>
           {(e.content || e.text) ? <div className="mp-card-b">{String(e.content || e.text).slice(0, 200)}</div> : null}
         </div>
       ))}
@@ -119,33 +125,35 @@ function WorldbookPanel({ s }) {
 }
 
 function CardsPanel({ s }) {
+  const { t } = useTranslation();
   const onStage = Array.isArray(s.active_entities) ? s.active_entities : [];
   const rel = s.relationships || {};
   const relEntries = Object.entries(rel);
   return (
     <>
-      <Sec title="在场" count={onStage.length}>
+      <Sec title={t('mobile.game_panels.cards.section_on_stage')} count={onStage.length}>
         {onStage.length ? onStage.map((c, i) => {
-          const nm = c.name || c.id || ('实体' + i);
+          const nm = c.name || c.id || (t('mobile.game_panels.cards.entity_fallback', { index: i }));
           return <div key={i} className="mp-row"><span className="mp-av serif">{String(nm).slice(0, 1)}</span><span className="mp-row-tx"><strong>{nm}</strong>{c.role || c.status ? <span>{c.role || c.status}</span> : null}</span></div>;
-        }) : <Empty>当前无在场角色</Empty>}
+        }) : <Empty>{t('mobile.game_panels.cards.empty_on_stage')}</Empty>}
       </Sec>
-      <Sec title="关系" count={relEntries.length}>
+      <Sec title={t('mobile.game_panels.cards.section_relationships')} count={relEntries.length}>
         {relEntries.length ? relEntries.slice(0, 30).map(([name, r]) => (
           <div key={name} className="mp-kv"><span className="mp-k">{name}</span><span className="mp-v">{typeof r === 'object' ? (r.tone || r.status || r.value || JSON.stringify(r)) : String(r)}</span></div>
-        )) : <Empty>暂无关系记录</Empty>}
+        )) : <Empty>{t('mobile.game_panels.cards.empty_relationships')}</Empty>}
       </Sec>
     </>
   );
 }
 
 function TimelinePanel({ s }) {
+  const { t } = useTranslation();
   const w = s.world || {};
   const tl = w.timeline || {};
   const items = Array.isArray(tl) ? tl : (Array.isArray(tl.events) ? tl.events : (Array.isArray(w.known_events) ? w.known_events : []));
-  if (!items.length) return <Empty>暂无时间线事件。</Empty>;
+  if (!items.length) return <Empty>{t('mobile.game_panels.timeline.empty')}</Empty>;
   return (
-    <Sec title="时间线" count={items.length}>
+    <Sec title={t('mobile.game_panels.tab.timeline')} count={items.length}>
       {items.slice(0, 40).map((e, i) => (
         <div key={i} className="mp-tl"><span className="mp-tl-dot" /><div className="mp-tl-tx"><strong>{e.time || e.when || ''}</strong><span>{typeof e === 'string' ? e : (e.text || e.title || e.event || JSON.stringify(e))}</span></div></div>
       ))}
@@ -154,11 +162,12 @@ function TimelinePanel({ s }) {
 }
 
 function ContextPanel({ s }) {
+  const { t } = useTranslation();
   const c = s.context || {};
   const segs = Array.isArray(c.segments) ? c.segments : [];
-  if (!segs.length) return <Empty>本轮尚无上下文分项。底部「上下文」按钮可看本轮 token 用量。</Empty>;
+  if (!segs.length) return <Empty>{t('mobile.game_panels.context.empty')}</Empty>;
   return (
-    <Sec title="上下文分项" count={segs.length}>
+    <Sec title={t('mobile.game_panels.context.section_segments')} count={segs.length}>
       {segs.map((seg, i) => (
         <div key={i} className="mp-kv"><span className="mp-k">{seg.label}</span><span className="mp-v mono">{seg.tok} · {seg.pct}%</span></div>
       ))}
@@ -167,8 +176,9 @@ function ContextPanel({ s }) {
 }
 
 function DebugPanel({ s }) {
+  const { t } = useTranslation();
   return (
-    <Sec title="原始 state(调试)">
+    <Sec title={t('mobile.game_panels.debug.section_raw_state')}>
       <pre className="mp-pre">{JSON.stringify(s, null, 2)}</pre>
     </Sec>
   );

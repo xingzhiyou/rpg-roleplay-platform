@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import CSModal from '@cloudscape-design/components/modal';
 import CSBox from '@cloudscape-design/components/box';
 import CSSpaceBetween from '@cloudscape-design/components/space-between';
@@ -37,6 +38,7 @@ export default function GenerateImageModal({
   saveId,
 }) {
   const { useState, useEffect } = React;
+  const { t } = useTranslation();
 
   const [prompt, setPrompt] = useState(defaultPrompt);
   const [size, setSize] = useState('');
@@ -44,7 +46,7 @@ export default function GenerateImageModal({
 
   // 生图内核(generate + 每 2s 轮询 + creds 分类)收口到 useImageGeneration;busy/error/credsMissing
   // 取自 hook。done → onDone(url)+onClose;creds 文案逐字保留。
-  const CREDS_TEXT = '请先在设置中配置该 Provider 的 API Key，再重试。';
+  const CREDS_TEXT = t('components.generate_image_modal.creds_missing_hint');
   const { generate, generating: busy, error, credsMissing, reset, stop, setError } = useImageGeneration({
     onDone: (url) => { if (onDone) onDone(url); if (onClose) onClose(); },
   });
@@ -56,12 +58,12 @@ export default function GenerateImageModal({
   }, [open]);
   // perCall:逐字保留本组件原 done/fail/error 文案与轮询策略。
   const PER_CALL = {
-    noImageIdMsg: '服务端未返回任务 ID',   // 响应无 image_id(含 !res)→ 报错
-    failFallback: '生成失败',               // failed 取错文兜底
+    noImageIdMsg: t('components.generate_image_modal.error.no_image_id'),   // 响应无 image_id(含 !res)→ 报错
+    failFallback: t('components.generate_image_modal.error.generate_failed'),               // failed 取错文兜底
     credsErrorText: CREDS_TEXT,             // creds 时显示该文 + credsMissing 旗标
-    emptyResStops: true, emptyResMsg: '轮询返回空响应',   // 轮询空响应:停并报错
-    catchStops: true, pollCatchMsg: '轮询出错',           // 轮询 catch:停并报错(不再重试)
-    genericErrorMsg: '请求失败',
+    emptyResStops: true, emptyResMsg: t('components.generate_image_modal.error.poll_empty'),   // 轮询空响应:停并报错
+    catchStops: true, pollCatchMsg: t('components.generate_image_modal.error.poll_error'),           // 轮询 catch:停并报错(不再重试)
+    genericErrorMsg: t('components.generate_image_modal.error.request_failed'),
   };
 
   // 当 defaultPrompt 变化(如父组件切换上下文)时同步
@@ -78,11 +80,11 @@ export default function GenerateImageModal({
   async function handleGenerate() {
     const trimmedPrompt = (prompt || '').trim();
     if (!trimmedPrompt) {
-      setError('请填写生成描述（Prompt）');
+      setError(t('components.generate_image_modal.error.prompt_required'));
       return;
     }
     if (!selModel.api_id || !selModel.model) {
-      setError('请先选择模型');
+      setError(t('components.generate_image_modal.error.model_required'));
       return;
     }
     const body = {
@@ -107,18 +109,18 @@ export default function GenerateImageModal({
     <CSModal
       visible={!!open}
       onDismiss={handleClose}
-      header="AI 生图"
+      header={t('components.generate_image_modal.title')}
       footer={
         <CSBox float="right">
           <CSSpaceBetween direction="horizontal" size="xs">
-            <CSButton onClick={handleClose} disabled={busy}>取消</CSButton>
+            <CSButton onClick={handleClose} disabled={busy}>{t('common.cancel')}</CSButton>
             <CSButton
               variant="primary"
               loading={busy}
               disabled={busy || !(prompt || '').trim()}
               onClick={handleGenerate}
             >
-              生成
+              {t('components.generate_image_modal.generate_btn')}
             </CSButton>
           </CSSpaceBetween>
         </CSBox>
@@ -127,15 +129,15 @@ export default function GenerateImageModal({
       <CSSpaceBetween size="m">
         {busy && (
           <CSStatusIndicator type="loading">
-            生成中，请稍候…
+            {t('components.generate_image_modal.generating')}
           </CSStatusIndicator>
         )}
         {error && (
           <CSAlert
             type="error"
-            header={credsMissing ? '缺少 API Key' : '生成失败'}
+            header={credsMissing ? t('components.generate_image_modal.error.missing_api_key') : t('components.generate_image_modal.error.generate_failed')}
             action={credsMissing
-              ? <CSButton iconName="settings" onClick={() => { window.location.hash = 'settings-models'; }}>去配 Key</CSButton>
+              ? <CSButton iconName="settings" onClick={() => { window.location.hash = 'settings-models'; }}>{t('components.generate_image_modal.configure_key_btn')}</CSButton>
               : undefined
             }
           >
@@ -143,13 +145,13 @@ export default function GenerateImageModal({
           </CSAlert>
         )}
         <CSFormField
-          label="生成描述（Prompt）"
-          description="描述你想生成的图片内容，越具体越好。"
+          label={t('components.generate_image_modal.prompt_label')}
+          description={t('components.generate_image_modal.prompt_description')}
         >
           <CSTextarea
             value={prompt}
             onChange={({ detail }) => setPrompt(detail.value)}
-            placeholder="例如：身着白色汉服的年轻女子，清澈眼神，水墨风格"
+            placeholder={t('components.generate_image_modal.prompt_placeholder')}
             rows={3}
             disabled={busy}
           />
@@ -160,11 +162,11 @@ export default function GenerateImageModal({
           capabilityFilter="image_gen"
           variant="bare"
           header={undefined}
-          description="选择生图模型（仅展示支持图像生成的模型）"
+          description={t('components.generate_image_modal.model_picker_description')}
           configHash="settings-models"
           onChange={(api_id, model) => setSelModel({ api_id, model })}
         />
-        <CSFormField label="尺寸 / 比例" description="按用途推荐默认比例；改一次后本地记住。vertex(Gemini) 暂不支持自定义尺寸">
+        <CSFormField label={t('components.generate_image_modal.size_label')} description={t('components.generate_image_modal.size_description')}>
           <ImageSizePicker kind={kind} value={size} onChange={setSize} />
         </CSFormField>
       </CSSpaceBetween>

@@ -5,6 +5,8 @@
    nav={go, switchTab, push, pop, toast, page, params:{section}}
    ─────────────────────────────────────────────────────────────────── */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
+import i18n from '../../i18n';
 import { Icon } from '../icons.jsx';
 import { usePlatformData, useReactiveUser, publishUser } from '../../platform-app.jsx';
 import AvatarImg from '../../components/AvatarImg.jsx';
@@ -14,7 +16,7 @@ const fmtN = (n) => n == null ? '—' : Number(n).toLocaleString();
 const fmtWan = (n) => {
   const v = Number(n) || 0;
   if (!v) return '—';
-  return v >= 10000 ? (v / 10000).toFixed(1).replace(/\.0$/, '') + ' 万' : v.toLocaleString();
+  return v >= 10000 ? (v / 10000).toFixed(1).replace(/\.0$/, '') + i18n.t('mobile.me.stats.wan_unit') : v.toLocaleString();
 };
 // 统一到 window.__fmt.date(data-loader.js;YYYY-MM-DD),保留本地兜底。
 const fmtDate = (iso) => {
@@ -26,10 +28,10 @@ const fmtAgo = (iso) => {
   if (!iso) return '—';
   try {
     const ms = Date.now() - new Date(iso).getTime();
-    if (ms < 60_000) return '刚刚';
-    if (ms < 3_600_000) return Math.floor(ms / 60_000) + ' 分钟前';
-    if (ms < 86_400_000) return Math.floor(ms / 3_600_000) + ' 小时前';
-    return Math.floor(ms / 86_400_000) + ' 天前';
+    if (ms < 60_000) return i18n.t('mobile.me.time.just_now');
+    if (ms < 3_600_000) return i18n.t('mobile.me.time.minutes_ago', { n: Math.floor(ms / 60_000) });
+    if (ms < 86_400_000) return i18n.t('mobile.me.time.hours_ago', { n: Math.floor(ms / 3_600_000) });
+    return i18n.t('mobile.me.time.days_ago', { n: Math.floor(ms / 86_400_000) });
   } catch { return '—'; }
 };
 
@@ -40,10 +42,11 @@ const TIER_COLOR = { gold: '#d4a35c', silver: '#aab0be', bronze: '#b97a5a' };
 
 /* ── 共用头部 ──────────────────────────────────────────────────── */
 function PageHead({ title, sub, onBack, actions }) {
+  const { t } = useTranslation();
   return (
     <div className="pl-head">
       {onBack && (
-        <button className="pl-back" onClick={onBack} aria-label="返回">
+        <button className="pl-back" onClick={onBack} aria-label={t('mobile.me.back')}>
           <Icon name="chevron_left" size={20} />
         </button>
       )}
@@ -111,7 +114,7 @@ function ActionBtn({ label, icon, onClick, danger, loading, style: s }) {
       }}
     >
       {icon && <Icon name={icon} size={14} />}
-      {loading ? '处理中…' : label}
+      {loading ? i18n.t('mobile.me.processing') : label}
     </button>
   );
 }
@@ -168,6 +171,7 @@ function Select({ label, value, onChange, options }) {
    与 class-based .sheet 视觉/行为不同:scrim rgba(0.6)≠.sheet-scrim(0.5)、圆角 20px≠22px、
    无 .sheet-wrap.show 的从底滑入 transform 动画。强迁会改变视觉/行为 → 按铁律保留原样。 */
 function ConfirmSheet({ open, title, body, confirmLabel, onClose, onConfirm, danger, loading }) {
+  const { t } = useTranslation();
   if (!open) return null;
   return (
     <div
@@ -186,12 +190,12 @@ function ConfirmSheet({ open, title, body, confirmLabel, onClose, onConfirm, dan
         <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>{title}</div>
         {body && <div style={{ fontSize: 13, color: 'var(--text-quiet)', marginBottom: 18, lineHeight: 1.65 }}>{body}</div>}
         <div style={{ display: 'flex', gap: 10 }}>
-          <button onClick={onClose} style={{ flex: 1, height: 46, borderRadius: 12, fontSize: 14, fontWeight: 500, background: 'var(--panel-2)', border: '1px solid var(--line)', color: 'var(--text-quiet)' }}>取消</button>
+          <button onClick={onClose} style={{ flex: 1, height: 46, borderRadius: 12, fontSize: 14, fontWeight: 500, background: 'var(--panel-2)', border: '1px solid var(--line)', color: 'var(--text-quiet)' }}>{t('common.cancel')}</button>
           <button
             onClick={onConfirm} disabled={loading}
             style={{ flex: 1, height: 46, borderRadius: 12, fontSize: 14, fontWeight: 600, background: danger ? 'var(--danger)' : 'var(--accent)', border: 'none', color: '#fff8f3', opacity: loading ? 0.7 : 1 }}
           >
-            {loading ? '处理中…' : (confirmLabel || '确认')}
+            {loading ? t('mobile.me.processing') : (confirmLabel || t('common.confirm'))}
           </button>
         </div>
       </div>
@@ -203,6 +207,7 @@ function ConfirmSheet({ open, title, body, confirmLabel, onClose, onConfirm, dan
    VIEW: 个人主页 Overview
    ═══════════════════════════════════════════════════════════════════ */
 function ViewOverview({ nav, user }) {
+  const { t } = useTranslation();
   const { saves = [] } = usePlatformData();
   const [meStats, setMeStats] = useState(null);
   const [activity, setActivity] = useState(null);
@@ -262,9 +267,9 @@ function ViewOverview({ nav, user }) {
   return (
     <>
       <PageHead
-        title="个人主页"
+        title={t('mobile.me.overview.title')}
         actions={
-          <button className="pl-headbtn" onClick={() => nav.go('me-edit')} aria-label="编辑资料">
+          <button className="pl-headbtn" onClick={() => nav.go('me-edit')} aria-label={t('mobile.me.edit.title')}>
             <Icon name="edit" size={18} />
           </button>
         }
@@ -295,10 +300,10 @@ function ViewOverview({ nav, user }) {
                 {user.role && <span style={{ marginLeft: 8, padding: '1px 7px', borderRadius: 999, fontSize: 10.5, background: 'var(--accent-soft)', color: 'var(--accent)', border: '1px solid var(--accent-edge)' }}>{user.role}</span>}
               </div>
               <div style={{ fontSize: 12.5, color: 'var(--text-quiet)', marginTop: 5, lineHeight: 1.5 }}>
-                {user.bio || <span style={{ color: 'var(--muted-2)' }}>暂无简介</span>}
+                {user.bio || <span style={{ color: 'var(--muted-2)' }}>{t('mobile.me.overview.no_bio')}</span>}
               </div>
               <div style={{ fontSize: 11, color: 'var(--muted-2)', marginTop: 5, fontFamily: 'var(--font-mono)' }}>
-                注册于 {regAt}
+                {t('mobile.me.overview.registered_at', { date: regAt })}
               </div>
             </div>
           </div>
@@ -307,50 +312,50 @@ function ViewOverview({ nav, user }) {
           <div className="pl-stats" style={{ marginBottom: 16 }}>
             <div className="pl-stat">
               <span className="n accent">{playHours != null ? playHours : '—'}</span>
-              <div className="l">游玩时长h{playMinutesWeek != null ? <span style={{ display: 'block', fontSize: 9 }}>+{(playMinutesWeek/60).toFixed(1)}h/周</span> : ''}</div>
+              <div className="l">{t('mobile.me.stats.play_hours')}{playMinutesWeek != null ? <span style={{ display: 'block', fontSize: 9 }}>+{(playMinutesWeek/60).toFixed(1)}h/{t('mobile.me.stats.per_week')}</span> : ''}</div>
             </div>
             <div className="pl-stat">
               <span className="n">{totalRounds != null ? fmtN(totalRounds) : '—'}</span>
-              <div className="l">总回合</div>
+              <div className="l">{t('mobile.me.stats.total_rounds')}</div>
             </div>
             <div className="pl-stat">
               <span className="n">{branches != null ? fmtN(branches) : '—'}</span>
-              <div className="l">分支{maxDepth ? <span style={{ display: 'block', fontSize: 9 }}>最深{maxDepth}层</span> : ''}</div>
+              <div className="l">{t('mobile.me.stats.branches')}{maxDepth ? <span style={{ display: 'block', fontSize: 9 }}>{t('mobile.me.stats.max_depth', { n: maxDepth })}</span> : ''}</div>
             </div>
             <div className="pl-stat">
               <span className="n">{loginStreak != null ? loginStreak : '—'}</span>
-              <div className="l">连续天{longestStreak ? <span style={{ display: 'block', fontSize: 9 }}>最长{longestStreak}天</span> : ''}</div>
+              <div className="l">{t('mobile.me.stats.streak_days')}{longestStreak ? <span style={{ display: 'block', fontSize: 9 }}>{t('mobile.me.stats.longest_streak', { n: longestStreak })}</span> : ''}</div>
             </div>
           </div>
           <div className="pl-stats" style={{ marginBottom: 16 }}>
             <div className="pl-stat">
               <span className="n">{importedScripts != null ? importedScripts : '—'}</span>
-              <div className="l">导入剧本</div>
+              <div className="l">{t('mobile.me.stats.imported_scripts')}</div>
             </div>
             <div className="pl-stat">
               <span className="n">{importedWords != null ? fmtWan(importedWords) : '—'}</span>
-              <div className="l">导入字数</div>
+              <div className="l">{t('mobile.me.stats.imported_words')}</div>
             </div>
             <div className="pl-stat">
               <span className="n">{unlockedCount}</span>
-              <div className="l">已解锁成就</div>
+              <div className="l">{t('mobile.me.stats.achievements_unlocked')}</div>
             </div>
             <div className="pl-stat">
               <span className="n">{saves.length}</span>
-              <div className="l">存档</div>
+              <div className="l">{t('mobile.me.stats.saves')}</div>
             </div>
           </div>
 
           {/* 成就摘要 */}
           <div className="pl-sec">
             <div className="pl-sec-head">
-              <h2>成就</h2>
-              <button className="act" onClick={() => nav.go('wall')}>全部 <Icon name="chevron_right" size={13} /></button>
+              <h2>{t('mobile.me.overview.achievements')}</h2>
+              <button className="act" onClick={() => nav.go('wall')}>{t('common.all')} <Icon name="chevron_right" size={13} /></button>
             </div>
             {achv === null ? (
-              <div className="pl-empty">加载中…</div>
+              <div className="pl-empty">{t('common.loading')}</div>
             ) : achv.length === 0 ? (
-              <div className="pl-empty">暂无成就记录。</div>
+              <div className="pl-empty">{t('mobile.me.overview.no_achievements')}</div>
             ) : (
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', paddingBottom: 4 }}>
                 {topAchv.map(a => (
@@ -370,7 +375,7 @@ function ViewOverview({ nav, user }) {
                     background: 'var(--panel)', border: '1px solid var(--line-soft)', color: 'var(--muted)', fontSize: 12,
                   }}>
                     <Icon name="more" size={16} />
-                    <span style={{ fontSize: 10 }}>更多</span>
+                    <span style={{ fontSize: 10 }}>{t('mobile.me.overview.more')}</span>
                   </button>
                 )}
               </div>
@@ -380,27 +385,32 @@ function ViewOverview({ nav, user }) {
           {/* 最近活动 */}
           <div className="pl-sec">
             <div className="pl-sec-head">
-              <h2>最近活动</h2>
+              <h2>{t('mobile.me.overview.recent_activity')}</h2>
             </div>
             {/* 活动筛选标签 */}
             <div style={{ display: 'flex', gap: 7, marginBottom: 10, overflowX: 'auto', paddingBottom: 2 }} className="scroll">
-              {['all', '回合', '分支', '剧本'].map(f => (
-                <button key={f} onClick={() => setActFilter(f)} style={{
+              {[
+                { v: 'all', l: t('common.all') },
+                { v: '回合', l: t('mobile.me.overview.filter_rounds') },
+                { v: '分支', l: t('mobile.me.overview.filter_branches') },
+                { v: '剧本', l: t('mobile.me.overview.filter_scripts') },
+              ].map(f => (
+                <button key={f.v} onClick={() => setActFilter(f.v)} style={{
                   flexShrink: 0, height: 28, padding: '0 12px', borderRadius: 999,
                   fontSize: 12, fontWeight: 500,
-                  background: actFilter === f ? 'var(--accent-soft)' : 'var(--panel-2)',
-                  color: actFilter === f ? 'var(--accent)' : 'var(--muted)',
-                  border: '1px solid ' + (actFilter === f ? 'var(--accent-edge)' : 'var(--line-soft)'),
+                  background: actFilter === f.v ? 'var(--accent-soft)' : 'var(--panel-2)',
+                  color: actFilter === f.v ? 'var(--accent)' : 'var(--muted)',
+                  border: '1px solid ' + (actFilter === f.v ? 'var(--accent-edge)' : 'var(--line-soft)'),
                 }}>
-                  {f === 'all' ? '全部' : f}
+                  {f.l}
                 </button>
               ))}
             </div>
             {activity === null ? (
-              <div className="pl-empty">加载中…</div>
+              <div className="pl-empty">{t('common.loading')}</div>
             ) : filteredAct.length === 0 ? (
               <div className="pl-empty" style={{ fontSize: 12.5 }}>
-                {activity.length === 0 ? '暂无活动记录。' : '该分类暂无记录。'}
+                {activity.length === 0 ? t('mobile.me.overview.no_activity') : t('mobile.me.overview.no_activity_in_filter')}
               </div>
             ) : (
               <div style={{ display: 'grid', gap: 1 }}>
@@ -422,25 +432,25 @@ function ViewOverview({ nav, user }) {
 
           {/* 快捷跳转 */}
           <div className="pl-sec">
-            <div className="pl-sec-head"><h2>账户管理</h2></div>
+            <div className="pl-sec-head"><h2>{t('mobile.me.overview.account_mgmt')}</h2></div>
             <button className="pl-row" onClick={() => nav.go('me-edit')}>
               <span className="pl-row-ic"><Icon name="edit" size={17} /></span>
-              <span className="pl-row-tx"><strong>编辑资料</strong><span>显示名、简介、头像、联系方式</span></span>
+              <span className="pl-row-tx"><strong>{t('mobile.me.edit.title')}</strong><span>{t('mobile.me.overview.edit_desc')}</span></span>
               <span className="pl-row-chev"><Icon name="chevron_right" size={17} /></span>
             </button>
             <button className="pl-row" onClick={() => nav.go('me-settings')}>
               <span className="pl-row-ic"><Icon name="settings" size={17} /></span>
-              <span className="pl-row-tx"><strong>账户设置</strong><span>安全、会话、人格、数据导出</span></span>
+              <span className="pl-row-tx"><strong>{t('mobile.me.settings.title')}</strong><span>{t('mobile.me.overview.settings_desc')}</span></span>
               <span className="pl-row-chev"><Icon name="chevron_right" size={17} /></span>
             </button>
             <button className="pl-row" onClick={() => nav.go('usage')}>
               <span className="pl-row-ic info"><Icon name="usage" size={17} /></span>
-              <span className="pl-row-tx"><strong>用量统计</strong><span>Token 消耗、成本、趋势图</span></span>
+              <span className="pl-row-tx"><strong>{t('mobile.me.usage.title')}</strong><span>{t('mobile.me.overview.usage_desc')}</span></span>
               <span className="pl-row-chev"><Icon name="chevron_right" size={17} /></span>
             </button>
             <button className="pl-row" onClick={() => nav.go('wall')}>
               <span className="pl-row-ic ok"><Icon name="trophy" size={17} /></span>
-              <span className="pl-row-tx"><strong>成就墙</strong><span>{unlockedCount} 个已解锁</span></span>
+              <span className="pl-row-tx"><strong>{t('mobile.me.wall.title')}</strong><span>{t('mobile.me.overview.wall_desc', { count: unlockedCount })}</span></span>
               <span className="pl-row-chev"><Icon name="chevron_right" size={17} /></span>
             </button>
           </div>
@@ -454,6 +464,7 @@ function ViewOverview({ nav, user }) {
    VIEW: 编辑资料 Edit
    ═══════════════════════════════════════════════════════════════════ */
 function ViewEdit({ nav, user }) {
+  const { t } = useTranslation();
   const [form, setForm] = useState({
     display_name: user.display_name || '',
     username: user.username || '',
@@ -504,16 +515,16 @@ function ViewEdit({ nav, user }) {
           publishUser({ ...form });
         }
       } catch (_) { publishUser({ ...form }); }
-      nav.toast('资料已保存', 'ok', 'check');
+      nav.toast(t('mobile.me.edit.save_success'), 'ok', 'check');
       nav.go('me');
     } catch (e) {
-      nav.toast('保存失败: ' + (e?.message || ''), 'danger', 'warn');
+      nav.toast(t('mobile.me.edit.save_error', { msg: e?.message || '' }), 'danger', 'warn');
     } finally { setSaving(false); }
   };
 
   const onAvatarFile = async (file) => {
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) { nav.toast('文件最大 2MB', 'danger', 'warn'); return; }
+    if (file.size > 2 * 1024 * 1024) { nav.toast(t('mobile.me.edit.avatar_too_large'), 'danger', 'warn'); return; }
     try {
       // 乐观预览：用 object URL 即时显示选中的图片
       const previewUrl = URL.createObjectURL(file);
@@ -522,11 +533,11 @@ function ViewEdit({ nav, user }) {
       // 上传完成后用后端返回的正式 URL 替换（若有）
       const serverUrl = r?.avatar_url || r?.url || null;
       if (serverUrl) setAvatarUrl(serverUrl);
-      nav.toast('头像已更新', 'ok', 'check');
+      nav.toast(t('mobile.me.edit.avatar_updated'), 'ok', 'check');
     } catch (e) {
       // 上传失败：还原到原始头像
       setAvatarUrl(user.avatar_url || user._raw?.avatar_url || null);
-      nav.toast('上传失败', 'danger', 'warn');
+      nav.toast(t('mobile.me.edit.upload_failed'), 'danger', 'warn');
     }
   };
 
@@ -534,19 +545,19 @@ function ViewEdit({ nav, user }) {
     try {
       await window.api.account.avatarReset();
       setAvatarUrl(null);
-      nav.toast('已恢复默认头像', 'ok', 'check');
-    } catch (e) { nav.toast('操作失败', 'danger', 'warn'); }
+      nav.toast(t('mobile.me.edit.avatar_reset'), 'ok', 'check');
+    } catch (e) { nav.toast(t('mobile.me.op_failed'), 'danger', 'warn'); }
   };
 
   return (
     <>
-      <PageHead title="编辑资料" onBack={() => nav.go('me')} />
+      <PageHead title={t('mobile.me.edit.title')} onBack={() => nav.go('me')} />
       <div className="pl-body tabbed">
         <div className="pl-pad">
 
           {/* 头像 */}
           <div className="pl-sec">
-            <div className="pl-sec-head"><h2>头像</h2></div>
+            <div className="pl-sec-head"><h2>{t('mobile.me.edit.avatar_section')}</h2></div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '8px 0 12px' }}>
               <AvatarImg
                 src={avatarUrl}
@@ -556,9 +567,9 @@ function ViewEdit({ nav, user }) {
                 className="mc-me-avatar-edit"
               />
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <ActionBtn label="上传新头像" icon="upload" onClick={() => avatarRef.current?.click()} />
-                <ActionBtn label="恢复默认" icon="user" onClick={onResetAvatar} />
-                <div style={{ fontSize: 11, color: 'var(--muted)' }}>PNG/JPG/WEBP · 最大 2MB</div>
+                <ActionBtn label={t('mobile.me.edit.upload_avatar')} icon="upload" onClick={() => avatarRef.current?.click()} />
+                <ActionBtn label={t('mobile.me.edit.reset_avatar')} icon="user" onClick={onResetAvatar} />
+                <div style={{ fontSize: 11, color: 'var(--muted)' }}>{t('mobile.me.edit.avatar_hint')}</div>
               </div>
             </div>
             <input ref={avatarRef} type="file" accept="image/png,image/jpeg,image/webp"
@@ -567,14 +578,14 @@ function ViewEdit({ nav, user }) {
 
           {/* 基本资料 */}
           <div className="pl-sec">
-            <div className="pl-sec-head"><h2>基本资料</h2></div>
-            <Input label="显示名" hint="出现在游戏和评论里" value={form.display_name} onChange={v => u('display_name', v)} />
-            <Input label="用户名" hint="登录用，6 个月可改一次" value={form.username} onChange={v => u('username', v)} />
-            <Input label="真实姓名" hint="仅自己可见" value={form.real_name} onChange={v => u('real_name', v)} />
+            <div className="pl-sec-head"><h2>{t('mobile.me.edit.basic_section')}</h2></div>
+            <Input label={t('mobile.me.edit.field_display_name')} hint={t('mobile.me.edit.field_display_name_hint')} value={form.display_name} onChange={v => u('display_name', v)} />
+            <Input label={t('mobile.me.edit.field_username')} hint={t('mobile.me.edit.field_username_hint')} value={form.username} onChange={v => u('username', v)} />
+            <Input label={t('mobile.me.edit.field_real_name')} hint={t('mobile.me.edit.field_real_name_hint')} value={form.real_name} onChange={v => u('real_name', v)} />
             <div style={{ marginBottom: 14 }}>
-              <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8 }}>性别</div>
+              <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8 }}>{t('mobile.me.edit.field_gender')}</div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                {[{ v: 'female', l: '女' }, { v: 'male', l: '男' }, { v: 'other', l: '其他' }, { v: 'unspecified', l: '不公开' }].map(o => (
+                {[{ v: 'female', l: t('mobile.me.edit.gender_female') }, { v: 'male', l: t('mobile.me.edit.gender_male') }, { v: 'other', l: t('mobile.me.edit.gender_other') }, { v: 'unspecified', l: t('mobile.me.edit.gender_unspecified') }].map(o => (
                   <button key={o.v} onClick={() => u('gender', o.v)} style={{
                     height: 34, padding: '0 16px', borderRadius: 999, fontSize: 13,
                     background: form.gender === o.v ? 'var(--accent)' : 'var(--panel)',
@@ -584,17 +595,17 @@ function ViewEdit({ nav, user }) {
                 ))}
               </div>
             </div>
-            <Select label="代词" value={form.pronouns || '不公开'}
+            <Select label={t('mobile.me.edit.field_pronouns')} value={form.pronouns || t('mobile.me.edit.gender_unspecified')}
               onChange={v => u('pronouns', v)}
-              options={[{ value: '她/她', label: '她/她' }, { value: '他/他', label: '他/他' }, { value: 'TA/TA', label: 'TA/TA' }, { value: '不公开', label: '不公开' }]} />
-            <Input label="生日" type="date" value={form.birthday} onChange={v => u('birthday', v)} />
-            <Input label="所在地" placeholder="例：上海" value={form.location} onChange={v => u('location', v)} />
-            <Input label="个人网站" placeholder="https://..." value={form.website} onChange={v => u('website', v)} />
+              options={[{ value: '她/她', label: t('mobile.me.edit.pronoun_she') }, { value: '他/他', label: t('mobile.me.edit.pronoun_he') }, { value: 'TA/TA', label: 'TA/TA' }, { value: '不公开', label: t('mobile.me.edit.gender_unspecified') }]} />
+            <Input label={t('mobile.me.edit.field_birthday')} type="date" value={form.birthday} onChange={v => u('birthday', v)} />
+            <Input label={t('mobile.me.edit.field_location')} placeholder={t('mobile.me.edit.field_location_placeholder')} value={form.location} onChange={v => u('location', v)} />
+            <Input label={t('mobile.me.edit.field_website')} placeholder="https://..." value={form.website} onChange={v => u('website', v)} />
             <div style={{ marginBottom: 14 }}>
-              <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 5 }}>简介 <span style={{ float: 'right', color: 'var(--muted-2)' }}>{form.bio.length}/280</span></div>
+              <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 5 }}>{t('mobile.me.edit.field_bio')} <span style={{ float: 'right', color: 'var(--muted-2)' }}>{form.bio.length}/280</span></div>
               <textarea
                 value={form.bio} onChange={e => u('bio', e.target.value)} rows={4}
-                placeholder="280 字以内"
+                placeholder={t('mobile.me.edit.field_bio_placeholder')}
                 style={{
                   width: '100%', background: 'var(--panel)', border: '1px solid var(--line)',
                   borderRadius: 10, color: 'var(--text)', fontSize: 16, padding: '10px 12px',
@@ -606,25 +617,25 @@ function ViewEdit({ nav, user }) {
 
           {/* 联系方式 */}
           <div className="pl-sec">
-            <div className="pl-sec-head"><h2>联系方式</h2></div>
-            <Input label="邮箱" hint="用于通知与找回密码" type="email" value={form.email} onChange={v => u('email', v)} placeholder="you@example.com" />
-            <Input label="手机" hint="选填，仅自己可见" type="tel" value={form.phone} onChange={v => u('phone', v)} placeholder="选填" />
+            <div className="pl-sec-head"><h2>{t('mobile.me.edit.contact_section')}</h2></div>
+            <Input label={t('mobile.me.edit.field_email')} hint={t('mobile.me.edit.field_email_hint')} type="email" value={form.email} onChange={v => u('email', v)} placeholder="you@example.com" />
+            <Input label={t('mobile.me.edit.field_phone')} hint={t('mobile.me.edit.field_phone_hint')} type="tel" value={form.phone} onChange={v => u('phone', v)} placeholder={t('mobile.me.edit.optional')} />
           </div>
 
           {/* 本地化 */}
           <div className="pl-sec">
-            <div className="pl-sec-head"><h2>本地化</h2></div>
-            <Select label="界面语言" value={form.language} onChange={v => u('language', v)}
+            <div className="pl-sec-head"><h2>{t('mobile.me.edit.locale_section')}</h2></div>
+            <Select label={t('mobile.me.edit.field_language')} value={form.language} onChange={v => u('language', v)}
               options={[{ value: 'zh-CN', label: '简体中文' }, { value: 'zh-TW', label: '繁體中文' }, { value: 'en', label: 'English (Beta)' }, { value: 'ja', label: '日本語' }]} />
-            <Select label="时区" value={form.timezone} onChange={v => u('timezone', v)}
-              options={[{ value: 'Asia/Shanghai', label: 'UTC+8 · 上海' }, { value: 'Asia/Tokyo', label: 'UTC+9 · 东京' }, { value: 'UTC', label: 'UTC' }, { value: 'America/Los_Angeles', label: 'UTC-8 · 洛杉矶' }]} />
+            <Select label={t('mobile.me.edit.field_timezone')} value={form.timezone} onChange={v => u('timezone', v)}
+              options={[{ value: 'Asia/Shanghai', label: 'UTC+8 · Shanghai' }, { value: 'Asia/Tokyo', label: 'UTC+9 · Tokyo' }, { value: 'UTC', label: 'UTC' }, { value: 'America/Los_Angeles', label: 'UTC-8 · Los Angeles' }]} />
           </div>
 
           {/* 保存 */}
           <div style={{ display: 'flex', gap: 10, padding: '8px 0 32px' }}>
-            <button onClick={() => nav.go('me')} style={{ flex: 1, height: 46, borderRadius: 12, fontSize: 14, background: 'var(--panel-2)', border: '1px solid var(--line)', color: 'var(--text-quiet)' }}>取消</button>
+            <button onClick={() => nav.go('me')} style={{ flex: 1, height: 46, borderRadius: 12, fontSize: 14, background: 'var(--panel-2)', border: '1px solid var(--line)', color: 'var(--text-quiet)' }}>{t('common.cancel')}</button>
             <button onClick={onSave} disabled={saving} style={{ flex: 2, height: 46, borderRadius: 12, fontSize: 14, fontWeight: 600, background: 'var(--accent)', border: 'none', color: '#fff8f3', opacity: saving ? 0.7 : 1 }}>
-              {saving ? '保存中…' : '保存资料'}
+              {saving ? t('mobile.me.edit.saving') : t('mobile.me.edit.save_btn')}
             </button>
           </div>
         </div>
@@ -637,6 +648,7 @@ function ViewEdit({ nav, user }) {
    VIEW: 账户设置 Settings
    ═══════════════════════════════════════════════════════════════════ */
 function ViewSettings({ nav, user }) {
+  const { t } = useTranslation();
   const hasPassword = user.has_password !== false;
 
   /* 偏好开关 */
@@ -751,19 +763,27 @@ function ViewSettings({ nav, user }) {
 
   const nSess = sessions.length;
   const curSess = sessions.find(s => s.current) || sessions[0];
-  const sessDesc = nSess === 0 ? '暂无活跃会话' : `${nSess} 个登录会话${curSess ? ` · 最近 ${curSess.ts}` : ''}`;
+  const sessDesc = nSess === 0
+    ? t('mobile.me.settings.no_sessions')
+    : curSess
+      ? t('mobile.me.settings.sessions_desc_with_ts', { count: nSess, ts: curSess.ts })
+      : t('mobile.me.settings.sessions_desc', { count: nSess });
 
   const cutoff = Date.now() - 30 * 86_400_000;
   const okIn30d = loginHistory.filter(h => h.result === 'ok' && (() => { try { return new Date(h.at).getTime() >= cutoff; } catch { return false; } })()).length;
   const blocked = loginHistory.filter(h => h.result !== 'ok').length;
-  const histDesc = loginHistory.length === 0 ? '暂无登录历史' : `近30天 ${okIn30d} 次成功${blocked ? `，${blocked} 次拦截` : ''}`;
+  const histDesc = loginHistory.length === 0
+    ? t('mobile.me.settings.no_login_history')
+    : blocked
+      ? t('mobile.me.settings.login_history_desc_blocked', { ok: okIn30d, blocked })
+      : t('mobile.me.settings.login_history_desc', { ok: okIn30d });
 
   const onRevokeSession = async (sid) => {
     try {
       await window.api.auth.sessionsRevoke(sid);
       setSessions(s => s.filter(x => x.id !== sid));
-      nav.toast('已下线', 'ok', 'check');
-    } catch (e) { nav.toast('下线失败', 'danger', 'warn'); }
+      nav.toast(t('mobile.me.settings.session_revoked'), 'ok', 'check');
+    } catch (e) { nav.toast(t('mobile.me.settings.session_revoke_failed'), 'danger', 'warn'); }
   };
 
   const onRevokeAll = async () => {
@@ -771,21 +791,21 @@ function ViewSettings({ nav, user }) {
     try {
       await window.api.auth.revokeAllSessions();
       setSessions(s => s.filter(x => x.current));
-      nav.toast('已全部下线', 'ok', 'check');
-    } catch (e) { nav.toast('操作失败', 'danger', 'warn'); }
+      nav.toast(t('mobile.me.settings.all_revoked'), 'ok', 'check');
+    } catch (e) { nav.toast(t('mobile.me.op_failed'), 'danger', 'warn'); }
     finally { setRevokeAllBusy(false); }
   };
 
   const onChangePassword = async () => {
-    if (hasPassword && !pwForm.current) { nav.toast('请输入当前密码', 'danger', 'warn'); return; }
-    if (!pwForm.next) { nav.toast('请输入新密码', 'danger', 'warn'); return; }
-    if (pwForm.next !== pwForm.confirm) { nav.toast('两次密码不一致', 'danger', 'warn'); return; }
+    if (hasPassword && !pwForm.current) { nav.toast(t('mobile.me.settings.pw_enter_current'), 'danger', 'warn'); return; }
+    if (!pwForm.next) { nav.toast(t('mobile.me.settings.pw_enter_new'), 'danger', 'warn'); return; }
+    if (pwForm.next !== pwForm.confirm) { nav.toast(t('mobile.me.settings.pw_mismatch'), 'danger', 'warn'); return; }
     setSavingPw(true);
     try {
       await window.api.auth.changePassword({ current: pwForm.current, next: pwForm.next });
-      nav.toast('密码已修改', 'ok', 'check');
+      nav.toast(t('mobile.me.settings.pw_changed'), 'ok', 'check');
       setSubView(null); setPwForm({ current: '', next: '', confirm: '' });
-    } catch (e) { nav.toast('修改失败: ' + (e?.message || ''), 'danger', 'warn'); }
+    } catch (e) { nav.toast(t('mobile.me.settings.pw_change_failed', { msg: e?.message || '' }), 'danger', 'warn'); }
     finally { setSavingPw(false); }
   };
 
@@ -793,9 +813,9 @@ function ViewSettings({ nav, user }) {
     setExportBusy(true);
     try {
       const r = await window.api.account.exportData(exportForm);
-      nav.toast('已申请导出，完成后邮件通知', 'ok', 'check');
+      nav.toast(t('mobile.me.settings.export_requested'), 'ok', 'check');
       setSubView(null);
-    } catch (e) { nav.toast('申请失败', 'danger', 'warn'); }
+    } catch (e) { nav.toast(t('mobile.me.settings.export_failed'), 'danger', 'warn'); }
     finally { setExportBusy(false); }
   };
 
@@ -803,9 +823,9 @@ function ViewSettings({ nav, user }) {
     setVisBusy(true);
     try {
       await window.api.account.visibility(visForm);
-      nav.toast('可见性已保存', 'ok', 'check');
+      nav.toast(t('mobile.me.settings.visibility_saved'), 'ok', 'check');
       setSubView(null);
-    } catch (e) { nav.toast('保存失败', 'danger', 'warn'); }
+    } catch (e) { nav.toast(t('mobile.me.edit.save_error', { msg: '' }), 'danger', 'warn'); }
     finally { setVisBusy(false); }
   };
 
@@ -813,9 +833,9 @@ function ViewSettings({ nav, user }) {
     setDeleteBusy(true);
     try {
       await window.api.account.requestDelete();
-      nav.toast('删除申请已提交', 'ok', 'check');
+      nav.toast(t('mobile.me.settings.delete_requested'), 'ok', 'check');
       setSubView(null);
-    } catch (e) { nav.toast('操作失败: ' + (e?.message || ''), 'danger', 'warn'); }
+    } catch (e) { nav.toast(t('mobile.me.op_failed_msg', { msg: e?.message || '' }), 'danger', 'warn'); }
     finally { setDeleteBusy(false); }
   };
 
@@ -823,9 +843,9 @@ function ViewSettings({ nav, user }) {
     setDeactBusy(true);
     try {
       await window.api.account.deactivate?.();
-      nav.toast('账号已停用', 'ok', 'check');
+      nav.toast(t('mobile.me.settings.deactivated'), 'ok', 'check');
       setSubView(null);
-    } catch (e) { nav.toast('操作失败: ' + (e?.message || ''), 'danger', 'warn'); }
+    } catch (e) { nav.toast(t('mobile.me.op_failed_msg', { msg: e?.message || '' }), 'danger', 'warn'); }
     finally { setDeactBusy(false); }
   };
 
@@ -837,8 +857,8 @@ function ViewSettings({ nav, user }) {
       const r = await window.api.account.personas.list();
       setPersonas(r?.personas || r?.items || []);
       setPersonaEdit(null);
-      nav.toast('人格已保存', 'ok', 'check');
-    } catch (e) { nav.toast('保存失败', 'danger', 'warn'); }
+      nav.toast(t('mobile.me.settings.persona_saved'), 'ok', 'check');
+    } catch (e) { nav.toast(t('mobile.me.edit.save_error', { msg: '' }), 'danger', 'warn'); }
     finally { setPersonaSaving(false); }
   };
 
@@ -846,35 +866,35 @@ function ViewSettings({ nav, user }) {
     try {
       await window.api.account.personas.remove(id);
       setPersonas(ps => ps.filter(p => p.id !== id));
-      nav.toast('已删除', 'ok', 'check');
-    } catch (e) { nav.toast('删除失败', 'danger', 'warn'); }
+      nav.toast(t('mobile.me.settings.persona_deleted'), 'ok', 'check');
+    } catch (e) { nav.toast(t('mobile.me.settings.delete_failed'), 'danger', 'warn'); }
   };
 
   /* ── 子视图渲染 ─── */
   if (subView === 'sessions') return (
     <>
-      <PageHead title="活跃会话" sub={`${nSess} 个`} onBack={() => setSubView(null)} />
+      <PageHead title={t('mobile.me.settings.sessions_title')} sub={t('mobile.me.settings.sessions_count', { n: nSess })} onBack={() => setSubView(null)} />
       <div className="pl-body tabbed">
         <div className="pl-pad">
           {sessions.length === 0 ? (
-            <div className="pl-empty">暂无活跃会话</div>
+            <div className="pl-empty">{t('mobile.me.settings.no_sessions')}</div>
           ) : sessions.map((s, i) => (
             <div key={s.id || i} className="pl-row" style={{ margin: '0 0 6px' }}>
               <span className={'pl-row-ic' + (s.current ? ' accent' : '')}><Icon name="world" size={17} /></span>
               <span className="pl-row-tx">
-                <strong style={{ fontSize: 13 }}>{s.device}{s.current && <span style={{ marginLeft: 6, fontSize: 10.5, padding: '1px 6px', borderRadius: 999, background: 'var(--ok-soft)', color: 'var(--ok)', border: '1px solid rgba(126,184,142,0.3)' }}>当前</span>}</strong>
+                <strong style={{ fontSize: 13 }}>{s.device}{s.current && <span style={{ marginLeft: 6, fontSize: 10.5, padding: '1px 6px', borderRadius: 999, background: 'var(--ok-soft)', color: 'var(--ok)', border: '1px solid rgba(126,184,142,0.3)' }}>{t('mobile.me.settings.current_session')}</span>}</strong>
                 <span className="mono">{s.loc} · {s.ip} · {s.ts}</span>
               </span>
               {!s.current && (
                 <button onClick={() => onRevokeSession(s.id)} style={{ flexShrink: 0, height: 30, padding: '0 10px', borderRadius: 8, fontSize: 12, background: 'var(--danger-soft)', color: 'var(--danger)', border: '1px solid rgba(200,103,93,0.3)' }}>
-                  下线
+                  {t('mobile.me.settings.revoke')}
                 </button>
               )}
             </div>
           ))}
           {nSess > 1 && (
             <button onClick={onRevokeAll} disabled={revokeAllBusy} className="pl-btn-ghost" style={{ marginTop: 12, width: '100%' }}>
-              <Icon name="logout" size={15} />{revokeAllBusy ? '处理中…' : '全部下线（保留当前）'}
+              <Icon name="logout" size={15} />{revokeAllBusy ? t('mobile.me.processing') : t('mobile.me.settings.revoke_all')}
             </button>
           )}
         </div>
@@ -884,10 +904,10 @@ function ViewSettings({ nav, user }) {
 
   if (subView === 'history') return (
     <>
-      <PageHead title="登录历史" sub={`${loginHistory.length} 条`} onBack={() => setSubView(null)} />
+      <PageHead title={t('mobile.me.settings.history_title')} sub={t('mobile.me.settings.history_count', { n: loginHistory.length })} onBack={() => setSubView(null)} />
       <div className="pl-body tabbed">
         <div className="pl-pad">
-          {loginHistory.length === 0 ? <div className="pl-empty">暂无登录记录</div> :
+          {loginHistory.length === 0 ? <div className="pl-empty">{t('mobile.me.settings.no_login_history')}</div> :
             loginHistory.map((r, i) => (
               <div key={i} className="pl-row" style={{ margin: '0 0 5px' }}>
                 <span className={'pl-row-ic ' + (r.result === 'ok' ? 'ok' : 'warn')}><Icon name={r.result === 'ok' ? 'check' : 'shield'} size={16} /></span>
@@ -896,7 +916,7 @@ function ViewSettings({ nav, user }) {
                   <span className="mono">{r.ip} · {r.ts}</span>
                 </span>
                 <span style={{ flexShrink: 0, fontSize: 11, padding: '2px 8px', borderRadius: 999, background: r.result === 'ok' ? 'var(--ok-soft)' : 'var(--danger-soft)', color: r.result === 'ok' ? 'var(--ok)' : 'var(--danger)', border: '1px solid ' + (r.result === 'ok' ? 'rgba(126,184,142,0.3)' : 'rgba(200,103,93,0.3)') }}>
-                  {r.result === 'ok' ? '成功' : '拦截'}
+                  {r.result === 'ok' ? t('mobile.me.settings.login_ok') : t('mobile.me.settings.login_blocked')}
                 </span>
               </div>
             ))
@@ -908,20 +928,20 @@ function ViewSettings({ nav, user }) {
 
   if (subView === 'pw') return (
     <>
-      <PageHead title={hasPassword ? '修改密码' : '设置密码'} onBack={() => setSubView(null)} />
+      <PageHead title={hasPassword ? t('mobile.me.settings.change_password') : t('mobile.me.settings.set_password')} onBack={() => setSubView(null)} />
       <div className="pl-body tabbed">
         <div className="pl-pad">
           <div className="pl-sec" style={{ paddingTop: 8 }}>
             {hasPassword && (
-              <Input label="当前密码" type="password" value={pwForm.current} onChange={v => setPwForm(f => ({ ...f, current: v }))} />
+              <Input label={t('mobile.me.settings.pw_current')} type="password" value={pwForm.current} onChange={v => setPwForm(f => ({ ...f, current: v }))} />
             )}
-            <Input label="新密码" hint="至少 12 位 · 含大小写 + 数字" type="password" value={pwForm.next} onChange={v => setPwForm(f => ({ ...f, next: v }))} />
-            <Input label="确认新密码" type="password" value={pwForm.confirm} onChange={v => setPwForm(f => ({ ...f, confirm: v }))} />
+            <Input label={t('mobile.me.settings.pw_new')} hint={t('mobile.me.settings.pw_new_hint')} type="password" value={pwForm.next} onChange={v => setPwForm(f => ({ ...f, next: v }))} />
+            <Input label={t('mobile.me.settings.pw_confirm')} type="password" value={pwForm.confirm} onChange={v => setPwForm(f => ({ ...f, confirm: v }))} />
           </div>
           <div style={{ display: 'flex', gap: 10, paddingTop: 8 }}>
-            <button onClick={() => setSubView(null)} style={{ flex: 1, height: 46, borderRadius: 12, fontSize: 14, background: 'var(--panel-2)', border: '1px solid var(--line)', color: 'var(--text-quiet)' }}>取消</button>
+            <button onClick={() => setSubView(null)} style={{ flex: 1, height: 46, borderRadius: 12, fontSize: 14, background: 'var(--panel-2)', border: '1px solid var(--line)', color: 'var(--text-quiet)' }}>{t('common.cancel')}</button>
             <button onClick={onChangePassword} disabled={savingPw} style={{ flex: 2, height: 46, borderRadius: 12, fontSize: 14, fontWeight: 600, background: 'var(--accent)', border: 'none', color: '#fff8f3', opacity: savingPw ? 0.7 : 1 }}>
-              {savingPw ? '修改中…' : (hasPassword ? '修改密码' : '设置密码')}
+              {savingPw ? t('mobile.me.settings.pw_changing') : (hasPassword ? t('mobile.me.settings.change_password') : t('mobile.me.settings.set_password'))}
             </button>
           </div>
         </div>
@@ -932,10 +952,10 @@ function ViewSettings({ nav, user }) {
   if (subView === 'personas') return (
     <>
       <PageHead
-        title="人格 Persona"
+        title={t('mobile.me.settings.personas_title')}
         onBack={() => { setSubView(null); setPersonaEdit(null); }}
         actions={
-          <button className="pl-headbtn" onClick={() => setPersonaEdit({ id: '', name: '', description: '', prompt: '' })} aria-label="新建">
+          <button className="pl-headbtn" onClick={() => setPersonaEdit({ id: '', name: '', description: '', prompt: '' })} aria-label={t('mobile.me.settings.persona_new')}>
             <Icon name="plus" size={18} />
           </button>
         }
@@ -944,27 +964,27 @@ function ViewSettings({ nav, user }) {
         <div className="pl-pad">
           {personaEdit && (
             <div style={{ background: 'var(--panel)', border: '1px solid var(--accent-edge)', borderRadius: 14, padding: '14px 14px 10px', marginBottom: 14 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--accent)', marginBottom: 12 }}>{personaEdit.id ? '编辑人格' : '新建人格'}</div>
-              <Input label="名称" value={personaEdit.name || ''} onChange={v => setPersonaEdit(p => ({ ...p, name: v }))} />
-              <Input label="简介" value={personaEdit.description || ''} onChange={v => setPersonaEdit(p => ({ ...p, description: v }))} />
-              <Input label="提示词" multiline value={personaEdit.prompt || ''} onChange={v => setPersonaEdit(p => ({ ...p, prompt: v }))} rows={4} />
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--accent)', marginBottom: 12 }}>{personaEdit.id ? t('mobile.me.settings.persona_edit') : t('mobile.me.settings.persona_new')}</div>
+              <Input label={t('mobile.me.settings.persona_name')} value={personaEdit.name || ''} onChange={v => setPersonaEdit(p => ({ ...p, name: v }))} />
+              <Input label={t('mobile.me.settings.persona_desc')} value={personaEdit.description || ''} onChange={v => setPersonaEdit(p => ({ ...p, description: v }))} />
+              <Input label={t('mobile.me.settings.persona_prompt')} multiline value={personaEdit.prompt || ''} onChange={v => setPersonaEdit(p => ({ ...p, prompt: v }))} rows={4} />
               <div style={{ display: 'flex', gap: 9 }}>
-                <button onClick={() => setPersonaEdit(null)} style={{ flex: 1, height: 40, borderRadius: 10, fontSize: 13, background: 'var(--panel-2)', border: '1px solid var(--line)', color: 'var(--text-quiet)' }}>取消</button>
+                <button onClick={() => setPersonaEdit(null)} style={{ flex: 1, height: 40, borderRadius: 10, fontSize: 13, background: 'var(--panel-2)', border: '1px solid var(--line)', color: 'var(--text-quiet)' }}>{t('common.cancel')}</button>
                 <button onClick={onPersonaSave} disabled={personaSaving} style={{ flex: 2, height: 40, borderRadius: 10, fontSize: 13, fontWeight: 600, background: 'var(--accent)', border: 'none', color: '#fff8f3', opacity: personaSaving ? 0.7 : 1 }}>
-                  {personaSaving ? '保存中…' : '保存'}
+                  {personaSaving ? t('mobile.me.edit.saving') : t('common.save')}
                 </button>
               </div>
             </div>
           )}
           {personas === null ? (
-            <div className="pl-empty">加载中…</div>
+            <div className="pl-empty">{t('common.loading')}</div>
           ) : personas.length === 0 ? (
-            <div className="pl-empty">暂无人格。点击右上角新建。</div>
+            <div className="pl-empty">{t('mobile.me.settings.no_personas')}</div>
           ) : personas.map(p => (
             <div key={p.id} className="pl-row" style={{ margin: '0 0 6px', alignItems: 'flex-start' }}>
               <span className="pl-row-ic"><Icon name="user" size={17} /></span>
               <span className="pl-row-tx">
-                <strong>{p.name || '未命名'}</strong>
+                <strong>{p.name || t('mobile.me.settings.persona_unnamed')}</strong>
                 {p.description && <span style={{ fontSize: 12 }}>{p.description}</span>}
                 {p.prompt && <span className="mono" style={{ fontSize: 11, color: 'var(--muted-2)', marginTop: 2, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{p.prompt}</span>}
               </span>
@@ -985,23 +1005,23 @@ function ViewSettings({ nav, user }) {
 
   if (subView === 'export') return (
     <>
-      <PageHead title="导出数据" onBack={() => setSubView(null)} />
+      <PageHead title={t('mobile.me.settings.export_title')} onBack={() => setSubView(null)} />
       <div className="pl-body tabbed">
         <div className="pl-pad">
           <div className="pl-sec" style={{ paddingTop: 8 }}>
             <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 14, lineHeight: 1.7 }}>
-              打包导出全部剧本、存档、记忆、库资产、用量记录。生成后通过邮件发送下载链接（7 天有效）。
+              {t('mobile.me.settings.export_desc')}
             </div>
-            <Select label="范围" value={exportForm.scope} onChange={v => setExportForm(f => ({ ...f, scope: v }))}
-              options={[{ value: 'all', label: '全部 · 剧本 · 存档 · 库 · 用量' }, { value: 'scripts', label: '仅剧本与章节' }, { value: 'saves', label: '仅存档与分支' }, { value: 'library', label: '仅库资产' }, { value: 'usage', label: '仅用量日志' }]} />
-            <Select label="格式" value={exportForm.format} onChange={v => setExportForm(f => ({ ...f, format: v }))}
-              options={[{ value: 'zip', label: 'ZIP · 含 JSON + 附件' }, { value: 'json', label: 'JSON · 仅元数据' }]} />
-            <Input label="接收邮箱" type="email" value={exportForm.email} onChange={v => setExportForm(f => ({ ...f, email: v }))} placeholder="用于接收下载链接" />
+            <Select label={t('mobile.me.settings.export_scope')} value={exportForm.scope} onChange={v => setExportForm(f => ({ ...f, scope: v }))}
+              options={[{ value: 'all', label: t('mobile.me.settings.export_scope_all') }, { value: 'scripts', label: t('mobile.me.settings.export_scope_scripts') }, { value: 'saves', label: t('mobile.me.settings.export_scope_saves') }, { value: 'library', label: t('mobile.me.settings.export_scope_library') }, { value: 'usage', label: t('mobile.me.settings.export_scope_usage') }]} />
+            <Select label={t('mobile.me.settings.export_format')} value={exportForm.format} onChange={v => setExportForm(f => ({ ...f, format: v }))}
+              options={[{ value: 'zip', label: t('mobile.me.settings.export_format_zip') }, { value: 'json', label: t('mobile.me.settings.export_format_json') }]} />
+            <Input label={t('mobile.me.settings.export_email')} type="email" value={exportForm.email} onChange={v => setExportForm(f => ({ ...f, email: v }))} placeholder={t('mobile.me.settings.export_email_placeholder')} />
           </div>
           <div style={{ display: 'flex', gap: 10, paddingTop: 8 }}>
-            <button onClick={() => setSubView(null)} style={{ flex: 1, height: 46, borderRadius: 12, fontSize: 14, background: 'var(--panel-2)', border: '1px solid var(--line)', color: 'var(--text-quiet)' }}>取消</button>
+            <button onClick={() => setSubView(null)} style={{ flex: 1, height: 46, borderRadius: 12, fontSize: 14, background: 'var(--panel-2)', border: '1px solid var(--line)', color: 'var(--text-quiet)' }}>{t('common.cancel')}</button>
             <button onClick={onExportData} disabled={exportBusy} style={{ flex: 2, height: 46, borderRadius: 12, fontSize: 14, fontWeight: 600, background: 'var(--accent)', border: 'none', color: '#fff8f3', opacity: exportBusy ? 0.7 : 1 }}>
-              {exportBusy ? '申请中…' : '申请导出'}
+              {exportBusy ? t('mobile.me.settings.export_requesting') : t('mobile.me.settings.export_request_btn')}
             </button>
           </div>
         </div>
@@ -1011,20 +1031,20 @@ function ViewSettings({ nav, user }) {
 
   if (subView === 'visibility') return (
     <>
-      <PageHead title="资料可见性" onBack={() => setSubView(null)} />
+      <PageHead title={t('mobile.me.settings.visibility_title')} onBack={() => setSubView(null)} />
       <div className="pl-body tabbed">
         <div className="pl-pad">
           <div className="pl-sec" style={{ paddingTop: 8 }}>
-            <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 16, lineHeight: 1.6 }}>逐项控制谁能看到你的个人资料字段。</div>
-            {[{ k: 'real_name', l: '真实姓名' }, { k: 'gender', l: '性别' }, { k: 'birthday', l: '生日' }, { k: 'location', l: '所在地' }, { k: 'email', l: '邮箱' }, { k: 'phone', l: '手机' }].map(({ k, l }) => (
+            <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 16, lineHeight: 1.6 }}>{t('mobile.me.settings.visibility_desc')}</div>
+            {[{ k: 'real_name', l: t('mobile.me.edit.field_real_name') }, { k: 'gender', l: t('mobile.me.edit.field_gender') }, { k: 'birthday', l: t('mobile.me.edit.field_birthday') }, { k: 'location', l: t('mobile.me.edit.field_location') }, { k: 'email', l: t('mobile.me.edit.field_email') }, { k: 'phone', l: t('mobile.me.edit.field_phone') }].map(({ k, l }) => (
               <Select key={k} label={l} value={visForm[k] || 'self'} onChange={v => setVisForm(f => ({ ...f, [k]: v }))}
-                options={[{ value: 'self', label: '仅自己' }, { value: 'friends', label: '好友' }, { value: 'public', label: '所有人' }]} />
+                options={[{ value: 'self', label: t('mobile.me.settings.vis_self') }, { value: 'friends', label: t('mobile.me.settings.vis_friends') }, { value: 'public', label: t('mobile.me.settings.vis_public') }]} />
             ))}
           </div>
           <div style={{ display: 'flex', gap: 10, paddingTop: 8 }}>
-            <button onClick={() => setSubView(null)} style={{ flex: 1, height: 46, borderRadius: 12, fontSize: 14, background: 'var(--panel-2)', border: '1px solid var(--line)', color: 'var(--text-quiet)' }}>取消</button>
+            <button onClick={() => setSubView(null)} style={{ flex: 1, height: 46, borderRadius: 12, fontSize: 14, background: 'var(--panel-2)', border: '1px solid var(--line)', color: 'var(--text-quiet)' }}>{t('common.cancel')}</button>
             <button onClick={onSaveVisibility} disabled={visBusy} style={{ flex: 2, height: 46, borderRadius: 12, fontSize: 14, fontWeight: 600, background: 'var(--accent)', border: 'none', color: '#fff8f3', opacity: visBusy ? 0.7 : 1 }}>
-              {visBusy ? '保存中…' : '保存可见性'}
+              {visBusy ? t('mobile.me.edit.saving') : t('mobile.me.settings.visibility_save_btn')}
             </button>
           </div>
         </div>
@@ -1034,101 +1054,102 @@ function ViewSettings({ nav, user }) {
 
   if (subView === 'policy') return (
     <>
-      <PageHead title="隐私政策" onBack={() => setSubView(null)} />
+      <PageHead title={t('mobile.me.settings.policy_title')} onBack={() => setSubView(null)} />
       <div className="pl-body tabbed">
         <div className="pl-pad">
           <div style={{ fontSize: 13.5, lineHeight: 1.8, color: 'var(--text-quiet)' }}>
-            <p><strong style={{ color: 'var(--text)' }}>1. 我们收集什么</strong><br />账号信息（用户名、邮箱、可选手机）、设备指纹（用于会话）、用量遥测（仅在你开启时）。</p>
-            <p><strong style={{ color: 'var(--text)' }}>2. 我们不收集什么</strong><br />剧本正文、玩家变量、私聊、长期记忆、世界书条目——这些数据加密存储在你的工作区，团队无任何访问。</p>
-            <p><strong style={{ color: 'var(--text)' }}>3. 与第三方</strong><br />不向第三方分享剧本内容。模型 API 调用按你配置直接发往对应厂商，团队不代理也不留存。</p>
-            <p><strong style={{ color: 'var(--text)' }}>4. 数据所有权</strong><br />你可以随时申请完整归档；可随时停用账号（90 天保留）或永久删除（立刻执行）。</p>
-            <p><strong style={{ color: 'var(--text)' }}>5. 合规</strong><br />本平台符合 GDPR · 中国《个人信息保护法》· 加州 CCPA。</p>
+            <p><strong style={{ color: 'var(--text)' }}>{t('mobile.me.settings.policy_1_title')}</strong><br />{t('mobile.me.settings.policy_1_body')}</p>
+            <p><strong style={{ color: 'var(--text)' }}>{t('mobile.me.settings.policy_2_title')}</strong><br />{t('mobile.me.settings.policy_2_body')}</p>
+            <p><strong style={{ color: 'var(--text)' }}>{t('mobile.me.settings.policy_3_title')}</strong><br />{t('mobile.me.settings.policy_3_body')}</p>
+            <p><strong style={{ color: 'var(--text)' }}>{t('mobile.me.settings.policy_4_title')}</strong><br />{t('mobile.me.settings.policy_4_body')}</p>
+            <p><strong style={{ color: 'var(--text)' }}>{t('mobile.me.settings.policy_5_title')}</strong><br />{t('mobile.me.settings.policy_5_body')}</p>
           </div>
-          <button onClick={() => setSubView(null)} className="pl-btn-primary" style={{ width: '100%', marginTop: 20 }}>我已阅读</button>
+          <button onClick={() => setSubView(null)} className="pl-btn-primary" style={{ width: '100%', marginTop: 20 }}>{t('mobile.me.settings.policy_read')}</button>
         </div>
       </div>
     </>
   );
 
   /* ── 主设置页 ─── */
+  const DELETE_CONFIRM_PHRASE = t('mobile.me.settings.delete_confirm_phrase');
   return (
     <>
-      <PageHead title="账户设置" onBack={() => nav.go('me')} />
+      <PageHead title={t('mobile.me.settings.title')} onBack={() => nav.go('me')} />
       <div className="pl-body tabbed">
         <div className="pl-pad">
 
           {/* 隐私 · 公开范围 */}
           <div className="pl-sec">
-            <div className="pl-sec-head"><h2>隐私 · 公开范围</h2></div>
-            <SetRow label="公开个人主页" desc="开启后，他人可通过 @用户名 查看你的成就墙和最近活动。">
+            <div className="pl-sec-head"><h2>{t('mobile.me.settings.privacy_section')}</h2></div>
+            <SetRow label={t('mobile.me.settings.public_profile')} desc={t('mobile.me.settings.public_profile_desc')}>
               <Toggle on={!!publicProfile} onChange={v => setPublicProfile(v)} disabled={!prefLoaded} />
             </SetRow>
-            <SetRow label="允许搜索" desc="允许通过显示名或用户名在平台内搜索找到你。">
+            <SetRow label={t('mobile.me.settings.searchable')} desc={t('mobile.me.settings.searchable_desc')}>
               <Toggle on={!!searchable} onChange={v => setSearchable(v)} disabled={!prefLoaded} />
             </SetRow>
-            <SetRow label="资料字段可见性" desc="逐项控制谁能看到你的真实姓名、所在地、生日等。">
-              <ActionBtn label="逐项配置" icon="sliders" onClick={() => setSubView('visibility')} />
+            <SetRow label={t('mobile.me.settings.field_visibility')} desc={t('mobile.me.settings.field_visibility_desc')}>
+              <ActionBtn label={t('mobile.me.settings.field_visibility_btn')} icon="sliders" onClick={() => setSubView('visibility')} />
             </SetRow>
           </div>
 
           {/* 账号 · 安全 */}
           <div className="pl-sec">
-            <div className="pl-sec-head"><h2>账号 · 安全</h2></div>
-            <SetRow label={hasPassword ? '修改密码' : '设置密码'} desc={hasPassword ? '建议每 90 天更换，至少 12 位 + 大小写 + 数字。' : '当前通过邮箱链接登录，尚未设置密码。'}>
-              <ActionBtn label={hasPassword ? '修改密码' : '设置密码'} icon="lock" onClick={() => setSubView('pw')} />
+            <div className="pl-sec-head"><h2>{t('mobile.me.settings.security_section')}</h2></div>
+            <SetRow label={hasPassword ? t('mobile.me.settings.change_password') : t('mobile.me.settings.set_password')} desc={hasPassword ? t('mobile.me.settings.pw_desc_change') : t('mobile.me.settings.pw_desc_set')}>
+              <ActionBtn label={hasPassword ? t('mobile.me.settings.change_password') : t('mobile.me.settings.set_password')} icon="lock" onClick={() => setSubView('pw')} />
             </SetRow>
-            <SetRow label="二次验证（2FA）" desc="通过 Authenticator App 或手机短信进行二次验证。">
+            <SetRow label={t('mobile.me.settings.twofa')} desc={t('mobile.me.settings.twofa_desc')}>
               <Toggle on={!!twofa} onChange={v => setTwofa(v)} disabled={!prefLoaded} />
             </SetRow>
-            <SetRow label="活跃会话" desc={sessDesc}>
-              <ActionBtn label="查看会话" icon="eye" onClick={() => setSubView('sessions')} />
+            <SetRow label={t('mobile.me.settings.active_sessions')} desc={sessDesc}>
+              <ActionBtn label={t('mobile.me.settings.view_sessions')} icon="eye" onClick={() => setSubView('sessions')} />
             </SetRow>
-            <SetRow label="登录历史" desc={histDesc}>
-              <ActionBtn label="查看日志" icon="history" onClick={() => setSubView('history')} />
+            <SetRow label={t('mobile.me.settings.login_history_label')} desc={histDesc}>
+              <ActionBtn label={t('mobile.me.settings.view_history')} icon="history" onClick={() => setSubView('history')} />
             </SetRow>
           </div>
 
           {/* 人格 Persona */}
           <div className="pl-sec">
-            <div className="pl-sec-head"><h2>人格 Persona</h2></div>
-            <SetRow label="我的人格" desc="在游戏中使用的玩家人格设定，可创建多个切换。">
-              <ActionBtn label="管理人格" icon="user" onClick={() => setSubView('personas')} />
+            <div className="pl-sec-head"><h2>{t('mobile.me.settings.personas_section')}</h2></div>
+            <SetRow label={t('mobile.me.settings.my_persona')} desc={t('mobile.me.settings.my_persona_desc')}>
+              <ActionBtn label={t('mobile.me.settings.manage_persona')} icon="user" onClick={() => setSubView('personas')} />
             </SetRow>
           </div>
 
           {/* 通知 */}
           <div className="pl-sec">
-            <div className="pl-sec-head"><h2>通知</h2></div>
-            <SetRow label="邮件通知" desc="重要安全事件、订阅变更、长时间未登录提醒。">
+            <div className="pl-sec-head"><h2>{t('mobile.me.settings.notifications_section')}</h2></div>
+            <SetRow label={t('mobile.me.settings.email_notif')} desc={t('mobile.me.settings.email_notif_desc')}>
               <Toggle on={!!emailNotif} onChange={v => setEmailNotif(v)} disabled={!prefLoaded} />
             </SetRow>
           </div>
 
           {/* 数据共享 */}
           <div className="pl-sec">
-            <div className="pl-sec-head"><h2>数据共享 · 合规</h2></div>
-            <SetRow label="匿名用量统计" desc="将按钮点击/页面停留时长（不含剧本内容）匿名上报，用于改进体验。">
+            <div className="pl-sec-head"><h2>{t('mobile.me.settings.data_sharing_section')}</h2></div>
+            <SetRow label={t('mobile.me.settings.anon_usage')} desc={t('mobile.me.settings.anon_usage_desc')}>
               <Toggle on={!!shareUsage} onChange={v => setShareUsage(v)} disabled={!prefLoaded} />
             </SetRow>
-            <SetRow label="崩溃 / 错误报告" desc="出现错误时上传堆栈信息和最近操作，剧本内容不会被上传。">
+            <SetRow label={t('mobile.me.settings.crash_report')} desc={t('mobile.me.settings.crash_report_desc')}>
               <Toggle on={!!shareCrash} onChange={v => setShareCrash(v)} disabled={!prefLoaded} />
             </SetRow>
-            <SetRow label="GDPR / 隐私政策">
-              <ActionBtn label="查看政策" icon="file" onClick={() => setSubView('policy')} />
+            <SetRow label="GDPR / Privacy Policy">
+              <ActionBtn label={t('mobile.me.settings.view_policy')} icon="file" onClick={() => setSubView('policy')} />
             </SetRow>
           </div>
 
           {/* 数据所有权 */}
           <div className="pl-sec">
-            <div className="pl-sec-head"><h2>数据所有权</h2></div>
-            <SetRow label="导出我的数据" desc="打包导出全部剧本、存档、记忆、库资产、用量记录。">
-              <ActionBtn label="申请导出" icon="download" onClick={() => setSubView('export')} />
+            <div className="pl-sec-head"><h2>{t('mobile.me.settings.data_ownership_section')}</h2></div>
+            <SetRow label={t('mobile.me.settings.export_my_data')} desc={t('mobile.me.settings.export_my_data_desc')}>
+              <ActionBtn label={t('mobile.me.settings.export_request_btn')} icon="download" onClick={() => setSubView('export')} />
             </SetRow>
-            <SetRow label="停用账号" desc="停用后无法登录，剧本和存档保留 90 天，期间可随时恢复。">
-              <ActionBtn label="停用账号" onClick={() => setSubView('deact-confirm')} />
+            <SetRow label={t('mobile.me.settings.deactivate')} desc={t('mobile.me.settings.deactivate_desc')}>
+              <ActionBtn label={t('mobile.me.settings.deactivate')} onClick={() => setSubView('deact-confirm')} />
             </SetRow>
-            <SetRow label="永久删除账号" desc="立刻删除全部账号信息、剧本、存档，无法恢复。" danger>
-              <ActionBtn label="删除账号" icon="trash" danger onClick={() => setSubView('delete-confirm')} />
+            <SetRow label={t('mobile.me.settings.delete_account')} desc={t('mobile.me.settings.delete_account_desc')} danger>
+              <ActionBtn label={t('mobile.me.settings.delete_account_btn')} icon="trash" danger onClick={() => setSubView('delete-confirm')} />
             </SetRow>
           </div>
 
@@ -1138,9 +1159,9 @@ function ViewSettings({ nav, user }) {
       {/* 停用确认 Sheet */}
       <ConfirmSheet
         open={subView === 'deact-confirm'}
-        title="停用账号？"
-        body="账号停用 90 天内可登录恢复。期间剧本与存档保留但不可访问。"
-        confirmLabel="停用"
+        title={t('mobile.me.settings.deact_confirm_title')}
+        body={t('mobile.me.settings.deact_confirm_body')}
+        confirmLabel={t('mobile.me.settings.deactivate')}
         onClose={() => setSubView(null)}
         onConfirm={onDeactivate}
         loading={deactBusy}
@@ -1151,25 +1172,26 @@ function ViewSettings({ nav, user }) {
         <div style={{ position: 'fixed', inset: 0, zIndex: 60, background: 'rgba(10,9,8,0.6)', display: 'flex', alignItems: 'flex-end' }}>
           <div style={{ width: '100%', background: 'var(--panel)', borderRadius: '20px 20px 0 0', padding: '20px 18px calc(var(--safe-bottom,20px) + 16px)', borderTop: '1px solid var(--line)' }}>
             <div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--line-strong)', margin: '0 auto 16px' }} />
-            <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 6, color: 'var(--danger)' }}>永久删除账号？</div>
+            <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 6, color: 'var(--danger)' }}>{t('mobile.me.settings.delete_confirm_title')}</div>
             <div style={{ fontSize: 13, color: 'var(--text-quiet)', marginBottom: 16, lineHeight: 1.7 }}>
-              这会<strong style={{ color: 'var(--danger)' }}>立刻</strong>删除你的账号、剧本、存档、库资产，<strong style={{ color: 'var(--danger)' }}>无法恢复</strong>。<br />删除后无法用同一邮箱再注册（30 天冷冻期）。
+              {t('mobile.me.settings.delete_confirm_body')}<br />
+              {t('mobile.me.settings.delete_confirm_body2')}
             </div>
             <div style={{ marginBottom: 14 }}>
-              <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 6 }}>输入"确认删除"以继续</div>
+              <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 6 }}>{t('mobile.me.settings.delete_confirm_prompt', { phrase: DELETE_CONFIRM_PHRASE })}</div>
               <input
                 value={deleteConfirmText} onChange={e => setDeleteConfirmText(e.target.value)}
-                placeholder="确认删除"
+                placeholder={DELETE_CONFIRM_PHRASE}
                 style={{ width: '100%', background: 'var(--panel-2)', border: '1px solid var(--danger)', borderRadius: 10, color: 'var(--text)', fontSize: 16, padding: '10px 12px', outline: 'none', boxSizing: 'border-box' }}
               />
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
-              <button onClick={() => { setSubView(null); setDeleteConfirmText(''); }} style={{ flex: 1, height: 46, borderRadius: 12, fontSize: 14, background: 'var(--panel-2)', border: '1px solid var(--line)', color: 'var(--text-quiet)' }}>取消</button>
+              <button onClick={() => { setSubView(null); setDeleteConfirmText(''); }} style={{ flex: 1, height: 46, borderRadius: 12, fontSize: 14, background: 'var(--panel-2)', border: '1px solid var(--line)', color: 'var(--text-quiet)' }}>{t('common.cancel')}</button>
               <button
-                onClick={onDeleteAccount} disabled={deleteConfirmText !== '确认删除' || deleteBusy}
-                style={{ flex: 1, height: 46, borderRadius: 12, fontSize: 14, fontWeight: 600, background: 'var(--danger)', border: 'none', color: '#fff', opacity: (deleteConfirmText !== '确认删除' || deleteBusy) ? 0.45 : 1 }}
+                onClick={onDeleteAccount} disabled={deleteConfirmText !== DELETE_CONFIRM_PHRASE || deleteBusy}
+                style={{ flex: 1, height: 46, borderRadius: 12, fontSize: 14, fontWeight: 600, background: 'var(--danger)', border: 'none', color: '#fff', opacity: (deleteConfirmText !== DELETE_CONFIRM_PHRASE || deleteBusy) ? 0.45 : 1 }}
               >
-                {deleteBusy ? '处理中…' : '永久删除'}
+                {deleteBusy ? t('mobile.me.processing') : t('mobile.me.settings.delete_permanent_btn')}
               </button>
             </div>
           </div>
@@ -1183,9 +1205,9 @@ function ViewSettings({ nav, user }) {
    VIEW: 用量统计 Usage
    ═══════════════════════════════════════════════════════════════════ */
 const USAGE_RANGES = [
-  { id: '7d', label: '7 天', days: 7 },
-  { id: '30d', label: '30 天', days: 30 },
-  { id: '90d', label: '90 天', days: 90 },
+  { id: '7d', labelKey: 'mobile.me.usage.range_7d', days: 7 },
+  { id: '30d', labelKey: 'mobile.me.usage.range_30d', days: 30 },
+  { id: '90d', labelKey: 'mobile.me.usage.range_90d', days: 90 },
 ];
 
 function BarChart({ buckets, valueKey, color, height = 60 }) {
@@ -1207,6 +1229,7 @@ function BarChart({ buckets, valueKey, color, height = 60 }) {
 }
 
 function ViewUsage({ nav }) {
+  const { t } = useTranslation();
   const [range, setRange] = useState('30d');
   const [data, setData] = useState(null);
   const [series, setSeries] = useState(null);
@@ -1226,7 +1249,7 @@ function ViewUsage({ nav }) {
         ]);
         if (!cancelled) { setData(u || null); setSeries(t || null); }
       } catch (e) {
-        if (!cancelled) setErr(e?.message || '拉取用量失败');
+        if (!cancelled) setErr(e?.message || t('mobile.me.usage.load_error'));
       } finally { if (!cancelled) setLoading(false); }
     })();
     return () => { cancelled = true; };
@@ -1244,16 +1267,23 @@ function ViewUsage({ nav }) {
   const totalCost = Number(totals.cost_usd || 0);
   const totalCachedIn = Number(totals.cached_input_tokens || 0);
 
-  const SCENARIO_META = { chat: { l: '对话', ic: 'feedback' }, opening: { l: '开场', ic: 'play' }, extract: { l: '提取', ic: 'search' }, embedding: { l: '向量化', ic: 'layers' }, assistant: { l: '助手', ic: 'sparkle' }, tool: { l: '工具', ic: 'plug' } };
+  const SCENARIO_META = {
+    chat: { l: t('mobile.me.usage.scenario_chat'), ic: 'feedback' },
+    opening: { l: t('mobile.me.usage.scenario_opening'), ic: 'play' },
+    extract: { l: t('mobile.me.usage.scenario_extract'), ic: 'search' },
+    embedding: { l: t('mobile.me.usage.scenario_embedding'), ic: 'layers' },
+    assistant: { l: t('mobile.me.usage.scenario_assistant'), ic: 'sparkle' },
+    tool: { l: t('mobile.me.usage.scenario_tool'), ic: 'plug' },
+  };
 
   return (
     <>
       <PageHead
-        title="用量统计"
+        title={t('mobile.me.usage.title')}
         onBack={() => nav.go('me')}
         actions={
-          <button className="pl-headbtn" onClick={() => setRange(r => { const idx = USAGE_RANGES.findIndex(x => x.id === r); return USAGE_RANGES[(idx + 1) % USAGE_RANGES.length].id; })} aria-label="切换时间范围">
-            <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)' }}>{USAGE_RANGES.find(r2 => r2.id === range)?.label}</span>
+          <button className="pl-headbtn" onClick={() => setRange(r => { const idx = USAGE_RANGES.findIndex(x => x.id === r); return USAGE_RANGES[(idx + 1) % USAGE_RANGES.length].id; })} aria-label={t('mobile.me.usage.range_toggle')}>
+            <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)' }}>{t(USAGE_RANGES.find(r2 => r2.id === range)?.labelKey || '')}</span>
           </button>
         }
       />
@@ -1268,7 +1298,7 @@ function ViewUsage({ nav }) {
                 background: range === r.id ? 'var(--accent-soft)' : 'var(--panel-2)',
                 color: range === r.id ? 'var(--accent)' : 'var(--muted)',
                 border: '1px solid ' + (range === r.id ? 'var(--accent-edge)' : 'var(--line-soft)'),
-              }}>{r.label}</button>
+              }}>{t(r.labelKey)}</button>
             ))}
           </div>
 
@@ -1279,67 +1309,67 @@ function ViewUsage({ nav }) {
             </div>
           )}
 
-          {loading && !data && <div className="pl-empty">加载中…</div>}
+          {loading && !data && <div className="pl-empty">{t('common.loading')}</div>}
 
           {/* 核心统计 */}
           <div className="pl-stats" style={{ marginBottom: 14 }}>
             <div className="pl-stat">
               <span className="n accent">{fmtN(totalTurns)}</span>
-              <div className="l">请求数{totalTurns ? <span style={{ display: 'block', fontSize: 9 }}>日均{Math.round(totalTurns/days)}</span> : ''}</div>
+              <div className="l">{t('mobile.me.usage.requests')}{totalTurns ? <span style={{ display: 'block', fontSize: 9 }}>{t('mobile.me.usage.daily_avg', { n: Math.round(totalTurns/days) })}</span> : ''}</div>
             </div>
             <div className="pl-stat">
               <span className="n">{fmtN(totalTokIn)}</span>
-              <div className="l">输入Token</div>
+              <div className="l">{t('mobile.me.usage.input_tokens')}</div>
             </div>
             <div className="pl-stat">
               <span className="n">{fmtN(totalTokOut)}</span>
-              <div className="l">输出Token</div>
+              <div className="l">{t('mobile.me.usage.output_tokens')}</div>
             </div>
             <div className="pl-stat">
               <span className="n">${totalCost.toFixed(2)}</span>
-              <div className="l">成本</div>
+              <div className="l">{t('mobile.me.usage.cost')}</div>
             </div>
           </div>
           <div className="pl-stats" style={{ marginBottom: 16 }}>
             <div className="pl-stat">
               <span className="n">{totalCachedIn ? fmtN(totalCachedIn) : '—'}</span>
-              <div className="l">缓存输入{totalTokIn > 0 && totalCachedIn ? <span style={{ display: 'block', fontSize: 9 }}>{Math.round(totalCachedIn/totalTokIn*100)}%占比</span> : ''}</div>
+              <div className="l">{t('mobile.me.usage.cached_input')}{totalTokIn > 0 && totalCachedIn ? <span style={{ display: 'block', fontSize: 9 }}>{Math.round(totalCachedIn/totalTokIn*100)}%</span> : ''}</div>
             </div>
             <div className="pl-stat">
               <span className="n">
                 {totalCachedIn > 0 && totalTokIn > 0 ? '$' + ((totalCachedIn / totalTokIn) * totalCost * 0.75).toFixed(3) : '—'}
               </span>
-              <div className="l">缓存节省</div>
+              <div className="l">{t('mobile.me.usage.cache_savings')}</div>
             </div>
             {forecast && <div className="pl-stat">
               <span className="n">${Number(forecast.avg_daily_cost_usd || 0).toFixed(3)}</span>
-              <div className="l">日均成本</div>
+              <div className="l">{t('mobile.me.usage.daily_cost')}</div>
             </div>}
             {forecast && <div className="pl-stat">
               <span className="n">${Number(forecast.projected_30d_cost || 0).toFixed(2)}</span>
-              <div className="l">30天预测</div>
+              <div className="l">{t('mobile.me.usage.forecast_30d')}</div>
             </div>}
           </div>
 
           {/* 趋势图 */}
           {buckets.length > 0 && (
             <div className="pl-sec">
-              <div className="pl-sec-head"><h2>趋势</h2></div>
+              <div className="pl-sec-head"><h2>{t('mobile.me.usage.trend')}</h2></div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 6 }}>
                 <div>
-                  <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 5 }}>请求数 <span className="mono" style={{ float: 'right' }}>{fmtN(buckets.reduce((a, b) => a + Number(b.turns || 0), 0))}</span></div>
+                  <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 5 }}>{t('mobile.me.usage.requests')} <span className="mono" style={{ float: 'right' }}>{fmtN(buckets.reduce((a, b) => a + Number(b.turns || 0), 0))}</span></div>
                   <BarChart buckets={buckets} valueKey="turns" color="var(--accent)" />
                 </div>
                 <div>
-                  <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 5 }}>成本 $<span className="mono" style={{ float: 'right' }}>{buckets.reduce((a, b) => a + Number(b.cost_usd || 0), 0).toFixed(2)}</span></div>
+                  <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 5 }}>{t('mobile.me.usage.cost')} $<span className="mono" style={{ float: 'right' }}>{buckets.reduce((a, b) => a + Number(b.cost_usd || 0), 0).toFixed(2)}</span></div>
                   <BarChart buckets={buckets} valueKey="cost_usd" color="var(--ok)" />
                 </div>
                 <div>
-                  <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 5 }}>输入 Token <span className="mono" style={{ float: 'right' }}>{fmtN(buckets.reduce((a, b) => a + Number(b.input_tokens || 0), 0))}</span></div>
+                  <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 5 }}>{t('mobile.me.usage.input_tokens')} <span className="mono" style={{ float: 'right' }}>{fmtN(buckets.reduce((a, b) => a + Number(b.input_tokens || 0), 0))}</span></div>
                   <BarChart buckets={buckets} valueKey="input_tokens" color="var(--info)" />
                 </div>
                 <div>
-                  <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 5 }}>输出 Token <span className="mono" style={{ float: 'right' }}>{fmtN(buckets.reduce((a, b) => a + Number(b.output_tokens || 0), 0))}</span></div>
+                  <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 5 }}>{t('mobile.me.usage.output_tokens')} <span className="mono" style={{ float: 'right' }}>{fmtN(buckets.reduce((a, b) => a + Number(b.output_tokens || 0), 0))}</span></div>
                   <BarChart buckets={buckets} valueKey="output_tokens" color="var(--warn)" />
                 </div>
               </div>
@@ -1349,7 +1379,7 @@ function ViewUsage({ nav }) {
           {/* 按场景拆分 */}
           {byScenario && Object.keys(byScenario).length > 0 && (
             <div className="pl-sec">
-              <div className="pl-sec-head"><h2>按场景</h2></div>
+              <div className="pl-sec-head"><h2>{t('mobile.me.usage.by_scenario')}</h2></div>
               {(() => {
                 const keys = Object.keys(byScenario);
                 const totalSc = keys.reduce((s, k) => s + Number(byScenario[k]?.turns || 0), 0) || 1;
@@ -1382,7 +1412,7 @@ function ViewUsage({ nav }) {
           {/* 按模型拆分 */}
           {byModel.length > 0 && (
             <div className="pl-sec">
-              <div className="pl-sec-head"><h2>按模型</h2></div>
+              <div className="pl-sec-head"><h2>{t('mobile.me.usage.by_model')}</h2></div>
               {byModel.map((m, i) => (
                 <div key={i} className="pl-row" style={{ margin: '0 0 5px', pointerEvents: 'none' }}>
                   <span className="pl-row-ic info"><Icon name="sparkle" size={15} /></span>
@@ -1406,6 +1436,7 @@ function ViewUsage({ nav }) {
    VIEW: 成就墙 Wall
    ═══════════════════════════════════════════════════════════════════ */
 function ViewWall({ nav, user }) {
+  const { t } = useTranslation();
   const [achv, setAchv] = useState(null);
   const [err, setErr] = useState('');
   // 支持查看他人公开墙：从 nav.params.username 读 or 查自己
@@ -1425,7 +1456,7 @@ function ViewWall({ nav, user }) {
           if (!cancelled) setAchv({ items: (r && r.items) || [], display_name: user?.display_name, username: user?.username, unlocked_count: ((r && r.items) || []).filter(a => a.unlocked).length, total: ((r && r.items) || []).length });
         }
       } catch (e) {
-        if (!cancelled) setErr((e && e.message) || '加载失败');
+        if (!cancelled) setErr((e && e.message) || t('mobile.me.wall.load_error'));
       }
     })();
     return () => { cancelled = true; };
@@ -1439,7 +1470,7 @@ function ViewWall({ nav, user }) {
   const groups = (() => {
     const m = new Map();
     items.forEach(a => {
-      const cat = a.category || '其他';
+      const cat = a.category || t('mobile.me.wall.other_category');
       if (!m.has(cat)) m.set(cat, []);
       m.get(cat).push(a);
     });
@@ -1453,7 +1484,7 @@ function ViewWall({ nav, user }) {
     const url = `${location.origin}/wall?u=${encodeURIComponent(u)}`;
     try {
       await navigator.clipboard.writeText(url);
-      nav.toast('链接已复制', 'ok', 'copy');
+      nav.toast(t('mobile.me.wall.link_copied'), 'ok', 'copy');
     } catch (_) {
       nav.toast(url, 'ok', 'info');
     }
@@ -1462,11 +1493,11 @@ function ViewWall({ nav, user }) {
   return (
     <>
       <PageHead
-        title={isOther ? (achv?.display_name || targetUser || '成就墙') : '我的成就墙'}
-        sub={achv ? `${unlockedCount} / ${total} 已解锁` : '加载中…'}
+        title={isOther ? (achv?.display_name || targetUser || t('mobile.me.wall.title')) : t('mobile.me.wall.my_title')}
+        sub={achv ? t('mobile.me.wall.unlocked_sub', { unlocked: unlockedCount, total }) : t('common.loading')}
         onBack={() => nav.go('me')}
         actions={!isOther && unlockedCount > 0 && (
-          <button className="pl-headbtn" onClick={onCopyWallLink} aria-label="分享链接">
+          <button className="pl-headbtn" onClick={onCopyWallLink} aria-label={t('mobile.me.wall.share_link')}>
             <Icon name="link" size={17} />
           </button>
         )}
@@ -1474,11 +1505,11 @@ function ViewWall({ nav, user }) {
       <div className="pl-body tabbed">
         <div className="pl-pad">
           {err ? (
-            <div className="pl-empty">{err.includes('404') || err.includes('not found') ? '该用户未公开成就墙，或不存在。' : err}</div>
+            <div className="pl-empty">{err.includes('404') || err.includes('not found') ? t('mobile.me.wall.not_public') : err}</div>
           ) : achv === null ? (
-            <div className="pl-empty">加载中…</div>
+            <div className="pl-empty">{t('common.loading')}</div>
           ) : items.length === 0 ? (
-            <div className="pl-empty">暂无成就记录。</div>
+            <div className="pl-empty">{t('mobile.me.overview.no_achievements')}</div>
           ) : (
             groups.map(([cat, list]) => {
               const unl = list.filter(a => a.unlocked).length;
@@ -1510,7 +1541,7 @@ function ViewWall({ nav, user }) {
                           <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2, lineHeight: 1.4 }}>{a.desc}</div>
                           {a.unlocked ? (
                             <div className="mono" style={{ fontSize: 10, color: TIER_COLOR[a.tier] || 'var(--ok)', marginTop: 3 }}>
-                              {a.unlocked_at ? fmtDate(a.unlocked_at) : '✓ 已达成'}
+                              {a.unlocked_at ? fmtDate(a.unlocked_at) : t('mobile.me.wall.achieved')}
                               {a.rarity != null ? ` · ${a.rarity}%` : ''}
                             </div>
                           ) : (

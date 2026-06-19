@@ -12,6 +12,8 @@
 
 import React from 'react';
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
+import i18n from '../../i18n';
 import { Icon } from '../icons.jsx';
 import { lsGet, lsSet, lsGetJSON, lsSetJSON, lsRemove } from '../../lib/storage.js';
 
@@ -29,48 +31,43 @@ const ALLOWED_SOURCES = {
 
 const ORIGIN_OPTIONS = [
   {
-    value: 'soul', icon: '◈', label: '灵魂穿越',
-    essence: '意识独立 · 占据异世界躯体',
-    mapping: '你的灵魂穿越到某个原住民的肉身中',
-    hint: '可以选择挂靠任何一个本地身份',
+    value: 'soul', icon: '◈', labelKey: 'mobile.new_game.origin.soul.label',
+    essenceKey: 'mobile.new_game.origin.soul.essence',
+    mappingKey: 'mobile.new_game.origin.soul.mapping',
+    hintKey: 'mobile.new_game.origin.soul.hint',
     accentColor: '#8db4e8', accentBg: 'rgba(85,130,200,.14)', accentBorder: 'rgba(85,130,200,.38)',
   },
   {
-    value: 'body', icon: '◉', label: '整体穿越',
-    essence: '肉体完整 · 以异乡者姿态闯入',
-    mapping: '你整个人连同外貌一起穿越到这个世界',
-    hint: '你是彻底的外来者,无法挂靠本地身份',
+    value: 'body', icon: '◉', labelKey: 'mobile.new_game.origin.body.label',
+    essenceKey: 'mobile.new_game.origin.body.essence',
+    mappingKey: 'mobile.new_game.origin.body.mapping',
+    hintKey: 'mobile.new_game.origin.body.hint',
     accentColor: '#e8a87c', accentBg: 'rgba(220,140,80,.14)', accentBorder: 'rgba(220,140,80,.38)',
   },
   {
-    value: 'dual', icon: '◑', label: '双魂同体',
-    essence: '两魂共生 · 共享同一具肉体',
-    mapping: '你与某个原住民灵魂同时存在于同一躯体',
-    hint: '必须选一个共体的本地身份',
+    value: 'dual', icon: '◑', labelKey: 'mobile.new_game.origin.dual.label',
+    essenceKey: 'mobile.new_game.origin.dual.essence',
+    mappingKey: 'mobile.new_game.origin.dual.mapping',
+    hintKey: 'mobile.new_game.origin.dual.hint',
     accentColor: '#b8a0e8', accentBg: 'rgba(160,130,210,.14)', accentBorder: 'rgba(160,130,210,.38)',
   },
   {
-    value: 'native', icon: '◎', label: '本世界人',
-    essence: '原住民 · 从未离开这个世界',
-    mapping: '你就是这个世界的原住民角色',
-    hint: '不能再选另一个原著角色作为「失忆身份」',
+    value: 'native', icon: '◎', labelKey: 'mobile.new_game.origin.native.label',
+    essenceKey: 'mobile.new_game.origin.native.essence',
+    mappingKey: 'mobile.new_game.origin.native.mapping',
+    hintKey: 'mobile.new_game.origin.native.hint',
     accentColor: '#b8b0a5', accentBg: 'rgba(150,143,133,.14)', accentBorder: 'rgba(150,143,133,.32)',
   },
 ];
 
-const SOURCE_LABELS = {
-  none:   '不挂身份',
-  npc:    '从原著角色',
-  ai:     'AI 生成',
-  manual: '手动填写',
-};
+// SOURCE_LABELS: keys rendered via t() inside StepIdentity
 
 const STEPS = [
-  { n: 0, title: '剧本与出生点' },
-  { n: 1, title: '角色卡' },
-  { n: 2, title: '出身与身份' },
-  { n: 3, title: '引导与防剧透' },
-  { n: 4, title: '确认创建' },
+  { n: 0, titleKey: 'mobile.new_game.steps.script_birth' },
+  { n: 1, titleKey: 'mobile.new_game.steps.role' },
+  { n: 2, titleKey: 'mobile.new_game.steps.identity' },
+  { n: 3, titleKey: 'mobile.new_game.steps.meta' },
+  { n: 4, titleKey: 'mobile.new_game.steps.confirm' },
 ];
 
 const TOTAL_STEPS = STEPS.length;
@@ -86,12 +83,12 @@ function scriptBlockReason(script) {
     script.active_job?.status || script.readiness?.active_job?.status || ''
   ).trim().toLowerCase();
   if (status && NEWGAME_ACTIVE_IMPORT_STATUSES.has(status) && !NEWGAME_IMPORT_TERMINAL_STATUSES.has(status)) {
-    return '剧本正在导入,请稍后';
+    return i18n.t('mobile.new_game.script_block.importing');
   }
   const missing = Array.isArray(script.readiness?.missing) ? script.readiness.missing : [];
   const blocking = missing.filter(k => NEWGAME_BLOCKING_READINESS_KEYS.has(k));
-  if (blocking.length > 0) return `剧本缺少: ${blocking.join('、')}`;
-  if (Number(script.chapter_count || 0) <= 0) return '剧本章节尚未就绪';
+  if (blocking.length > 0) return i18n.t('mobile.new_game.script_block.missing', { keys: blocking.join(', ') });
+  if (Number(script.chapter_count || 0) <= 0) return i18n.t('mobile.new_game.script_block.no_chapters');
   return '';
 }
 
@@ -135,10 +132,11 @@ function ErrBar({ msg }) {
    加载占位
    ================================================================ */
 function Loading({ text }) {
+  const { t } = useTranslation();
   return (
     <div className="pl-empty" style={{ padding: '28px 20px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontSize: 13, color: 'var(--muted)' }}>
-        <Icon name="spinner" size={14} className="spin" /> {text || '加载中…'}
+        <Icon name="spinner" size={14} className="spin" /> {text || t('common.loading')}
       </div>
     </div>
   );
@@ -162,6 +160,7 @@ function FieldLabel({ children, hint }) {
    STEP 0 — 剧本与出生点
    ================================================================ */
 function StepScriptBirth({ scripts, lockedScriptId, scriptId, setScriptId, birthpoint, setBirthpoint }) {
+  const { t } = useTranslation();
   const [phases, setPhases] = useState([]);
   const [bpLoading, setBpLoading] = useState(false);
   const [bpErr, setBpErr] = useState('');
@@ -181,7 +180,7 @@ function StepScriptBirth({ scripts, lockedScriptId, scriptId, setScriptId, birth
           setPhases([]);
         }
       } catch (_) {
-        setBpErr('出生点加载失败,可继续跳过');
+        setBpErr(t('mobile.new_game.birthpoint.load_error'));
         setPhases([]);
       } finally {
         setBpLoading(false);
@@ -208,10 +207,10 @@ function StepScriptBirth({ scripts, lockedScriptId, scriptId, setScriptId, birth
       {/* 剧本选择 */}
       {!lockedScriptId && (
         <div>
-          <FieldLabel hint="选择你想进入的剧本世界">剧本</FieldLabel>
+          <FieldLabel hint={t('mobile.new_game.script.hint')}>{t('mobile.new_game.script.label')}</FieldLabel>
           {scripts.length === 0 ? (
             <div style={{ fontSize: 12.5, color: 'var(--muted)', padding: '10px 0' }}>
-              暂无可用剧本,请先在剧本页面导入
+              {t('mobile.new_game.script.empty')}
             </div>
           ) : (
             <div style={{ display: 'grid', gap: 7 }}>
@@ -235,7 +234,7 @@ function StepScriptBirth({ scripts, lockedScriptId, scriptId, setScriptId, birth
                     <span style={{ flex: 1, minWidth: 0 }}>
                       <span style={{ display: 'block', fontFamily: 'var(--font-serif)', fontSize: 14, color: sel ? 'var(--accent)' : 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sc.title}</span>
                       {reason && <span style={{ display: 'block', fontSize: 11, color: 'var(--warn)', marginTop: 2 }}>{reason}</span>}
-                      {!reason && sc.chapter_count != null && <span style={{ display: 'block', fontSize: 10.5, color: 'var(--muted-2)', fontFamily: 'var(--font-mono)', marginTop: 2 }}>{sc.chapter_count} 章</span>}
+                      {!reason && sc.chapter_count != null && <span style={{ display: 'block', fontSize: 10.5, color: 'var(--muted-2)', fontFamily: 'var(--font-mono)', marginTop: 2 }}>{t('mobile.new_game.script.chapter_count', { count: sc.chapter_count })}</span>}
                     </span>
                     {sel && <Icon name="check" size={14} style={{ color: 'var(--accent)', flexShrink: 0 }} />}
                   </button>
@@ -262,13 +261,13 @@ function StepScriptBirth({ scripts, lockedScriptId, scriptId, setScriptId, birth
       {/* 出生点 */}
       {scriptId && !blockReason && (
         <div>
-          <FieldLabel hint="选择从哪个剧情节点开始游戏(可选,默认从开头)">出生点</FieldLabel>
+          <FieldLabel hint={t('mobile.new_game.birthpoint.hint')}>{t('mobile.new_game.birthpoint.label')}</FieldLabel>
           <ErrBar msg={bpErr} />
-          {bpLoading && <Loading text="加载出生点…" />}
+          {bpLoading && <Loading text={t('mobile.new_game.birthpoint.loading')} />}
           {!bpLoading && phases.length === 0 && !bpErr && (
             <div style={{ fontSize: 12, color: 'var(--muted)', padding: '8px 0' }}>
-              该剧本暂无预设出生点,将从开头开始
-              <button onClick={fetchBp} style={{ marginLeft: 8, fontSize: 12, color: 'var(--accent)' }}>重试</button>
+              {t('mobile.new_game.birthpoint.empty')}
+              <button onClick={fetchBp} style={{ marginLeft: 8, fontSize: 12, color: 'var(--accent)' }}>{t('common.refresh')}</button>
             </div>
           )}
           {!bpLoading && phases.length > 0 && (
@@ -291,7 +290,7 @@ function StepScriptBirth({ scripts, lockedScriptId, scriptId, setScriptId, birth
                         <span style={{ fontFamily: 'var(--font-serif)', fontSize: 13.5 }}>{phase.phase_label}</span>
                       </div>
                       <span style={{ fontSize: 10.5, color: 'var(--muted-2)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>
-                        第 {phase.chapter_min}–{phase.chapter_max} 章
+                        {t('mobile.new_game.birthpoint.chapter_range', { min: phase.chapter_min, max: phase.chapter_max })}
                       </span>
                     </button>
                     {isOpen && (
@@ -318,7 +317,9 @@ function StepScriptBirth({ scripts, lockedScriptId, scriptId, setScriptId, birth
                                 {anchor.sample_summary && <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 2, lineHeight: 1.5 }}>{anchor.sample_summary}</div>}
                               </div>
                               <span style={{ fontSize: 10.5, color: 'var(--muted-2)', whiteSpace: 'nowrap', fontFamily: 'var(--font-mono)' }}>
-                                {anchor.chapter_max !== anchor.chapter_min ? `${anchor.chapter_min}–${anchor.chapter_max}` : `第 ${anchor.chapter_min} 章`}
+                                {anchor.chapter_max !== anchor.chapter_min
+                                  ? t('mobile.new_game.birthpoint.chapter_range', { min: anchor.chapter_min, max: anchor.chapter_max })
+                                  : t('mobile.new_game.birthpoint.chapter_single', { n: anchor.chapter_min })}
                               </span>
                             </label>
                           );
@@ -340,22 +341,23 @@ function StepScriptBirth({ scripts, lockedScriptId, scriptId, setScriptId, birth
    STEP 1 — 角色卡
    ================================================================ */
 function StepRole({ personas, userCards, roleMode, setRoleMode, pickedCard, setPickedCard, newCardName, setNewCardName, newCardRole, setNewCardRole, newCardBg, setNewCardBg }) {
+  const { t } = useTranslation();
   const allOpts = [
-    ...personas.map(p => ({ key: `persona:${p.id || p.slug}`, kind: 'persona', name: p.name || '(未命名)', subtitle: p.role || '人格', id: p.id, slug: p.slug, pinned: !!p.is_default })),
-    ...userCards.map(c => ({ key: `user:${c.id || c.slug}`, kind: 'user_card', name: c.name || '(未命名)', subtitle: c.identity || c.role || '角色卡', id: c.id, slug: c.slug, pinned: false })),
+    ...personas.map(p => ({ key: `persona:${p.id || p.slug}`, kind: 'persona', name: p.name || t('mobile.new_game.role.unnamed'), subtitle: p.role || t('mobile.new_game.role.kind_persona'), id: p.id, slug: p.slug, pinned: !!p.is_default })),
+    ...userCards.map(c => ({ key: `user:${c.id || c.slug}`, kind: 'user_card', name: c.name || t('mobile.new_game.role.unnamed'), subtitle: c.identity || c.role || t('mobile.new_game.role.kind_card'), id: c.id, slug: c.slug, pinned: false })),
   ];
 
   return (
     <div style={{ display: 'grid', gap: 20 }}>
       {/* 模式切换 */}
       <div>
-        <FieldLabel>角色来源</FieldLabel>
+        <FieldLabel>{t('mobile.new_game.role.source_label')}</FieldLabel>
         <div className="pl-seg2" style={{ marginBottom: 16 }}>
           <button className={roleMode === 'existing' ? 'active' : ''} disabled={allOpts.length === 0} onClick={() => setRoleMode('existing')}>
-            选择现有卡
+            {t('mobile.new_game.role.pick_existing')}
           </button>
           <button className={roleMode === 'new' ? 'active' : ''} onClick={() => setRoleMode('new')}>
-            新建角色
+            {t('mobile.new_game.role.create_new')}
           </button>
         </div>
       </div>
@@ -364,7 +366,7 @@ function StepRole({ personas, userCards, roleMode, setRoleMode, pickedCard, setP
       {roleMode === 'existing' && (
         allOpts.length === 0 ? (
           <div style={{ fontSize: 12.5, color: 'var(--muted)', padding: '10px 0', lineHeight: 1.6 }}>
-            暂无角色卡,请先在「角色卡」页面创建,或切换到「新建角色」
+            {t('mobile.new_game.role.existing_empty')}
           </div>
         ) : (
           <div style={{ display: 'grid', gap: 7 }}>
@@ -394,10 +396,10 @@ function StepRole({ personas, userCards, roleMode, setRoleMode, pickedCard, setP
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
                       <span style={{ fontSize: 14, fontWeight: 500, color: sel ? 'var(--accent)' : 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{opt.name}</span>
-                      {opt.pinned && <span className="pill accent" style={{ fontSize: 10 }}>默认</span>}
+                      {opt.pinned && <span className="pill accent" style={{ fontSize: 10 }}>{t('mobile.new_game.role.default_badge')}</span>}
                     </div>
                     <div style={{ fontSize: 11.5, color: 'var(--muted-2)', marginTop: 2 }}>
-                      {opt.subtitle} · {opt.kind === 'persona' ? '人格' : '角色卡'}
+                      {opt.subtitle} · {opt.kind === 'persona' ? t('mobile.new_game.role.kind_persona') : t('mobile.new_game.role.kind_card')}
                     </div>
                   </div>
                   {sel && <Icon name="check" size={15} style={{ color: 'var(--accent)', flexShrink: 0 }} />}
@@ -412,30 +414,30 @@ function StepRole({ personas, userCards, roleMode, setRoleMode, pickedCard, setP
       {roleMode === 'new' && (
         <div style={{ display: 'grid', gap: 14 }}>
           <div className="pl-field">
-            <label>角色名称 <span style={{ color: 'var(--danger)' }}>*</span></label>
+            <label>{t('mobile.new_game.role.new_name_label')} <span style={{ color: 'var(--danger)' }}>*</span></label>
             <input
               className="pl-input"
-              placeholder="在这个世界中的称谓"
+              placeholder={t('mobile.new_game.role.new_name_placeholder')}
               value={newCardName}
               onChange={e => setNewCardName(e.target.value)}
               autoComplete="off"
             />
           </div>
           <div className="pl-field">
-            <label>身份定位</label>
+            <label>{t('mobile.new_game.role.new_role_label')}</label>
             <input
               className="pl-input"
-              placeholder="例:穿越者、宫廷谋士、流浪剑客"
+              placeholder={t('mobile.new_game.role.new_role_placeholder')}
               value={newCardRole}
               onChange={e => setNewCardRole(e.target.value)}
               autoComplete="off"
             />
           </div>
           <div className="pl-field">
-            <label>背景经历</label>
+            <label>{t('mobile.new_game.role.new_bg_label')}</label>
             <textarea
               className="pl-input"
-              placeholder="角色的来历、性格、目标…(可选)"
+              placeholder={t('mobile.new_game.role.new_bg_placeholder')}
               value={newCardBg}
               onChange={e => setNewCardBg(e.target.value)}
               rows={3}
@@ -451,6 +453,7 @@ function StepRole({ personas, userCards, roleMode, setRoleMode, pickedCard, setP
    STEP 2 — 出身与身份
    ================================================================ */
 function StepIdentity({ scriptId, birthpoint, pickedCard, allRoleOptions, playerOrigin, setPlayerOrigin, identity, setIdentity, identityKnown, setIdentityKnown }) {
+  const { t } = useTranslation();
   // 允许的身份来源
   const allowedSources = ALLOWED_SOURCES[playerOrigin] || ['none', 'npc', 'ai', 'manual'];
 
@@ -547,11 +550,11 @@ function StepIdentity({ scriptId, birthpoint, pickedCard, allRoleOptions, player
       });
       const data = await r.json().catch(() => ({}));
       if (!r.ok || data.ok === false) {
-        setRecsErr((data && data.error) || `请求失败 (${r.status})`);
+        setRecsErr((data && data.error) || t('mobile.new_game.identity.ai_request_failed', { status: r.status }));
       } else if (data && Array.isArray(data.recommendations) && data.recommendations.length > 0) {
         setRecs(data.recommendations);
       } else {
-        setRecsErr('暂无推荐,请重试或手动填写');
+        setRecsErr(t('mobile.new_game.identity.ai_empty'));
       }
     } catch (e) { setRecsErr(String(e?.message || e)); }
     setRecsLoading(false);
@@ -562,7 +565,7 @@ function StepIdentity({ scriptId, birthpoint, pickedCard, allRoleOptions, player
 
       {/* ── 出身来源 ── */}
       <div>
-        <FieldLabel hint="你以何种方式进入这个世界">第一步:出身来源</FieldLabel>
+        <FieldLabel hint={t('mobile.new_game.identity.origin_hint')}>{t('mobile.new_game.identity.origin_step')}</FieldLabel>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
           {ORIGIN_OPTIONS.map(orig => {
             const sel = playerOrigin === orig.value;
@@ -579,11 +582,11 @@ function StepIdentity({ scriptId, birthpoint, pickedCard, allRoleOptions, player
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
                   <span style={{ fontSize: 17, lineHeight: 1, flexShrink: 0, color: sel ? orig.accentColor : 'var(--muted-2)', fontFamily: 'var(--font-serif)' }}>{orig.icon}</span>
-                  <span style={{ fontFamily: 'var(--font-serif)', fontSize: 13.5, fontWeight: 700, color: sel ? orig.accentColor : 'var(--text)', lineHeight: 1.2 }}>{orig.label}</span>
+                  <span style={{ fontFamily: 'var(--font-serif)', fontSize: 13.5, fontWeight: 700, color: sel ? orig.accentColor : 'var(--text)', lineHeight: 1.2 }}>{t(orig.labelKey)}</span>
                 </div>
-                <span style={{ fontSize: 11, fontWeight: 600, color: sel ? orig.accentColor : 'var(--muted)', lineHeight: 1.3 }}>{orig.essence}</span>
-                <span style={{ fontSize: 10.5, color: 'var(--muted-2)', lineHeight: 1.5 }}>{orig.mapping}</span>
-                {sel && <span style={{ fontSize: 10.5, color: 'var(--muted)', lineHeight: 1.5, borderTop: `1px solid ${orig.accentBorder}`, paddingTop: 5, marginTop: 2 }}>{orig.hint}</span>}
+                <span style={{ fontSize: 11, fontWeight: 600, color: sel ? orig.accentColor : 'var(--muted)', lineHeight: 1.3 }}>{t(orig.essenceKey)}</span>
+                <span style={{ fontSize: 10.5, color: 'var(--muted-2)', lineHeight: 1.5 }}>{t(orig.mappingKey)}</span>
+                {sel && <span style={{ fontSize: 10.5, color: 'var(--muted)', lineHeight: 1.5, borderTop: `1px solid ${orig.accentBorder}`, paddingTop: 5, marginTop: 2 }}>{t(orig.hintKey)}</span>}
               </button>
             );
           })}
@@ -592,11 +595,16 @@ function StepIdentity({ scriptId, birthpoint, pickedCard, allRoleOptions, player
 
       {/* ── 身份来源 ── */}
       <div>
-        <FieldLabel hint="你在这个世界中的初始身份卡(可选)">第二步:身份来源</FieldLabel>
+        <FieldLabel hint={t('mobile.new_game.identity.src_hint')}>{t('mobile.new_game.identity.src_step')}</FieldLabel>
 
         {/* 来源选择器 */}
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
-          {[['none', '不挂身份'], ['npc', '从原著角色'], ['ai', 'AI 生成'], ['manual', '手动填写']].filter(([sid]) => allowedNow.includes(sid)).map(([sid, lbl]) => {
+          {[
+            ['none', t('mobile.new_game.identity.src_none')],
+            ['npc', t('mobile.new_game.identity.src_npc')],
+            ['ai', t('mobile.new_game.identity.src_ai')],
+            ['manual', t('mobile.new_game.identity.src_manual')],
+          ].filter(([sid]) => allowedNow.includes(sid)).map(([sid, lbl]) => {
             const sel = idSrc === sid;
             return (
               <button
@@ -625,22 +633,22 @@ function StepIdentity({ scriptId, birthpoint, pickedCard, allRoleOptions, player
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', alignItems: 'center', marginBottom: 3 }}>
                 <span className="pill accent" style={{ fontSize: 10 }}>
-                  {identity._from === 'ai' ? 'AI' : identity._from === 'npc_card' ? 'NPC' : '手动'}
+                  {identity._from === 'ai' ? 'AI' : identity._from === 'npc_card' ? 'NPC' : t('mobile.new_game.identity.badge_manual')}
                 </span>
                 {identity.name && <strong style={{ fontFamily: 'var(--font-serif)', fontSize: 14, color: 'var(--text)' }}>{identity.name}</strong>}
                 {identity.role && <span style={{ fontSize: 12.5, color: 'var(--text-quiet)' }}>{identity.role}</span>}
               </div>
               {identity.background && <div style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.6 }}>{identity.background}</div>}
             </div>
-            <button onClick={() => chooseSource('none')} style={{ flexShrink: 0, fontSize: 12, color: 'var(--muted-2)', padding: '2px 6px' }}>清除</button>
+            <button onClick={() => chooseSource('none')} style={{ flexShrink: 0, fontSize: 12, color: 'var(--muted-2)', padding: '2px 6px' }}>{t('mobile.new_game.identity.clear')}</button>
           </div>
         )}
 
         {/* 从原著角色 */}
         {idSrc === 'npc' && (
-          npcLoading ? <Loading text="加载角色卡…" /> :
+          npcLoading ? <Loading text={t('mobile.new_game.identity.npc_loading')} /> :
           npcCards.length === 0 ? (
-            <div style={{ fontSize: 12.5, color: 'var(--muted)', padding: '8px 0' }}>该剧本暂无原著角色卡</div>
+            <div style={{ fontSize: 12.5, color: 'var(--muted)', padding: '8px 0' }}>{t('mobile.new_game.identity.npc_empty')}</div>
           ) : (
             <div style={{ display: 'grid', gap: 6 }}>
               {npcCards.map((card, i) => {
@@ -659,7 +667,7 @@ function StepIdentity({ scriptId, birthpoint, pickedCard, allRoleOptions, player
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                       {nm && <strong style={{ fontFamily: 'var(--font-serif)', fontSize: 14 }}>{nm}</strong>}
                       {role && <span className="pill" style={{ fontSize: 10.5 }}>{role}</span>}
-                      {isSel && <span className="pill accent" style={{ fontSize: 10, marginLeft: 'auto' }}>✓ 已选</span>}
+                      {isSel && <span className="pill accent" style={{ fontSize: 10, marginLeft: 'auto' }}>{t('mobile.new_game.identity.selected_badge')}</span>}
                     </div>
                     {bg && <span style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.55, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{bg}</span>}
                   </button>
@@ -673,7 +681,7 @@ function StepIdentity({ scriptId, birthpoint, pickedCard, allRoleOptions, player
         {idSrc === 'ai' && (
           <div style={{ display: 'grid', gap: 10 }}>
             <button className="pl-btn-ghost" onClick={fetchAiRecs} disabled={recsLoading} style={{ height: 40, fontSize: 13 }}>
-              {recsLoading ? <><Icon name="spinner" size={13} className="spin" /> 生成中…</> : recs.length > 0 ? '重新生成' : 'AI 生成身份推荐'}
+              {recsLoading ? <><Icon name="spinner" size={13} className="spin" /> {t('mobile.new_game.identity.ai_generating')}</> : recs.length > 0 ? t('mobile.new_game.identity.ai_regenerate') : t('mobile.new_game.identity.ai_generate_btn')}
             </button>
             <ErrBar msg={recsErr} />
             {recs.length > 0 && (
@@ -690,7 +698,7 @@ function StepIdentity({ scriptId, birthpoint, pickedCard, allRoleOptions, player
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                         {rec.name && <strong style={{ fontFamily: 'var(--font-serif)', fontSize: 14 }}>{rec.name}</strong>}
                         {rec.role && <span className="pill" style={{ fontSize: 10.5 }}>{rec.role}</span>}
-                        {isSel && <span className="pill accent" style={{ fontSize: 10, marginLeft: 'auto' }}>✓ 已选</span>}
+                        {isSel && <span className="pill accent" style={{ fontSize: 10, marginLeft: 'auto' }}>{t('mobile.new_game.identity.selected_badge')}</span>}
                       </div>
                       {rec.background && <span style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.55 }}>{rec.background}</span>}
                     </button>
@@ -705,19 +713,19 @@ function StepIdentity({ scriptId, birthpoint, pickedCard, allRoleOptions, player
         {idSrc === 'manual' && (
           <div style={{ display: 'grid', gap: 12 }}>
             <div className="pl-field" style={{ marginBottom: 0 }}>
-              <label>别名</label>
-              <input className="pl-input" placeholder="在这个世界中的名字(可选)" value={manualName} onChange={e => setManualName(e.target.value)} />
+              <label>{t('mobile.new_game.identity.manual_alias_label')}</label>
+              <input className="pl-input" placeholder={t('mobile.new_game.identity.manual_alias_placeholder')} value={manualName} onChange={e => setManualName(e.target.value)} />
             </div>
             <div className="pl-field" style={{ marginBottom: 0 }}>
-              <label>定位 <span style={{ color: 'var(--danger)' }}>*</span></label>
-              <input className="pl-input" placeholder="例:皇帝的心腹、叛军头领" value={manualRole} onChange={e => setManualRole(e.target.value)} />
+              <label>{t('mobile.new_game.identity.manual_role_label')} <span style={{ color: 'var(--danger)' }}>*</span></label>
+              <input className="pl-input" placeholder={t('mobile.new_game.identity.manual_role_placeholder')} value={manualRole} onChange={e => setManualRole(e.target.value)} />
             </div>
             <div className="pl-field" style={{ marginBottom: 0 }}>
-              <label>背景</label>
-              <textarea className="pl-input" rows={3} placeholder="身份的来历与处境(可选)" value={manualBg} onChange={e => setManualBg(e.target.value)} />
+              <label>{t('mobile.new_game.identity.manual_bg_label')}</label>
+              <textarea className="pl-input" rows={3} placeholder={t('mobile.new_game.identity.manual_bg_placeholder')} value={manualBg} onChange={e => setManualBg(e.target.value)} />
             </div>
             <button className="pl-btn-primary" onClick={applyManual} disabled={!manualRole.trim() && !manualBg.trim()} style={{ height: 42, fontSize: 13 }}>
-              <Icon name="check" size={14} /> 确认身份
+              <Icon name="check" size={14} /> {t('mobile.new_game.identity.manual_confirm_btn')}
             </button>
           </div>
         )}
@@ -726,11 +734,11 @@ function StepIdentity({ scriptId, birthpoint, pickedCard, allRoleOptions, player
       {/* ── 是否知道这个身份 ── */}
       {identity && playerOrigin !== 'body' && (
         <div>
-          <FieldLabel hint="开局时,你的角色是否知道自己拥有这个身份">第三步:是否知道身份</FieldLabel>
+          <FieldLabel hint={t('mobile.new_game.identity.known_hint')}>{t('mobile.new_game.identity.known_step')}</FieldLabel>
           <div style={{ display: 'flex', gap: 8 }}>
             {[
-              { val: true, label: '知道', desc: '角色清楚自己的本地身份' },
-              { val: false, label: '不知道', desc: '失忆开局,之后可能揭开' },
+              { val: true, label: t('mobile.new_game.identity.known_yes'), desc: t('mobile.new_game.identity.known_yes_desc') },
+              { val: false, label: t('mobile.new_game.identity.known_no'), desc: t('mobile.new_game.identity.known_no_desc') },
             ].map(({ val, label, desc }) => {
               const sel = identityKnown === val;
               return (
@@ -756,6 +764,7 @@ function StepIdentity({ scriptId, birthpoint, pickedCard, allRoleOptions, player
    STEP 3 — 引导与防剧透 + 故事意图
    ================================================================ */
 function StepMeta({ foreknowledge, setForeknowledge, npcAwareness, setNpcAwareness, steering, setSteering, spoiler, setSpoiler, storyIntent, setStoryIntent }) {
+  const { t } = useTranslation();
   const segOpts = (opts, cur, set) => (
     <div className="pl-seg2">
       {opts.map(([v, lbl]) => (
@@ -768,51 +777,51 @@ function StepMeta({ foreknowledge, setForeknowledge, npcAwareness, setNpcAwarene
     <div style={{ display: 'grid', gap: 22 }}>
       {/* 元知识 */}
       <div>
-        <FieldLabel hint="你作为玩家,对原著剧情的了解程度">元知识/先知</FieldLabel>
+        <FieldLabel hint={t('mobile.new_game.meta.foreknowledge_hint')}>{t('mobile.new_game.meta.foreknowledge_label')}</FieldLabel>
         {segOpts([
-          ['none', '无先知'],
-          ['partial', '部分'],
-          ['omniscient', '全知'],
+          ['none', t('mobile.new_game.meta.foreknowledge_none')],
+          ['partial', t('mobile.new_game.meta.foreknowledge_partial')],
+          ['omniscient', t('mobile.new_game.meta.foreknowledge_omniscient')],
         ], foreknowledge, setForeknowledge)}
       </div>
 
       {/* NPC 起疑 */}
       <div>
-        <FieldLabel hint="世界中的 NPC 对你的异常行为有多敏感">NPC 起疑阈值</FieldLabel>
+        <FieldLabel hint={t('mobile.new_game.meta.npc_hint')}>{t('mobile.new_game.meta.npc_label')}</FieldLabel>
         {segOpts([
-          ['oblivious', '迟钝'],
-          ['suspicious', '多疑'],
+          ['oblivious', t('mobile.new_game.meta.npc_oblivious')],
+          ['suspicious', t('mobile.new_game.meta.npc_suspicious')],
         ], npcAwareness, setNpcAwareness)}
       </div>
 
       {/* 引导强度 */}
       <div>
-        <FieldLabel hint="GM 引导故事走向的力度">故事引导</FieldLabel>
+        <FieldLabel hint={t('mobile.new_game.meta.steering_hint')}>{t('mobile.new_game.meta.steering_label')}</FieldLabel>
         {segOpts([
-          ['rail', '强引导'],
-          ['guided', '适度'],
-          ['free', '自由'],
+          ['rail', t('mobile.new_game.meta.steering_rail')],
+          ['guided', t('mobile.new_game.meta.steering_guided')],
+          ['free', t('mobile.new_game.meta.steering_free')],
         ], steering, setSteering)}
       </div>
 
       {/* 防剧透 */}
       <div>
-        <FieldLabel hint="GM 保护原著剧情不被过早揭露">防剧透等级</FieldLabel>
+        <FieldLabel hint={t('mobile.new_game.meta.spoiler_hint')}>{t('mobile.new_game.meta.spoiler_label')}</FieldLabel>
         {segOpts([
-          ['strict', '严格'],
-          ['loose', '宽松'],
+          ['strict', t('mobile.new_game.meta.spoiler_strict')],
+          ['loose', t('mobile.new_game.meta.spoiler_loose')],
         ], spoiler, setSpoiler)}
       </div>
 
       {/* 故事意图 */}
       <div>
-        <FieldLabel hint="告诉 GM 你的游戏方向与偏好(可选)">故事意图</FieldLabel>
+        <FieldLabel hint={t('mobile.new_game.meta.intent_hint')}>{t('mobile.new_game.meta.intent_label')}</FieldLabel>
         <textarea
           className="pl-input"
           rows={4}
           value={storyIntent}
           onChange={e => setStoryIntent(e.target.value)}
-          placeholder={"示例:\n· 拒绝战斗,须找非战斗解法\n· 穿越者身份是绝对秘密\n· 优先甜文路线"}
+          placeholder={t('mobile.new_game.meta.intent_placeholder')}
         />
       </div>
     </div>
@@ -823,32 +832,33 @@ function StepMeta({ foreknowledge, setForeknowledge, npcAwareness, setNpcAwarene
    STEP 4 — 确认
    ================================================================ */
 function StepConfirm({ title, setTitle, scripts, scriptId, birthpoint, roleMode, pickedCard, newCardName, allRoleOptions, playerOrigin, identity, foreknowledge, npcAwareness, steering, spoiler, submitErr, submitting }) {
+  const { t } = useTranslation();
   const selScript = scripts.find(s => String(s.id) === String(scriptId)) || null;
   const pickedOpt = allRoleOptions.find(o => o.key === pickedCard);
-  const roleName = roleMode === 'new' ? (newCardName.trim() || '(新建角色)') : (pickedOpt?.name || '—');
-  const origLabel = ORIGIN_OPTIONS.find(o => o.value === playerOrigin)?.label || playerOrigin;
+  const roleName = roleMode === 'new' ? (newCardName.trim() || t('mobile.new_game.confirm.new_role_fallback')) : (pickedOpt?.name || '—');
+  const origLabel = (() => { const o = ORIGIN_OPTIONS.find(x => x.value === playerOrigin); return o ? t(o.labelKey) : playerOrigin; })();
 
   const rows = [
-    { k: '存档名称', v: title.trim() || '—', highlight: !title.trim() },
-    { k: '剧本', v: selScript?.title || '—', highlight: !selScript },
-    { k: '出生点', v: birthpoint?.story_time_label || '从开头' },
-    { k: '角色', v: roleName, highlight: !roleName || roleName === '—' },
-    { k: '出身', v: origLabel },
-    { k: '身份', v: identity ? `${identity.name || ''} ${identity.role || ''}`.trim() || '(已设置)' : '未挂靠' },
-    { k: '元知识', v: { none: '无先知', partial: '部分', omniscient: '全知' }[foreknowledge] || foreknowledge },
-    { k: '引导', v: { rail: '强引导', guided: '适度', free: '自由' }[steering] || steering },
-    { k: '防剧透', v: { strict: '严格', loose: '宽松' }[spoiler] || spoiler },
+    { k: t('mobile.new_game.confirm.row_save_name'), v: title.trim() || '—', highlight: !title.trim() },
+    { k: t('mobile.new_game.confirm.row_script'), v: selScript?.title || '—', highlight: !selScript },
+    { k: t('mobile.new_game.confirm.row_birthpoint'), v: birthpoint?.story_time_label || t('mobile.new_game.confirm.from_start') },
+    { k: t('mobile.new_game.confirm.row_role'), v: roleName, highlight: !roleName || roleName === '—' },
+    { k: t('mobile.new_game.confirm.row_origin'), v: origLabel },
+    { k: t('mobile.new_game.confirm.row_identity'), v: identity ? `${identity.name || ''} ${identity.role || ''}`.trim() || t('mobile.new_game.confirm.identity_set') : t('mobile.new_game.confirm.identity_none') },
+    { k: t('mobile.new_game.confirm.row_foreknowledge'), v: { none: t('mobile.new_game.meta.foreknowledge_none'), partial: t('mobile.new_game.meta.foreknowledge_partial'), omniscient: t('mobile.new_game.meta.foreknowledge_omniscient') }[foreknowledge] || foreknowledge },
+    { k: t('mobile.new_game.confirm.row_steering'), v: { rail: t('mobile.new_game.meta.steering_rail'), guided: t('mobile.new_game.meta.steering_guided'), free: t('mobile.new_game.meta.steering_free') }[steering] || steering },
+    { k: t('mobile.new_game.confirm.row_spoiler'), v: { strict: t('mobile.new_game.meta.spoiler_strict'), loose: t('mobile.new_game.meta.spoiler_loose') }[spoiler] || spoiler },
   ];
 
   return (
     <div style={{ display: 'grid', gap: 16 }}>
       <div className="pl-field">
-        <label>存档名称 <span style={{ color: 'var(--danger)' }}>*</span></label>
+        <label>{t('mobile.new_game.confirm.save_name_label')} <span style={{ color: 'var(--danger)' }}>*</span></label>
         <input
           className="pl-input"
           value={title}
           onChange={e => setTitle(e.target.value)}
-          placeholder="给这段旅程起个名字"
+          placeholder={t('mobile.new_game.confirm.save_name_placeholder')}
           autoFocus
         />
       </div>
@@ -869,7 +879,7 @@ function StepConfirm({ title, setTitle, scripts, scriptId, birthpoint, roleMode,
 
       {submitting && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: 'var(--muted)', justifyContent: 'center', padding: '6px 0' }}>
-          <Icon name="spinner" size={13} className="spin" /> 正在创建存档…
+          <Icon name="spinner" size={13} className="spin" /> {t('mobile.new_game.confirm.creating')}
         </div>
       )}
     </div>
@@ -880,6 +890,7 @@ function StepConfirm({ title, setTitle, scripts, scriptId, birthpoint, roleMode,
    主组件
    ================================================================ */
 export function MobileNewGame({ nav, scriptId: propScriptId, onDone }) {
+  const { t } = useTranslation();
   const lockedScriptId = propScriptId ? String(propScriptId) : null;
 
   // ── 数据加载 ──
@@ -948,11 +959,11 @@ export function MobileNewGame({ nav, scriptId: propScriptId, onDone }) {
         // 默认存档名
         const sc = scList.find(x => String(x.id) === pickId);
         const scTitle = (sc && (sc.title || '').replace(/^《|》$/g, '')) || '';
-        setTitle(scTitle ? `${scTitle} · 新档` : '');
+        setTitle(scTitle ? `${scTitle} ${t('mobile.new_game.default_save_suffix')}` : '');
       } else {
         const sc = scList.find(x => String(x.id) === lockedScriptId);
         const scTitle = (sc && (sc.title || '').replace(/^《|》$/g, '')) || '';
-        setTitle(scTitle ? `${scTitle} · 新档` : '');
+        setTitle(scTitle ? `${scTitle} ${t('mobile.new_game.default_save_suffix')}` : '');
       }
 
       // 默认角色
@@ -1007,8 +1018,8 @@ export function MobileNewGame({ nav, scriptId: propScriptId, onDone }) {
 
   // ── 各步骤校验 ──
   const allRoleOptions = [
-    ...personas.map(p => ({ key: `persona:${p.id || p.slug}`, kind: 'persona', id: p.id || null, slug: p.slug || '', name: p.name || '(未命名)', subtitle: p.role || '人格', pinned: !!p.is_default })),
-    ...userCards.map(c => ({ key: `user:${c.id || c.slug}`, kind: 'user_card', id: c.id || null, slug: c.slug || '', name: c.name || '(未命名)', subtitle: c.identity || c.role || '角色卡', pinned: false })),
+    ...personas.map(p => ({ key: `persona:${p.id || p.slug}`, kind: 'persona', id: p.id || null, slug: p.slug || '', name: p.name || t('mobile.new_game.role.unnamed'), subtitle: p.role || t('mobile.new_game.role.kind_persona'), pinned: !!p.is_default })),
+    ...userCards.map(c => ({ key: `user:${c.id || c.slug}`, kind: 'user_card', id: c.id || null, slug: c.slug || '', name: c.name || t('mobile.new_game.role.unnamed'), subtitle: c.identity || c.role || t('mobile.new_game.role.kind_card'), pinned: false })),
   ];
 
   const selScript = scripts.find(s => String(s.id) === String(scriptId)) || null;
@@ -1034,7 +1045,7 @@ export function MobileNewGame({ nav, scriptId: propScriptId, onDone }) {
       if (activeJob) {
         const ajStatus = String(activeJob?.status || activeJob?.active_job?.status || '').toLowerCase();
         if (ajStatus && NEWGAME_ACTIVE_IMPORT_STATUSES.has(ajStatus) && !NEWGAME_IMPORT_TERMINAL_STATUSES.has(ajStatus)) {
-          throw new Error('剧本正在导入,请稍后重试');
+          throw new Error(t('mobile.new_game.script_block.importing_retry'));
         }
       }
 
@@ -1053,7 +1064,7 @@ export function MobileNewGame({ nav, scriptId: propScriptId, onDone }) {
           kind: 'user',
         });
         const created = r && r.card;
-        if (!created || !(created.id || created.slug)) throw new Error('角色卡创建失败');
+        if (!created || !(created.id || created.slug)) throw new Error(t('mobile.new_game.role.create_failed'));
         charId = created.id || created.slug;
         charKind = 'user_card';
         finalRoleMode = 'existing';
@@ -1090,7 +1101,7 @@ export function MobileNewGame({ nav, scriptId: propScriptId, onDone }) {
       onDone?.();
       nav.pop();
     } catch (e) {
-      const msg = e?.message || (e?.payload && (e.payload.error || e.payload.detail)) || '创建失败';
+      const msg = e?.message || (e?.payload && (e.payload.error || e.payload.detail)) || t('mobile.new_game.create_failed');
       setSubmitErr(msg);
     }
     setSubmitting(false);
@@ -1101,11 +1112,11 @@ export function MobileNewGame({ nav, scriptId: propScriptId, onDone }) {
     <>
       {/* 顶栏 */}
       <div className="pl-head">
-        <button className="pl-back" onClick={() => step > 0 ? setStep(s => s - 1) : nav.pop()} aria-label="返回">
+        <button className="pl-back" onClick={() => step > 0 ? setStep(s => s - 1) : nav.pop()} aria-label={t('mobile.new_game.back_label')}>
           <Icon name="chevron_left" size={17} />
         </button>
         <div className="pl-head-title">
-          <strong>{STEPS[step].title}</strong>
+          <strong>{t(STEPS[step].titleKey)}</strong>
           <StepDots step={step} total={TOTAL_STEPS} />
         </div>
       </div>
@@ -1114,7 +1125,7 @@ export function MobileNewGame({ nav, scriptId: propScriptId, onDone }) {
       <div className="pl-body" style={{ paddingBottom: 100 }}>
         <div className="pl-pad">
           {dataLoading ? (
-            <Loading text="加载向导数据…" />
+            <Loading text={t('mobile.new_game.loading_wizard')} />
           ) : dataErr ? (
             <ErrBar msg={dataErr} />
           ) : (
@@ -1209,7 +1220,7 @@ export function MobileNewGame({ nav, scriptId: propScriptId, onDone }) {
         }}>
           {step > 0 && (
             <button className="pl-btn-ghost" style={{ flex: 1 }} onClick={() => setStep(s => s - 1)}>
-              <Icon name="chevron_left" size={15} /> 上一步
+              <Icon name="chevron_left" size={15} /> {t('mobile.new_game.nav.prev')}
             </button>
           )}
           {step < TOTAL_STEPS - 1 ? (
@@ -1219,7 +1230,7 @@ export function MobileNewGame({ nav, scriptId: propScriptId, onDone }) {
               disabled={!canNext || dataLoading}
               onClick={() => { if (canNext) setStep(s => s + 1); }}
             >
-              下一步 <Icon name="chevron_right" size={15} />
+              {t('mobile.new_game.nav.next')} <Icon name="chevron_right" size={15} />
             </button>
           ) : (
             <button
@@ -1228,7 +1239,7 @@ export function MobileNewGame({ nav, scriptId: propScriptId, onDone }) {
               disabled={!step4Valid || submitting}
               onClick={handleCreate}
             >
-              {submitting ? <><Icon name="spinner" size={15} className="spin" /> 创建中…</> : <><Icon name="play" size={15} /> 开始游戏</>}
+              {submitting ? <><Icon name="spinner" size={15} className="spin" /> {t('mobile.new_game.nav.creating')}</> : <><Icon name="play" size={15} /> {t('mobile.new_game.nav.start')}</>}
             </button>
           )}
         </div>

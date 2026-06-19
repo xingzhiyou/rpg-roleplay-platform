@@ -1,6 +1,7 @@
 /* Game Console — main app shell: top bar, left rail, chat area with run-state, right panel. */
 
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { createPortal } from 'react-dom';
 import { useState as useStateA, useEffect as useEffectA, useRef as useRefA, useMemo as useMemoA, useCallback as useCallbackA } from 'react';
 import { Icon } from './game-icons.jsx';
@@ -18,6 +19,7 @@ import { lsGet, lsSet, lsGetJSON, lsSetJSON } from './lib/storage.js';
 function LeftRail({ collapsed, onToggle, state, runState, onNew, onSave, onSwitchSave, onMemoryMode, currentSaveId, saves, resizeHandle, mobileOpen }) {
   // task 102E: resizeHandle 是 React 节点 (一般是 <ResizeHandle />),
   // 由 App 层注入,放在 <aside> 内绝对定位
+  const { t } = useTranslation();
   const m = state.memory || { mode: "normal" };
   const [branchOpen, setBranchOpen] = useStateA(false);
   return (
@@ -38,15 +40,15 @@ function LeftRail({ collapsed, onToggle, state, runState, onNew, onSave, onSwitc
             <span className="muted-2" style={{ fontSize: 11 }}>RPG Roleplay · {(state && state.world && state.world.timeline && state.world.timeline.current_phase) || "—"}</span>
           </div>
         </div>
-        <button className="iconbtn" onClick={onToggle} data-tip="折叠侧栏" data-tip-pos="below">
+        <button className="iconbtn" onClick={onToggle} data-tip={t('game.app.rail.collapse_tip')} data-tip-pos="below">
           <Icon name="chevron_left" size={14} />
         </button>
       </div>
 
       <div className="gc-rail-section">
         <div className="gc-rail-section-head">
-          <span>当前存档</span>
-          <button className="iconbtn" data-tip="新游戏" onClick={onNew}><Icon name="plus" size={12} /></button>
+          <span>{t('game.app.rail.current_save')}</span>
+          <button className="iconbtn" data-tip={t('game.app.rail.new_game_tip')} onClick={onNew}><Icon name="plus" size={12} /></button>
         </div>
         <div className="gc-rail-save-display">
           {(() => {
@@ -57,44 +59,44 @@ function LeftRail({ collapsed, onToggle, state, runState, onNew, onSave, onSwitc
             if (!cur) {
               return (
                 <>
-                  <strong className="muted">尚未创建存档</strong>
-                  <span className="muted-2 mono" style={{fontSize: 11}}>点 ＋ 新建游戏开始</span>
+                  <strong className="muted">{t('game.app.rail.no_save')}</strong>
+                  <span className="muted-2 mono" style={{fontSize: 11}}>{t('game.app.rail.no_save_hint')}</span>
                 </>
               );
             }
             return (
               <>
-                <strong>{cur.title || `存档 #${cur.id}`}</strong>
+                <strong>{cur.title || t('game.app.rail.save_label', { id: cur.id })}</strong>
                 <span className="muted-2 mono">{cur.updated_at || ""}</span>
               </>
             );
           })()}
         </div>
         <div className="gc-rail-quick">
-          <button className="btn ghost" onClick={onSave} data-tip="手动保存"><Icon name="save" size={12} /> 保存</button>
-          <button className="btn ghost" onClick={() => setBranchOpen(o => !o)} data-tip="切换分支树视图"><Icon name="branch" size={12} /> 分支</button>
+          <button className="btn ghost" onClick={onSave} data-tip={t('game.app.rail.manual_save_tip')}><Icon name="save" size={12} /> {t('common.save')}</button>
+          <button className="btn ghost" onClick={() => setBranchOpen(o => !o)} data-tip={t('game.app.rail.branch_tip')}><Icon name="branch" size={12} /> {t('game.app.rail.branch_btn')}</button>
         </div>
         {/* task 48：传 currentSaveId / state._raw.save_id，BranchTreeRail 走真 /api/branches */}
         {branchOpen && <BranchTreeRail saveId={currentSaveId || state?._raw?.save_id || null} />}
       </div>
 
       <div className="gc-rail-section">
-        <div className="gc-rail-section-head"><span>记忆模式</span></div>
+        <div className="gc-rail-section-head"><span>{t('game.app.rail.memory_mode')}</span></div>
         <div className="seg gc-mem-seg">
-          <button className={m.mode === "normal" ? "active" : ""} data-tip="每轮召回 6 段历史与原文" onClick={() => onMemoryMode?.("normal")}>
-            <Icon name="memory" /> 普通
+          <button className={m.mode === "normal" ? "active" : ""} data-tip={t('game.app.rail.memory_normal_tip')} onClick={() => onMemoryMode?.("normal")}>
+            <Icon name="memory" /> {t('game.app.rail.memory_normal')}
           </button>
-          <button className={m.mode === "deep" ? "active" : ""} data-tip="每轮召回 14 段，更慢但更连贯" onClick={() => onMemoryMode?.("deep")}>
-            <Icon name="sparkle" /> 深度
+          <button className={m.mode === "deep" ? "active" : ""} data-tip={t('game.app.rail.memory_deep_tip')} onClick={() => onMemoryMode?.("deep")}>
+            <Icon name="sparkle" /> {t('game.app.rail.memory_deep')}
           </button>
-          <button className={m.mode === "off" ? "active" : ""} data-tip="不召回历史，只用当前上下文" onClick={() => onMemoryMode?.("off")}>
-            <Icon name="eye_off" /> 关闭
+          <button className={m.mode === "off" ? "active" : ""} data-tip={t('game.app.rail.memory_off_tip')} onClick={() => onMemoryMode?.("off")}>
+            <Icon name="eye_off" /> {t('common.close')}
           </button>
         </div>
         <p className="gc-mem-desc">
-          {m.mode === "deep" ? <><strong>深度</strong> · 额外召回 8 段，延迟 +30%</>
-            : m.mode === "off" ? <><strong>关闭</strong> · 只用当前面板上下文</>
-            : <><strong>普通</strong> · 平衡速度和连贯性</>}
+          {m.mode === "deep" ? <><strong>{t('game.app.rail.memory_deep')}</strong> · {t('game.app.rail.memory_deep_desc')}</>
+            : m.mode === "off" ? <><strong>{t('common.close')}</strong> · {t('game.app.rail.memory_off_desc')}</>
+            : <><strong>{t('game.app.rail.memory_normal')}</strong> · {t('game.app.rail.memory_normal_desc')}</>}
         </p>
       </div>
 
@@ -104,10 +106,10 @@ function LeftRail({ collapsed, onToggle, state, runState, onNew, onSave, onSwitc
         const updates = Array.isArray(state?.memory?.last_structured_updates) ? state.memory.last_structured_updates : [];
         return (
           <div className="gc-rail-section compact">
-            <div className="gc-rail-section-head"><span>本轮结构化更新</span><span className="pill mono">{updates.length}</span></div>
+            <div className="gc-rail-section-head"><span>{t('game.app.rail.structured_updates')}</span><span className="pill mono">{updates.length}</span></div>
             <ul className="gc-rail-updates">
               {updates.length === 0 && (
-                <li><span className="muted-2" style={{fontSize: 11.5}}>暂无</span></li>
+                <li><span className="muted-2" style={{fontSize: 11.5}}>{t('game.app.rail.no_updates')}</span></li>
               )}
               {updates.slice(-6).map((u, i) => {
                 const text = typeof u === "string" ? u : (u?.text || JSON.stringify(u));
@@ -136,9 +138,9 @@ function LeftRail({ collapsed, onToggle, state, runState, onNew, onSave, onSwitc
         {/* task 37：CSS 已把 a 改成 inline-flex 占满 foot，icon 的 verticalAlign/marginRight
             可以删掉，避免和 flex align-items 打架（之前是这个让 SVG 视觉外溢、点击命中
             落到父 div，触发 'gc-rail-foot intercepts pointer events'）。 */}
-        <a href="Platform.html" className="muted" data-tip="返回平台主页" style={{ fontSize: 12, borderBottom: "0" }}>
+        <a href="Platform.html" className="muted" data-tip={t('game.app.rail.back_home_tip')} style={{ fontSize: 12, borderBottom: "0" }}>
           <Icon name="home" size={12} />
-          返回主页
+          {t('game.app.rail.back_home')}
         </a>
       </div>
       </div>
@@ -148,6 +150,7 @@ function LeftRail({ collapsed, onToggle, state, runState, onNew, onSave, onSwitc
 
 // ----------------------------- RUN STEPS ---------------------------------
 function RunStepsLine({ steps }) {
+  const { t } = useTranslation();
   return (
     <div className="gc-run gc-run-line">
       {steps.map((s, i) =>
@@ -157,7 +160,7 @@ function RunStepsLine({ steps }) {
           <span className="muted-2 mono gc-run-elapsed">{(s.elapsed_ms / 1000).toFixed(1)}s</span>
           {s.detail && s.status === "done" &&
         <details className="gc-run-detail">
-              <summary className="muted-2"><Icon name="chevron_down" size={10} /> 展开</summary>
+              <summary className="muted-2"><Icon name="chevron_down" size={10} /> {t('game.app.run.expand')}</summary>
               <div className="muted">{s.detail}</div>
             </details>
         }
@@ -219,12 +222,13 @@ function RunSteps({ steps, style }) {
 // 再自动收起。完整 raw phase 流（prompt/intent/llm_curator/manifest/provider:*/assembly
 // /rules_engine/main_gm/acceptance_check ...）藏在「详情」折叠里，要看时再展开，
 // 不会再铺满聊天区。
-const PUBLIC_STAGE_LABELS = {
-  context: "准备上下文",
-  rules:   "准备上下文",
-  gm:      "生成中",
-  save:    "渲染",
-  system:  "准备上下文",
+// Stage labels resolved via t() inside ThinkingPill — these keys are referenced there.
+const PUBLIC_STAGE_KEYS = {
+  context: "game.app.thinking.stage_context",
+  rules:   "game.app.thinking.stage_context",
+  gm:      "game.app.thinking.stage_gm",
+  save:    "game.app.thinking.stage_save",
+  system:  "game.app.thinking.stage_context",
 };
 // stage → 0-100% for progress ring (context/rules=25%, gm=60%, save=90%, done=100%)
 const PUBLIC_STAGE_PCT = {
@@ -237,6 +241,7 @@ const PUBLIC_STAGE_PCT = {
 
 // task 64: ThinkingPill — SVG 圆环 + 百分比 + 简短文案
 function ThinkingPill({ runState, runStyle }) {
+  const { t } = useTranslation();
   const running = !!runState?.running;
   const completedAt = runState?.completedAt || 0;
   const showCompleted = !running && completedAt > 0;
@@ -244,8 +249,8 @@ function ThinkingPill({ runState, runStyle }) {
 
   const stageId = runState?.publicStage || "system";
   const label = running
-    ? (PUBLIC_STAGE_LABELS[stageId] || PUBLIC_STAGE_LABELS.system)
-    : "已完成";
+    ? t(PUBLIC_STAGE_KEYS[stageId] || PUBLIC_STAGE_KEYS.system)
+    : t('game.app.thinking.done');
   const elapsedMs = running ? (runState?.totalElapsed || 0) : (runState?.completedElapsed || 0);
   const elapsedSec = (elapsedMs / 1000).toFixed(1);
   const pct = running ? (PUBLIC_STAGE_PCT[stageId] || 20) : 100;
@@ -288,6 +293,7 @@ function ThinkingPill({ runState, runStyle }) {
 // 空闲(完成 1.8s 后):rawSteps 已被清空 → 只剩"空闲·等待玩家"行,点行可展开
 // 暂存的 rawSteps(虽然此时为空,但 UI 保留 toggle 一致体验)。
 function RunStateSection({ runState }) {
+  const { t } = useTranslation();
   const running = !!runState?.running;
   const rawSteps = Array.isArray(runState?.rawSteps) ? runState.rawSteps : [];
   // running 时强制展开;空闲时默认折叠
@@ -299,16 +305,16 @@ function RunStateSection({ runState }) {
       <div className="gc-rail-runstate"
         onClick={canToggle ? () => setManualExpanded((v) => !v) : undefined}
         style={canToggle ? { cursor: "pointer" } : undefined}
-        title={canToggle ? "点击查看上一轮运行详情" : undefined}
+        title={canToggle ? t('game.app.run.click_last_detail') : undefined}
       >
         <div className="gc-rail-runstate-line">
           <span className={`dot ${running ? "accent pulse" : "ok"}`} style={{ marginRight: 6 }} />
           {running ? <span>{runState.label}</span> :
             <span className="muted">
-              空闲 · 等待玩家
+              {t('game.app.run.idle')}
               {rawSteps.length > 0 && (
                 <span className="muted-2" style={{ marginLeft: 8, fontSize: 10.5 }}>
-                  {manualExpanded ? "▾" : "▸"} 上轮详情
+                  {manualExpanded ? "▾" : "▸"} {t('game.app.run.last_detail')}
                 </span>
               )}
             </span>
@@ -325,6 +331,7 @@ function RunStateSection({ runState }) {
 // task 129: LeftRail 显示运行详情 (raw phase trace),Claude 同款的展开视图但放左侧
 // task 141: 不再自带 gc-rail-section 容器,由父 RunStateSection 控制是否展示
 function RunDetailRail({ runState }) {
+  const { t } = useTranslation();
   const rawSteps = Array.isArray(runState?.rawSteps) ? runState.rawSteps : [];
   const [expanded, setExpanded] = useStateA(false);
   if (!rawSteps.length) return null;
@@ -333,12 +340,12 @@ function RunDetailRail({ runState }) {
     <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid var(--line-soft, rgba(255,255,255,.06))" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
         <span className="muted-2" style={{ fontSize: 10.5, textTransform: "uppercase", letterSpacing: "0.14em" }}>
-          运行详情
+          {t('game.app.run.detail_title')}
         </span>
         {rawSteps.length > 6 && (
           <button className="iconbtn" style={{ padding: "2px 8px", fontSize: 10.5, whiteSpace: "nowrap", width: "auto", height: "auto" }}
             onClick={(e) => { e.stopPropagation(); setExpanded(v => !v); }}>
-            {expanded ? "收起" : `全部 (${rawSteps.length})`}
+            {expanded ? t('game.app.run.collapse') : t('game.app.run.show_all', { count: rawSteps.length })}
           </button>
         )}
       </div>
@@ -367,6 +374,7 @@ function MsgActions({ text, ts, msgIndex, totalMsgs, commitId, saveId, role, met
   // {label} 给后端 → 后端 int(None) 直接 500。现在 NarrativeBlock / PlayerBlock
   // 把 idx + saveId 透传进来，doFork 至少发 {save_id, message_index, label}，
   // 后端通过 resolve_commit_id_by_message 解析。
+  const { t } = useTranslation();
   const [copied, setCopied] = useStateA(false);
   const [forkOpen, setForkOpen] = useStateA(false);
   // task 116c: 删除消息 (软回滚) — 弹窗确认 + 进度
@@ -395,8 +403,8 @@ function MsgActions({ text, ts, msgIndex, totalMsgs, commitId, saveId, role, met
     }
     setCopied(true);
     if (window.toast) {
-      if (ok) window.toast("已复制", { kind: "ok", detail: txt.slice(0, 40) + (txt.length > 40 ? "…" : ""), duration: 1600 });
-      else window.toast("复制失败", { kind: "danger", detail: "浏览器拒绝剪贴板访问", duration: 2400 });
+      if (ok) window.toast(t('game.app.msg.copied'), { kind: "ok", detail: txt.slice(0, 40) + (txt.length > 40 ? "…" : ""), duration: 1600 });
+      else window.toast(t('game.app.msg.copy_failed'), { kind: "danger", detail: t('game.app.msg.clipboard_denied'), duration: 2400 });
     }
     setTimeout(() => setCopied(false), 1400);
   };
@@ -405,9 +413,9 @@ function MsgActions({ text, ts, msgIndex, totalMsgs, commitId, saveId, role, met
   const canFork = (commitId != null && commitId !== "") || (saveId != null && msgIndex != null);
   const onFork = () => {
     if (!canFork) {
-      window.toast?.("无法新建分支", {
+      window.toast?.(t('game.app.msg.fork_failed'), {
         kind: "warn",
-        detail: "缺存档上下文：未拿到 save_id 或消息索引",
+        detail: t('game.app.msg.fork_no_ctx'),
         duration: 2400,
       });
       return;
@@ -420,7 +428,7 @@ function MsgActions({ text, ts, msgIndex, totalMsgs, commitId, saveId, role, met
   const canRegen = saveId != null && msgIndex != null && msgIndex >= 0;
   const onRegenerate = () => {
     if (!canRegen) {
-      window.toast?.("无法重新生成", { kind: "warn", detail: "缺存档上下文:未拿到 save_id 或消息索引", duration: 2400 });
+      window.toast?.(t('game.app.msg.regen_failed'), { kind: "warn", detail: t('game.app.msg.fork_no_ctx'), duration: 2400 });
       return;
     }
     window.dispatchEvent(new CustomEvent("rpg-regenerate", { detail: { save_id: saveId, message_index: msgIndex } }));
@@ -428,7 +436,7 @@ function MsgActions({ text, ts, msgIndex, totalMsgs, commitId, saveId, role, met
   const doFork = async () => {
     setForkOpen(false);
     // 优先 node_id (commitId)；否则发 save_id + message_index 让后端 resolve。
-    const body = { label: "从消息分支" };
+    const body = { label: t('game.app.msg.fork_label') };
     if (commitId != null && commitId !== "") {
       body.node_id = commitId;
     } else if (saveId != null && msgIndex != null) {
@@ -438,7 +446,7 @@ function MsgActions({ text, ts, msgIndex, totalMsgs, commitId, saveId, role, met
     try {
       const r = await window.api.branches.continueFrom(body);
       if (r && r.ok === false) {
-        throw new Error(r.error || r.detail || "后端拒绝创建分支");
+        throw new Error(r.error || r.detail || "branch create denied");
       }
       // task 87：后端已经把新分支设为 active ref + 切换 runtime。
       // 必须 dispatch event 让 Game Console 顶层重载 /api/state（chat
@@ -447,7 +455,7 @@ function MsgActions({ text, ts, msgIndex, totalMsgs, commitId, saveId, role, met
       const newCommitId = r?.active_branch_node_id || r?.active_commit_id;
       const branchHint =
         (r?.active_ref?.name && r.active_ref.name.split("/").pop()) ||
-        (newCommitId ? `节点 #${newCommitId}` : "新分支");
+        (newCommitId ? t('game.app.msg.node_label', { id: newCommitId }) : t('game.app.msg.new_branch'));
       try {
         window.dispatchEvent(new CustomEvent("rpg-state-reload", {
           detail: { reason: "branch_fork", new_commit_id: newCommitId },
@@ -467,13 +475,13 @@ function MsgActions({ text, ts, msgIndex, totalMsgs, commitId, saveId, role, met
           } catch (_) {}
         }, 250);
       }
-      window.toast?.("已切换到新分支", {
+      window.toast?.(t('game.app.msg.fork_switched'), {
         kind: "ok",
-        detail: branchHint + (role === "user" ? " · 原消息已放回输入框,可编辑后重发" : " · 当前消息流已是新分支"),
+        detail: branchHint + (role === "user" ? " · " + t('game.app.msg.fork_restore_input') : " · " + t('game.app.msg.fork_on_branch')),
         duration: 2400,
       });
     } catch (e) {
-      window.toast?.("分支创建失败", { kind: "danger", detail: e?.message, duration: 3000 });
+      window.toast?.(t('game.app.msg.fork_create_failed'), { kind: "danger", detail: e?.message, duration: 3000 });
     }
   };
   // task 116c: 删除条件 — 必须有 saveId + msgIndex >= 0
@@ -484,7 +492,7 @@ function MsgActions({ text, ts, msgIndex, totalMsgs, commitId, saveId, role, met
     try {
       const r = await window.api.branches.rollbackToMessage(saveId, msgIndex);
       if (r && r.ok === false) {
-        throw new Error(r.error || r.detail || "后端拒绝删除");
+        throw new Error(r.error || r.detail || "delete denied");
       }
       setDelOpen(false);
       const d = r?.deleted || {};
@@ -495,11 +503,11 @@ function MsgActions({ text, ts, msgIndex, totalMsgs, commitId, saveId, role, met
         }));
         window.dispatchEvent(new CustomEvent("rpg-saves-updated"));
       } catch (_) {}
-      const detail = `已删 ${d.messages || 0} 条消息 · 回到第 ${(r?.restored_turn ?? -1) + 1} 回合`
-        + (r?.trash_ref ? " · 旧分支已存为 " + (r.trash_ref.name || "trash") : "");
-      window.toast?.("消息已删除", { kind: "ok", detail, duration: 3200 });
+      const detail = t('game.app.msg.delete_detail', { count: d.messages || 0, turn: (r?.restored_turn ?? -1) + 1 })
+        + (r?.trash_ref ? " · " + t('game.app.msg.delete_trash', { name: r.trash_ref.name || "trash" }) : "");
+      window.toast?.(t('game.app.msg.deleted'), { kind: "ok", detail, duration: 3200 });
     } catch (e) {
-      window.toast?.("删除失败", { kind: "danger", detail: e?.message, duration: 3000 });
+      window.toast?.(t('game.app.msg.delete_failed'), { kind: "danger", detail: e?.message, duration: 3000 });
     } finally {
       setDelBusy(false);
     }
@@ -507,12 +515,12 @@ function MsgActions({ text, ts, msgIndex, totalMsgs, commitId, saveId, role, met
   return (
     <>
       <div className="gc-msg-actions">
-        <button className="iconbtn gc-msg-act" data-tip={copied ? "已复制" : "复制"} data-tip-pos="below" onClick={onCopy}>
+        <button className="iconbtn gc-msg-act" data-tip={copied ? t('game.app.msg.copied') : t('game.app.msg.copy')} data-tip-pos="below" onClick={onCopy}>
           <Icon name={copied ? "check" : "file"} size={12} />
         </button>
         <button
           className="iconbtn gc-msg-act"
-          data-tip={canFork ? "从这里新建分支" : "缺存档上下文，无法分支"}
+          data-tip={canFork ? t('game.app.msg.fork_tip') : t('game.app.msg.fork_no_ctx_tip')}
           data-tip-pos="below"
           disabled={!canFork}
           onClick={onFork}>
@@ -520,7 +528,7 @@ function MsgActions({ text, ts, msgIndex, totalMsgs, commitId, saveId, role, met
         </button>
         <button
           className="iconbtn gc-msg-act"
-          data-tip={canRegen ? "重新生成这一轮(换个写法重走)" : "缺存档上下文,无法重新生成"}
+          data-tip={canRegen ? t('game.app.msg.regen_tip') : t('game.app.msg.regen_no_ctx_tip')}
           data-tip-pos="below"
           disabled={!canRegen}
           onClick={onRegenerate}>
@@ -528,14 +536,14 @@ function MsgActions({ text, ts, msgIndex, totalMsgs, commitId, saveId, role, met
         </button>
         <button
           className="iconbtn gc-msg-act gc-msg-act-danger"
-          data-tip={canDelete ? "删除此消息及之后所有(可恢复)" : "缺存档上下文,无法删除"}
+          data-tip={canDelete ? t('game.app.msg.delete_tip') : t('game.app.msg.delete_no_ctx_tip')}
           data-tip-pos="below"
           disabled={!canDelete}
           onClick={() => setDelOpen(true)}>
           <Icon name="trash" size={12} />
         </button>
         <span className="gc-msg-ts mono">{ts}</span>
-        {meta ? <span className="gc-msg-meta mono muted-2" data-tip="本轮用时 / token / 费用">{meta}</span> : null}
+        {meta ? <span className="gc-msg-meta mono muted-2" data-tip={t('game.app.msg.meta_tip')}>{meta}</span> : null}
       </div>
       <ForkConfirmModal open={forkOpen} text={text} onClose={() => setForkOpen(false)} onConfirm={doFork} />
       <DeleteConfirmModal
@@ -554,6 +562,7 @@ function MsgActions({ text, ts, msgIndex, totalMsgs, commitId, saveId, role, met
 // task 116c: 删除消息 → 软回滚到 turn N-1 的确认弹窗。
 // 警告用户:这会丢弃后续所有对话和世界线;但 git-style 保留了旧分支(refs/trash/...)可恢复。
 function DeleteConfirmModal({ open, text, msgIndex, role, busy, onClose, onConfirm }) {
+  const { t } = useTranslation();
   if (!open) return null;
   const preview = (text || "").slice(0, 80) + ((text || "").length > 80 ? "…" : "");
   const turnOfMsg = msgIndex != null && msgIndex >= 0 ? Math.floor(msgIndex / 2) : null;
@@ -567,8 +576,8 @@ function DeleteConfirmModal({ open, text, msgIndex, role, busy, onClose, onConfi
       onClose={onClose}
       header={
         <div>
-          <div className="pl-modal-eyebrow" style={{color: "var(--danger)"}}>危险操作</div>
-          <h2 className="pl-modal-title">删除此消息及之后所有?</h2>
+          <div className="pl-modal-eyebrow" style={{color: "var(--danger)"}}>{t('game.app.delete_modal.eyebrow')}</div>
+          <h2 className="pl-modal-title">{t('game.app.delete_modal.title')}</h2>
         </div>
       }
       footer={<>
@@ -576,35 +585,35 @@ function DeleteConfirmModal({ open, text, msgIndex, role, busy, onClose, onConfi
           <Icon name="info" size={11} /> POST /api/branches/rollback
         </span>
         <div style={{display: "flex", gap: 8}}>
-          <button className="btn ghost" onClick={onClose} disabled={busy}>取消</button>
+          <button className="btn ghost" onClick={onClose} disabled={busy}>{t('common.cancel')}</button>
           <button className="btn danger" onClick={onConfirm} disabled={busy}>
             {busy
-              ? <><span className="gc-spinner spin" /> 删除中…</>
-              : <><Icon name="trash" size={12} /> 确认删除</>}
+              ? <><span className="gc-spinner spin" /> {t('game.app.delete_modal.deleting')}</>
+              : <><Icon name="trash" size={12} /> {t('game.app.delete_modal.confirm_delete')}</>}
           </button>
         </div>
       </>}
     >
       <div style={{fontSize: 13.5, lineHeight: 1.7, color: "var(--text-quiet)"}}>
-        这是不可逆操作。{isAssistant ? "下面这条 GM 回复" : "下面这条消息"}及其之后的<strong style={{color: "var(--danger)"}}>所有对话、世界线、阶段摘要</strong>都会被丢弃。
-        {isAssistant && <span> 上一条玩家输入会保留，方便继续改写或重试。</span>}
+        {t('game.app.delete_modal.irreversible')} {isAssistant ? t('game.app.delete_modal.this_gm_reply') : t('game.app.delete_modal.this_message')}<strong style={{color: "var(--danger)"}}>{t('game.app.delete_modal.all_after')}</strong>{t('game.app.delete_modal.discarded')}
+        {isAssistant && <span> {t('game.app.delete_modal.player_input_kept')}</span>}
         <div style={{
           marginTop: 10, padding: "10px 12px",
           background: "var(--bg-deep)", border: "1px solid var(--line-soft)",
           borderRadius: 6, fontFamily: "var(--font-serif)", fontSize: 13,
           color: "var(--text-quiet)", borderLeft: "2px solid var(--danger)",
         }}>
-          {preview || "(空消息)"}
+          {preview || t('game.app.delete_modal.empty_msg')}
         </div>
         <div style={{marginTop: 10, fontSize: 12, color: "var(--muted)"}}>
           {isAssistant
-            ? <>存档会回到 <strong>这条 GM 回复之前</strong> 的状态。</>
+            ? <>{t('game.app.delete_modal.restore_before_gm')}</>
             : restoreTurn != null && restoreTurn >= 0
-            ? <>存档会回到 <strong>第 {restoreTurn + 1} 回合</strong> 结束时的状态。</>
-            : <>存档会回到 <strong>开局前</strong> 的状态。</>}
+            ? <>{t('game.app.delete_modal.restore_turn', { turn: restoreTurn + 1 })}</>
+            : <>{t('game.app.delete_modal.restore_start')}</>}
           <br />
-          旧分支会自动保留在 <code style={{fontFamily: "var(--font-mono)", fontSize: 11}}>refs/trash/...</code>,
-          通过分支树可以切回去恢复。
+          {t('game.app.delete_modal.trash_hint')} <code style={{fontFamily: "var(--font-mono)", fontSize: 11}}>refs/trash/...</code>
+          {t('game.app.delete_modal.trash_recover')}
         </div>
       </div>
     </Modal>
@@ -613,13 +622,14 @@ function DeleteConfirmModal({ open, text, msgIndex, role, busy, onClose, onConfi
 }
 
 function ForkConfirmModal({ open, text, onClose, onConfirm }) {
+  const { t } = useTranslation();
   if (!open) return null;
   const preview = (text || "").slice(0, 80) + ((text || "").length > 80 ? "…" : "");
   const node = (
     <Modal
       open
-      eyebrow="从这条消息新建分支"
-      title="在此节点开新分支"
+      eyebrow={t('game.app.fork_modal.eyebrow')}
+      title={t('game.app.fork_modal.title')}
       width={460}
       onClose={onClose}
       footer={<>
@@ -627,15 +637,15 @@ function ForkConfirmModal({ open, text, onClose, onConfirm }) {
           <Icon name="info" size={11} /> POST /api/branches/continue
         </span>
         <div style={{display: "flex", gap: 8}}>
-          <button className="btn ghost" onClick={onClose}>取消</button>
+          <button className="btn ghost" onClick={onClose}>{t('common.cancel')}</button>
           <button className="btn primary" onClick={onConfirm}>
-            <Icon name="fork" size={12} /> 新建分支
+            <Icon name="fork" size={12} /> {t('game.app.fork_modal.new_branch')}
           </button>
         </div>
       </>}
     >
       <div style={{fontSize: 13.5, lineHeight: 1.7, color: "var(--text-quiet)"}}>
-        当前节点之后的消息会保留在原分支，新分支从这里继续。
+        {t('game.app.fork_modal.body')}
         <div style={{
           marginTop: 10, padding: "10px 12px",
           background: "var(--bg-deep)", border: "1px solid var(--line-soft)",
@@ -695,6 +705,7 @@ function renderNarrativeWithInlineTools(rawText, toolOps, renderTool, streaming,
 // 酒馆模式复用:speakerName/speakerAvatar/tag 可选覆盖默认的 GM/主代理 标签。
 // 不传时与 Game Console 行为完全一致(默认 tag="GM", subtitle="主代理")。
 function NarrativeBlock({ text, streaming, ts, msgIndex, saveId, commitId, thinking, speakerName, speakerAvatar, tag, hideMeta, meta, images, toolOps, renderTool }) {
+  const { t } = useTranslation();
   const displayText = stripStateOpsForDisplay(text);
   // task 90: 用 RpgMarkdown.Block 渲染 markdown (** / # / list / code / link...)
   // window.RpgMarkdown 由 markdown-render.jsx 提供,加载顺序在 game-app.jsx 之前。
@@ -702,7 +713,7 @@ function NarrativeBlock({ text, streaming, ts, msgIndex, saveId, commitId, think
   const tagLabel = tag || "GM";
   // 酒馆模式显式传 speakerName="" → 隐藏副标题(只显示角色名 tag);
   // Game Console 不传(undefined)→ 默认"主代理"(零回归)。
-  const subLabel = speakerName === "" ? "" : (speakerName || "主代理");
+  const subLabel = speakerName === "" ? "" : (speakerName || t('game.app.narrative.main_agent'));
   // task 121a: thinking 状态显示带 spinner 的 italic 文字,跟正式 narrative 区分
   // speakerAvatar 兼容:若为 URL(/ 或 http 开头)则渲 AvatarImg,否则保持首字母 span(向后兼容)。
   const isAvatarUrl = speakerAvatar && (speakerAvatar.startsWith('/') || speakerAvatar.startsWith('http'));
@@ -719,11 +730,11 @@ function NarrativeBlock({ text, streaming, ts, msgIndex, saveId, commitId, think
           <div className="gc-msg-meta">
             {avatarNode}
             <span className="gc-msg-tag">{tagLabel}</span>
-            <span className="muted-2" style={{ fontSize: 11.5 }}>正在准备</span>
+            <span className="muted-2" style={{ fontSize: 11.5 }}>{t('game.app.narrative.preparing')}</span>
           </div>
         )}
         <div className="gc-msg-body" style={{ fontStyle: "italic", color: "var(--text-quiet)", opacity: 0.85 }}>
-          <span className="gc-spinner spin" /> {text || "请稍候…"}
+          <span className="gc-spinner spin" /> {text || t('game.app.narrative.please_wait')}
         </div>
       </div>
     );
@@ -756,7 +767,8 @@ function NarrativeBlock({ text, streaming, ts, msgIndex, saveId, commitId, think
 
 // 酒馆模式复用:speakerName/tag 可选覆盖默认「玩家」标签(persona 名等)。
 function PlayerBlock({ text, ts, attachments, msgIndex, saveId, commitId, speakerName, speakerAvatar, tag, hideMeta }) {
-  const tagLabel = tag || speakerName || "玩家";
+  const { t } = useTranslation();
+  const tagLabel = tag || speakerName || t('game.app.narrative.player');
   // speakerAvatar 兼容:若为 URL(/ 或 http 开头)则渲 AvatarImg,否则保持首字母 span(向后兼容)。
   const isAvatarUrl = speakerAvatar && (speakerAvatar.startsWith('/') || speakerAvatar.startsWith('http'));
   const avatarNode = speakerAvatar
@@ -858,6 +870,7 @@ export function useSaveImages(saveId, lastKeyRef) {
 
 // 助手消息气泡内的图片组(单图自然比例,多图方形拼贴),点击全屏。
 function ChatImageGroup({ images }) {
+  const { t } = useTranslation();
   const [lightbox, setLightbox] = useStateA(null);
   useEffectA(() => {
     if (!lightbox) return;
@@ -870,7 +883,7 @@ function ChatImageGroup({ images }) {
   return (
     <div className="rpg-chat-imgs">
       {images.map((im) => (
-        <button key={im.id} type="button" title={im.kind || '生成图片'}
+        <button key={im.id} type="button" title={im.kind || t('game.app.image.generated')}
           className={`rpg-chat-img ${multi ? 'rpg-chat-img--multi' : 'rpg-chat-img--single'}`}
           onClick={() => setLightbox(im.url)}>
           <img src={im.url} alt="" loading="lazy" decoding="async" />
@@ -879,7 +892,7 @@ function ChatImageGroup({ images }) {
       {lightbox && (
         <div className="mlb-backdrop" onClick={() => setLightbox(null)} role="dialog" aria-modal="true">
           <img src={lightbox} alt="" style={{ maxWidth: '92vw', maxHeight: '90vh', objectFit: 'contain', borderRadius: 10, boxShadow: '0 12px 60px rgba(0,0,0,.7)' }} onClick={(e) => e.stopPropagation()} />
-          <button onClick={() => setLightbox(null)} aria-label="关闭" style={{ position: 'absolute', top: 20, right: 24, width: 38, height: 38, borderRadius: 99, border: 0, background: 'rgba(255,255,255,.14)', color: '#fff', fontSize: 19, cursor: 'pointer' }}>×</button>
+          <button onClick={() => setLightbox(null)} aria-label={t('common.close')} style={{ position: 'absolute', top: 20, right: 24, width: 38, height: 38, borderRadius: 99, border: 0, background: 'rgba(255,255,255,.14)', color: '#fff', fontSize: 19, cursor: 'pointer' }}>×</button>
         </div>
       )}
     </div>
@@ -890,6 +903,7 @@ function ChatImageGroup({ images }) {
 // 挂载/saveId 变化时拉取已有图片(status==='done' && url),并订阅 SSE image topic 实时追加。
 // 组件卸载时取消订阅,防泄漏。
 function SaveImagesStrip({ saveId }) {
+  const { t } = useTranslation();
   const [images, setImages] = useStateA([]);
   const [lightbox, setLightbox] = useStateA(null); // 当前放大的 url
 
@@ -938,7 +952,7 @@ function SaveImagesStrip({ saveId }) {
       borderRadius: 8,
     }}>
       <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 8, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-        本局生成的图片 ({images.length})
+        {t('game.app.image.strip_title', { count: images.length })}
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
         {images.map((img) => (
@@ -949,7 +963,7 @@ function SaveImagesStrip({ saveId }) {
               border: 0, padding: 0, background: 'transparent', cursor: 'pointer',
               borderRadius: 6, overflow: 'hidden', flexShrink: 0,
             }}
-            title={img.prompt || img.kind || '生成图片'}
+            title={img.prompt || img.kind || t('game.app.image.generated')}
           >
             <AvatarImg
               src={img.url}
@@ -972,7 +986,7 @@ function SaveImagesStrip({ saveId }) {
         >
           <img
             src={lightbox}
-            alt="生成图片"
+            alt={t('game.app.image.generated')}
             style={{ maxWidth: '90vw', maxHeight: '90vh', borderRadius: 8, boxShadow: '0 8px 32px rgba(0,0,0,0.6)' }}
             onClick={(e) => e.stopPropagation()}
           />
@@ -992,6 +1006,7 @@ function SaveImagesStrip({ saveId }) {
 }
 
 function ChatArea({ history, runState, runStyle, narrativeFont, narrativeSize, hasError, errorMessage, saveId, onRetry, onShowSse }) {
+  const { t } = useTranslation();
   const ref = useRefA(null);
   // task 21：实战存档 history 可能有 100+ 条；一次性渲染整个数组 + 每次 setGame
   // 都重渲全部 NarrativeBlock 会拖死主线程（用户报 Playwright 简单 DOM 访问也 45s 不返回）。
@@ -1034,12 +1049,12 @@ function ChatArea({ history, runState, runStyle, narrativeFont, narrativeSize, h
       <div className="gc-chat-inner">
         {hiddenCount > 0 && (
           <div className="muted-2" style={{textAlign: "center", padding: "8px 0", fontSize: 12}}>
-            隐藏了较早的 {hiddenCount} 条 ·{" "}
+            {t('game.app.chat.hidden_count', { count: hiddenCount })} ·{" "}
             <a href="#" onClick={(e) => { e.preventDefault(); setExtra(x => x + HISTORY_WINDOW); }}>
-              再加载 {Math.min(HISTORY_WINDOW, hiddenCount)} 条
+              {t('game.app.chat.load_more', { count: Math.min(HISTORY_WINDOW, hiddenCount) })}
             </a>
             {" · "}
-            <span className="muted">完整历史走顶栏「历史回顾」抽屉</span>
+            <span className="muted">{t('game.app.chat.full_history_hint')}</span>
           </div>
         )}
         {visible.map((m, i) => {
@@ -1071,7 +1086,7 @@ function ChatArea({ history, runState, runStyle, narrativeFont, narrativeSize, h
               <span className="gc-waiting-gm-dot" />
               <span className="gc-waiting-gm-dot" style={{ animationDelay: '0.2s' }} />
               <span className="gc-waiting-gm-dot" style={{ animationDelay: '0.4s' }} />
-              <span className="gc-waiting-gm-label">等待 GM…</span>
+              <span className="gc-waiting-gm-label">{t('game.app.chat.waiting_gm')}</span>
             </div>
           );
         })()}
@@ -1087,15 +1102,15 @@ function ChatArea({ history, runState, runStyle, narrativeFont, narrativeSize, h
         <div className="gc-error">
             <Icon name="warn" size={14} style={{ color: "var(--danger)" }} />
             <div>
-              <strong>生成失败</strong>
+              <strong>{t('game.app.chat.gen_failed')}</strong>
               <p className="muted" style={{ margin: "4px 0 0", fontSize: 12.5 }}>
                 {/* task 31：以前这里硬编码"请求中断：上游 504"，把空消息/字段契约错全都误报成网络超时。
                     现在显示后端 error.message 的真实文本（hasError 为字符串时是错误正文，为 true 时回退）。 */}
-                {(typeof hasError === "string" && hasError) || errorMessage || "请求中断。已保留你的上一条输入，可重试或修改。"}
+                {(typeof hasError === "string" && hasError) || errorMessage || t('game.app.chat.request_aborted')}
               </p>
               <div className="gc-error-actions">
-                <button className="btn" onClick={onRetry} disabled={!onRetry}>重试本轮</button>
-                <button className="btn ghost" onClick={onShowSse} disabled={!onShowSse}>查看事件流</button>
+                <button className="btn" onClick={onRetry} disabled={!onRetry}>{t('game.app.chat.retry')}</button>
+                <button className="btn ghost" onClick={onShowSse} disabled={!onShowSse}>{t('game.app.chat.view_sse')}</button>
               </div>
             </div>
           </div>
@@ -1117,8 +1132,8 @@ function ChatArea({ history, runState, runStyle, narrativeFont, narrativeSize, h
               boxShadow: "var(--shadow-3, 0 6px 18px -6px rgba(0,0,0,0.5))",
               zIndex: 5, cursor: "pointer",
             }}
-            data-tip="跳到最新">
-            <Icon name="chevron_down" size={12} /> 回到最新
+            data-tip={t('game.app.chat.jump_latest_tip')}>
+            <Icon name="chevron_down" size={12} /> {t('game.app.chat.jump_latest')}
           </button>
         )}
       </div>
@@ -1132,6 +1147,7 @@ function ChatArea({ history, runState, runStyle, narrativeFont, narrativeSize, h
 // 前端这里只做 wrapper:拉 /api/branches/{saveId},喂给 BranchGraph 组件
 // (variant="compact" 紧凑型,适合右侧栏)。
 function BranchTreeRail({ saveId }) {
+  const { t } = useTranslation();
   const [data, setData] = useStateA({ loading: false, payload: null, error: "" });
   const [refreshTick, setRefreshTick] = useStateA(0);
   useEffectA(() => {
@@ -1160,7 +1176,7 @@ function BranchTreeRail({ saveId }) {
         } : null;
         setData({ loading: false, payload, error: "" });
       } catch (e) {
-        if (!cancelled) setData({ loading: false, payload: null, error: e?.message || "加载失败" });
+        if (!cancelled) setData({ loading: false, payload: null, error: e?.message || t('game.app.branch.load_failed') });
       }
     })();
     return () => { cancelled = true; };
@@ -1169,18 +1185,18 @@ function BranchTreeRail({ saveId }) {
   return (
     <div className="gc-rail-branch-tree">
       <div className="gc-rail-branch-head">
-        <span className="muted-2 mono" style={{fontSize: 10.5, textTransform: "uppercase", letterSpacing: "0.14em"}}>当前子分支</span>
-        <span className="muted-2 mono" style={{fontSize: 10.5, marginLeft: "auto"}}>HEAD 历史</span>
+        <span className="muted-2 mono" style={{fontSize: 10.5, textTransform: "uppercase", letterSpacing: "0.14em"}}>{t('game.app.branch.current_branches')}</span>
+        <span className="muted-2 mono" style={{fontSize: 10.5, marginLeft: "auto"}}>{t('game.app.branch.head_history')}</span>
         <a className="iconbtn" href="/saves-branches"
            target="_blank" rel="noopener noreferrer"
-           data-tip="在新标签打开完整分支图(查看所有分支路线)" data-tip-pos="below"
+           data-tip={t('game.app.branch.open_full_tip')} data-tip-pos="below"
            style={{width: 18, height: 18}}>
           <Icon name="arrow_right" size={10} />
         </a>
       </div>
-      {data.loading && <div className="muted-2" style={{padding: "10px 8px", fontSize: 11.5}}>加载中…</div>}
+      {data.loading && <div className="muted-2" style={{padding: "10px 8px", fontSize: 11.5}}>{t('common.loading')}</div>}
       {!data.loading && data.error && (
-        <div className="muted-2" style={{padding: "10px 8px", fontSize: 11.5}}>加载失败：{data.error}</div>
+        <div className="muted-2" style={{padding: "10px 8px", fontSize: 11.5}}>{t('game.app.branch.error_prefix')}{data.error}</div>
       )}
       {!data.loading && !data.error && data.payload && (
         <BranchGraph
@@ -1194,23 +1210,23 @@ function BranchTreeRail({ saveId }) {
           onActivate={async (commitId) => {
             try {
               const r = await window.api.branches.activate({ node_id: commitId, commit_id: commitId });
-              if (r && r.ok === false) throw new Error(r.error || r.detail || "切换分支失败");
-              window.__apiToast?.("已切到该分支", { kind: "ok", duration: 1500 });
+              if (r && r.ok === false) throw new Error(r.error || r.detail || t('game.app.branch.switch_failed'));
+              window.__apiToast?.(t('game.app.branch.switched'), { kind: "ok", duration: 1500 });
               window.dispatchEvent(new CustomEvent("rpg-state-reload"));
               window.dispatchEvent(new CustomEvent("rpg-saves-updated"));
             } catch (e) {
-              window.__apiToast?.("切换分支失败", { kind: "danger", detail: e?.message || String(e) });
+              window.__apiToast?.(t('game.app.branch.switch_failed'), { kind: "danger", detail: e?.message || String(e) });
             }
           }}
           onContinue={async (commitId) => {
             try {
               const r = await window.api.branches.continueFrom({ node_id: commitId });
-              if (r && r.ok === false) throw new Error(r.error || r.detail || "从此节点继续失败");
-              window.__apiToast?.("已从此节点新建分支", { kind: "ok", duration: 1500 });
+              if (r && r.ok === false) throw new Error(r.error || r.detail || t('game.app.branch.continue_failed'));
+              window.__apiToast?.(t('game.app.branch.continued'), { kind: "ok", duration: 1500 });
               window.dispatchEvent(new CustomEvent("rpg-state-reload"));
               window.dispatchEvent(new CustomEvent("rpg-saves-updated"));
             } catch (e) {
-              window.__apiToast?.("从此节点继续失败", { kind: "danger", detail: e?.message || String(e) });
+              window.__apiToast?.(t('game.app.branch.continue_failed'), { kind: "danger", detail: e?.message || String(e) });
             }
           }}
         />
@@ -1238,6 +1254,7 @@ function _readShowUsage() {
 }
 
 function GameSettingsModal({ open, onClose, saveTitle, permission, saveId }) {
+  const { t } = useTranslation();
   const [density, setDensityState] = useStateA(_readDensity);
   const [narrativeFont, setNarrativeFontState] = useStateA(_readNarrativeFont);
   const [autosave, setAutosaveState] = useStateA(_readAutosave);
@@ -1306,27 +1323,27 @@ function GameSettingsModal({ open, onClose, saveTitle, permission, saveId }) {
   if (!open) return null;
 
   const PERM_OPT = (typeof window.PERMISSION_OPTIONS !== "undefined" && window.PERMISSION_OPTIONS) || [
-    { id: "read_only",   label: "只读 · 纯叙事", icon: "eye" },
-    { id: "default",     label: "默认权限",       icon: "lock" },
-    { id: "review",      label: "自动审查",       icon: "shield" },
-    { id: "full_access", label: "完全访问",       icon: "unlock" },
+    { id: "read_only",   label: t('game.app.settings.perm_read_only'), icon: "eye" },
+    { id: "default",     label: t('game.app.settings.perm_default'),   icon: "lock" },
+    { id: "review",      label: t('game.app.settings.perm_review'),    icon: "shield" },
+    { id: "full_access", label: t('game.app.settings.perm_full'),      icon: "unlock" },
   ];
   const currentPerm = PERM_OPT.find(p => p.id === permission) || PERM_OPT[1];
 
   const DENSITY_OPTS = [
-    { id: "compact",  label: "紧凑" },
-    { id: "default",  label: "默认" },
-    { id: "spacious", label: "宽松" },
+    { id: "compact",  label: t('game.app.settings.density_compact') },
+    { id: "default",  label: t('game.app.settings.density_default') },
+    { id: "spacious", label: t('game.app.settings.density_spacious') },
   ];
   const FONT_OPTS = [
-    { id: "serif", label: "宋体 Serif" },
-    { id: "sans",  label: "黑体 Sans" },
-    { id: "mono",  label: "等宽 Mono" },
+    { id: "serif", label: t('game.app.settings.font_serif') },
+    { id: "sans",  label: t('game.app.settings.font_sans') },
+    { id: "mono",  label: t('game.app.settings.font_mono') },
   ];
   const STEER_OPTS = [
-    { id: "rail",    label: "贴原著" },
-    { id: "guided",  label: "软引导" },
-    { id: "free",    label: "自由" },
+    { id: "rail",    label: t('game.app.settings.steer_rail') },
+    { id: "guided",  label: t('game.app.settings.steer_guided') },
+    { id: "free",    label: t('game.app.settings.steer_free') },
   ];
 
   const rowStyle = {
@@ -1340,22 +1357,22 @@ function GameSettingsModal({ open, onClose, saveTitle, permission, saveId }) {
   const node = (
     <Modal
       open
-      eyebrow="游戏内设置 · 本档"
-      title={saveTitle || "本档设置"}
+      eyebrow={t('game.app.settings.eyebrow')}
+      title={saveTitle || t('game.app.settings.title')}
       width={480}
       onClose={onClose}
       footer={<>
         <span className="muted-2" style={{fontSize: 11.5}}>
-          <Icon name="info" size={11} /> 密度/字体改动即时生效
+          <Icon name="info" size={11} /> {t('game.app.settings.instant_hint')}
         </span>
         <div style={{display: "flex", gap: 8}}>
           <a className="btn ghost" href="/settings"
              target="_blank" rel="noopener noreferrer"
              style={{textDecoration: "none"}}>
-            <Icon name="settings" size={12} /> 全局设置 ↗
+            <Icon name="settings" size={12} /> {t('game.app.settings.global_settings')}
           </a>
           <button className="btn primary" onClick={onClose}>
-            <Icon name="check" size={12} /> 完成
+            <Icon name="check" size={12} /> {t('game.app.settings.done')}
           </button>
         </div>
       </>}
@@ -1365,8 +1382,8 @@ function GameSettingsModal({ open, onClose, saveTitle, permission, saveId }) {
           {/* ── 信息密度 ── */}
           <div style={rowStyle}>
             <div style={labelStyle}>
-              <div>信息密度</div>
-              <div style={sublabelStyle}>调整字号、行距与内边距</div>
+              <div>{t('game.app.settings.density_label')}</div>
+              <div style={sublabelStyle}>{t('game.app.settings.density_desc')}</div>
             </div>
             <div className="seg" style={{flexShrink: 0}}>
               {DENSITY_OPTS.map(d => (
@@ -1381,8 +1398,8 @@ function GameSettingsModal({ open, onClose, saveTitle, permission, saveId }) {
           {/* ── 叙事字体 ── */}
           <div style={rowStyle}>
             <div style={labelStyle}>
-              <div>叙事字体</div>
-              <div style={sublabelStyle}>GM 回复的文字字体</div>
+              <div>{t('game.app.settings.font_label')}</div>
+              <div style={sublabelStyle}>{t('game.app.settings.font_desc')}</div>
             </div>
             <div className="seg" style={{flexShrink: 0}}>
               {FONT_OPTS.map(f => (
@@ -1397,28 +1414,28 @@ function GameSettingsModal({ open, onClose, saveTitle, permission, saveId }) {
           {/* ── 自动存档 ── */}
           <div style={rowStyle}>
             <div style={labelStyle}>
-              <div>自动存档</div>
-              <div style={sublabelStyle}>每轮 GM 回复后自动保存进度</div>
+              <div>{t('game.app.settings.autosave_label')}</div>
+              <div style={sublabelStyle}>{t('game.app.settings.autosave_desc')}</div>
             </div>
             <label style={{display: "flex", alignItems: "center", gap: 8, cursor: "pointer", flexShrink: 0}}>
               <input type="checkbox" checked={autosave}
                      onChange={(e) => handleAutosave(e.target.checked)}
                      style={{width: 15, height: 15, cursor: "pointer"}} />
-              <span style={{fontSize: 12.5, color: "var(--text-quiet)"}}>{autosave ? "开启" : "关闭"}</span>
+              <span style={{fontSize: 12.5, color: "var(--text-quiet)"}}>{autosave ? t('game.app.settings.on') : t('game.app.settings.off')}</span>
             </label>
           </div>
 
           {/* ── 显示 token 用量 ── */}
           <div style={rowStyle}>
             <div style={labelStyle}>
-              <div>显示 token 用量</div>
-              <div style={sublabelStyle}>每轮在输入框下方显示输入/输出 tokens、费用与上下文占用</div>
+              <div>{t('game.app.settings.show_usage_label')}</div>
+              <div style={sublabelStyle}>{t('game.app.settings.show_usage_desc')}</div>
             </div>
             <label style={{display: "flex", alignItems: "center", gap: 8, cursor: "pointer", flexShrink: 0}}>
               <input type="checkbox" checked={showUsage}
                      onChange={(e) => handleShowUsage(e.target.checked)}
                      style={{width: 15, height: 15, cursor: "pointer"}} />
-              <span style={{fontSize: 12.5, color: "var(--text-quiet)"}}>{showUsage ? "开启" : "关闭"}</span>
+              <span style={{fontSize: 12.5, color: "var(--text-quiet)"}}>{showUsage ? t('game.app.settings.on') : t('game.app.settings.off')}</span>
             </label>
           </div>
 
@@ -1426,8 +1443,8 @@ function GameSettingsModal({ open, onClose, saveTitle, permission, saveId }) {
           {saveId != null && (
             <div style={rowStyle}>
               <div style={labelStyle}>
-                <div>剧情引导强度</div>
-                <div style={sublabelStyle}>贴原著=强力锚点;软引导=默认温和;自由=不注入</div>
+                <div>{t('game.app.settings.steering_label')}</div>
+                <div style={sublabelStyle}>{t('game.app.settings.steering_desc')}</div>
               </div>
               <div className="seg" style={{flexShrink: 0}}>
                 {STEER_OPTS.map(s => (
@@ -1443,8 +1460,8 @@ function GameSettingsModal({ open, onClose, saveTitle, permission, saveId }) {
           {/* ── 写入权限（只读展示） ── */}
           <div style={{...rowStyle, borderBottom: "none"}}>
             <div style={labelStyle}>
-              <div>LLM 写入权限</div>
-              <div style={sublabelStyle}>在输入框旁的锁图标切换；完整选项见全局设置</div>
+              <div>{t('game.app.settings.perm_label')}</div>
+              <div style={sublabelStyle}>{t('game.app.settings.perm_desc')}</div>
             </div>
             <div className="pill" style={{flexShrink: 0, gap: 6}}>
               <Icon name={currentPerm.icon} size={11} />
@@ -1494,6 +1511,7 @@ __gameToast.install();
 // 后续后端给出全文搜索接口时，可在 SearchDrawer 内挂 await 调用替换 localSearch。
 
 function HistoryDrawer({ open, history, onClose }) {
+  const { t } = useTranslation();
   // Esc 关闭
   React.useEffect(() => {
     if (!open) return;
@@ -1504,19 +1522,19 @@ function HistoryDrawer({ open, history, onClose }) {
   if (!open) return null;
   const items = Array.isArray(history) ? history : [];
   const node = (
-    <div className="pl-modal-backdrop" onClick={onClose} role="dialog" aria-label="历史回顾">
+    <div className="pl-modal-backdrop" onClick={onClose} role="dialog" aria-label={t('game.app.history.aria_label')}>
       <div className="pl-modal" onClick={(e) => e.stopPropagation()} style={{width: "min(720px, 100%)", maxHeight: "80vh", display: "flex", flexDirection: "column"}}>
         <header className="pl-modal-head">
           <div>
-            <div className="pl-modal-eyebrow">本档历史 · {items.length} 条</div>
-            <h2 className="pl-modal-title">历史回顾</h2>
+            <div className="pl-modal-eyebrow">{t('game.app.history.eyebrow', { count: items.length })}</div>
+            <h2 className="pl-modal-title">{t('game.app.history.title')}</h2>
           </div>
-          <button className="iconbtn" onClick={onClose} data-tip="关闭" aria-label="关闭"><Icon name="close" size={14} /></button>
+          <button className="iconbtn" onClick={onClose} data-tip={t('common.close')} aria-label={t('common.close')}><Icon name="close" size={14} /></button>
         </header>
         <div className="pl-modal-form" style={{overflow: "auto", paddingTop: 8}}>
           {items.length === 0 ? (
             <div className="muted" style={{padding: "32px 8px", textAlign: "center", fontSize: 13}}>
-              这一档还没有对话历史。开始与 GM 对话后，所有轮次会在这里聚合可回看。
+              {t('game.app.history.empty')}
             </div>
           ) : items.map((h, i) => (
             <div key={`hist-${i}`} className="pl-setting-row" style={{alignItems: "flex-start", gap: 12, padding: "10px 4px", borderBottom: "1px solid var(--line-soft, #eee)"}}>
@@ -1525,7 +1543,7 @@ function HistoryDrawer({ open, history, onClose }) {
               </div>
               <div style={{flex: 1, minWidth: 0}}>
                 <div style={{fontSize: 11, color: "var(--muted, #777)", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.04em"}}>
-                  {h && h.role === "assistant" ? "GM" : (h && h.role === "user" ? "玩家" : (h && h.role) || "—")}
+                  {h && h.role === "assistant" ? "GM" : (h && h.role === "user" ? t('game.app.narrative.player') : (h && h.role) || "—")}
                 </div>
                 <div className="serif" style={{fontSize: 13, lineHeight: 1.55, whiteSpace: "pre-wrap", wordBreak: "break-word"}}>
                   {/* 展示层 strip JSON ops fence — state.history 原文保留(后端 apply_structured_updates 已落库) */}
@@ -1537,9 +1555,9 @@ function HistoryDrawer({ open, history, onClose }) {
         </div>
         <footer className="pl-modal-foot">
           <span className="muted-2" style={{fontSize: 11.5}}>
-            提示：Esc 关闭 · 当前为本会话内存历史；完整分支历史见 Platform / 分支页
+            {t('game.app.history.footer_hint')}
           </span>
-          <button className="btn ghost" onClick={onClose}>关闭</button>
+          <button className="btn ghost" onClick={onClose}>{t('common.close')}</button>
         </footer>
       </div>
     </div>
@@ -1548,6 +1566,7 @@ function HistoryDrawer({ open, history, onClose }) {
 }
 
 function SearchDrawer({ open, history, state, onClose }) {
+  const { t } = useTranslation();
   const [q, setQ] = useStateA("");
   const inputRef = React.useRef(null);
   React.useEffect(() => {
@@ -1572,47 +1591,46 @@ function SearchDrawer({ open, history, state, onClose }) {
       out.push({ group, label, snippet: (start > 0 ? "…" : "") + text.slice(start, end) + (end < text.length ? "…" : ""), meta });
     };
     (Array.isArray(history) ? history : []).forEach((h, i) => {
-      const role = h && h.role === "assistant" ? "GM" : (h && h.role === "user" ? "玩家" : "—");
+      const role = h && h.role === "assistant" ? "GM" : (h && h.role === "user" ? t('game.app.narrative.player') : "—");
       // 搜索 index 走干净文本,避免搜 "op"/"set" 命中 JSON 而不是叙事
-      push("对话", `${role} · #${i + 1}`, stripNarrativeOps((h && h.content) || ""), { i });
+      push(t('game.app.search.group_dialog'), `${role} · #${i + 1}`, stripNarrativeOps((h && h.content) || ""), { i });
     });
     const mem = (state && state.memory) || {};
-    if (mem.main_quest) push("记忆", "主线", mem.main_quest, {});
-    if (mem.current_objective) push("记忆", "当前目标", mem.current_objective, {});
-    (Array.isArray(mem.pinned) ? mem.pinned : []).forEach((t, i) => push("记忆", `固定 #${i + 1}`, t, {}));
+    if (mem.main_quest) push(t('game.app.search.group_memory'), t('game.app.search.main_quest'), mem.main_quest, {});
+    if (mem.current_objective) push(t('game.app.search.group_memory'), t('game.app.search.current_objective'), mem.current_objective, {});
+    (Array.isArray(mem.pinned) ? mem.pinned : []).forEach((pinItem, i) => push(t('game.app.search.group_memory'), t('game.app.search.pinned_n', { n: i + 1 }), pinItem, {}));
     const world = (state && state.world) || {};
-    (Array.isArray(world.known_events) ? world.known_events : []).forEach((t, i) => push("世界", `已知事件 #${i + 1}`, t, {}));
+    (Array.isArray(world.known_events) ? world.known_events : []).forEach((evItem, i) => push(t('game.app.search.group_world'), t('game.app.search.known_event_n', { n: i + 1 }), evItem, {}));
     return out.slice(0, 40);
   }, [q, history, state]);
 
   if (!open) return null;
   const node = (
-    <div className="pl-modal-backdrop" onClick={onClose} role="dialog" aria-label="搜索本档">
+    <div className="pl-modal-backdrop" onClick={onClose} role="dialog" aria-label={t('game.app.search.aria_label')}>
       <div className="pl-modal" onClick={(e) => e.stopPropagation()} style={{width: "min(640px, 100%)", maxHeight: "80vh", display: "flex", flexDirection: "column"}}>
         <header className="pl-modal-head">
           <div style={{flex: 1}}>
-            <div className="pl-modal-eyebrow">本档搜索 · 前端聚合（对话 / 记忆 / 世界）</div>
+            <div className="pl-modal-eyebrow">{t('game.app.search.eyebrow')}</div>
             <input
               ref={inputRef}
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="输入关键词，回车即可…"
-              aria-label="搜索关键词"
+              placeholder={t('game.app.search.placeholder')}
+              aria-label={t('game.app.search.input_aria')}
               style={{width: "100%", marginTop: 6, padding: "8px 10px", fontSize: 14,
                       border: "1px solid var(--line, #ddd)", borderRadius: 6, background: "var(--bg, #fff)"}}
             />
           </div>
-          <button className="iconbtn" onClick={onClose} data-tip="关闭" aria-label="关闭"><Icon name="close" size={14} /></button>
+          <button className="iconbtn" onClick={onClose} data-tip={t('common.close')} aria-label={t('common.close')}><Icon name="close" size={14} /></button>
         </header>
         <div className="pl-modal-form" style={{overflow: "auto", paddingTop: 8}}>
           {!q.trim() ? (
             <div className="muted" style={{padding: "24px 8px", textAlign: "center", fontSize: 13}}>
-              输入关键词搜索本档对话历史 / 记忆 / 已知事件。<br />
-              （后端全文检索接口接入前，先做前端本地匹配。）
+              {t('game.app.search.empty_hint')}
             </div>
           ) : results.length === 0 ? (
             <div className="muted" style={{padding: "24px 8px", textAlign: "center", fontSize: 13}}>
-              没有匹配 "<span style={{color: "var(--text, #333)"}}>{q}</span>" 的条目。
+              {t('game.app.search.no_results_prefix')}"<span style={{color: "var(--text, #333)"}}>{q}</span>"{t('game.app.search.no_results_suffix')}
             </div>
           ) : results.map((r, i) => (
             <div key={`sr-${i}`} className="pl-setting-row" style={{alignItems: "flex-start", gap: 10, padding: "8px 4px", borderBottom: "1px solid var(--line-soft, #eee)"}}>
@@ -1626,9 +1644,9 @@ function SearchDrawer({ open, history, state, onClose }) {
         </div>
         <footer className="pl-modal-foot">
           <span className="muted-2" style={{fontSize: 11.5}}>
-            {q.trim() ? `匹配 ${results.length} 条（最多展示 40 条）` : "Esc 关闭"}
+            {q.trim() ? t('game.app.search.result_count', { count: results.length }) : t('game.app.search.esc_hint')}
           </span>
-          <button className="btn ghost" onClick={onClose}>关闭</button>
+          <button className="btn ghost" onClick={onClose}>{t('common.close')}</button>
         </footer>
       </div>
     </div>
@@ -1639,26 +1657,27 @@ function SearchDrawer({ open, history, state, onClose }) {
 // ----------------------------- TOP BAR -----------------------------------
 // task 55: 新增 assistantCollapsed / onExpandAssistant —— 助手折叠时显示"展开助手"图标按钮。
 function TopBar({ state, saveUpdatedAt, onOpenTweaks, onOpenSearch, onOpenHistory, onOpenSettings, railCollapsed, onExpandRail, panelCollapsed, onExpandPanel, assistantCollapsed, onExpandAssistant, versionSelectEl, onOpenNav }) {
+  const { t } = useTranslation();
   // task 49：原 "已存档 · 12 分钟前" 写死。改成读真实 save 的 updated_at（来自 /api/saves）。
   const savedAgo = (saveUpdatedAt && window.__fmt && window.__fmt.ago)
     ? window.__fmt.ago(saveUpdatedAt)
     : (saveUpdatedAt || "—");
   const scriptName = state?._raw?.save_title || state?.app?.script_name || "";
-  const chapter = state?.app?.current_chapter ? `第${state.app.current_chapter}章` : "";
+  const chapter = state?.app?.current_chapter ? t('game.app.topbar.chapter', { n: state.app.current_chapter }) : "";
   const phase = state?.data?.world?.timeline?.current_phase || state?.app?.current_phase || "";
   return (
     <header className="gc-topbar">
       <div className="gc-topbar-left">
         {/* #手机端: 汉堡按钮打开 rail 抽屉(存档/记忆/分支/运行状态),仅移动端显示 */}
-        <button className="iconbtn gc-nav-toggle" onClick={onOpenNav} data-tip="菜单 · 存档/记忆/分支" data-tip-pos="below" aria-label="打开菜单">
+        <button className="iconbtn gc-nav-toggle" onClick={onOpenNav} data-tip={t('game.app.topbar.menu_tip')} data-tip-pos="below" aria-label={t('game.app.topbar.open_menu')}>
           <Icon name="menu" size={16} />
         </button>
         {railCollapsed && (
-          <button className="iconbtn gc-topbar-expand" onClick={onExpandRail} data-tip="展开侧栏" data-tip-pos="below">
+          <button className="iconbtn gc-topbar-expand" onClick={onExpandRail} data-tip={t('game.app.topbar.expand_rail')} data-tip-pos="below">
             <Icon name="chevron_right" size={14} />
           </button>
         )}
-        <span className="pill"><span className="dot ok" /> {saveUpdatedAt ? `已存档 · ${savedAgo}` : "尚未保存"}</span>
+        <span className="pill"><span className="dot ok" /> {saveUpdatedAt ? t('game.app.topbar.saved_ago', { ago: savedAgo }) : t('game.app.topbar.unsaved')}</span>
         {versionSelectEl}
       </div>
       <div className="gc-topbar-center">
@@ -1667,15 +1686,15 @@ function TopBar({ state, saveUpdatedAt, onOpenTweaks, onOpenSearch, onOpenHistor
         {phase && <><span>·</span><span style={{color:'var(--text)'}}>{phase}</span></>}
       </div>
       <div className="gc-topbar-right">
-        <button className="iconbtn" data-tip="历史回顾" data-tip-pos="below" onClick={onOpenHistory}><Icon name="history" size={14} /></button>
-        <button className="iconbtn" data-tip="搜索本档" data-tip-pos="below" onClick={onOpenSearch}><Icon name="search" size={14} /></button>
-        <button className="iconbtn" data-tip="游戏内设置" data-tip-pos="below" onClick={onOpenSettings}><Icon name="settings" size={14} /></button>
+        <button className="iconbtn" data-tip={t('game.app.topbar.history_tip')} data-tip-pos="below" onClick={onOpenHistory}><Icon name="history" size={14} /></button>
+        <button className="iconbtn" data-tip={t('game.app.topbar.search_tip')} data-tip-pos="below" onClick={onOpenSearch}><Icon name="search" size={14} /></button>
+        <button className="iconbtn" data-tip={t('game.app.topbar.settings_tip')} data-tip-pos="below" onClick={onOpenSettings}><Icon name="settings" size={14} /></button>
         {/* 反馈入口 — 玩家遇 bug 时不用切回 Platform tab,直接报。
             runtime-telemetry 已装钩子,提交时自动附带最近 20 errors + 10 失败
             API + 最近对话快照,无需手动复制日志(FeedbackDrawer.jsx:154
             window.__getRuntimeSnapshot({includeRecentDialog: true})) */}
-        <button className="iconbtn" data-tip="提交反馈" data-tip-pos="below"
-                aria-label="提交反馈"
+        <button className="iconbtn" data-tip={t('game.app.topbar.feedback_tip')} data-tip-pos="below"
+                aria-label={t('game.app.topbar.feedback_tip')}
                 onClick={() => {
                   if (window.__openFeedback) window.__openFeedback();
                   else window.dispatchEvent(new CustomEvent('feedback:open'));
@@ -1686,14 +1705,14 @@ function TopBar({ state, saveUpdatedAt, onOpenTweaks, onOpenSearch, onOpenHistor
             想看须知到 Platform 点「📖 使用须知」即可 */}
         {/* task 55: 助手折叠时显示展开按钮 */}
         {assistantCollapsed && onExpandAssistant && (
-          <button className="iconbtn" data-tip="展开控制台助手" data-tip-pos="below"
-                  aria-label="展开控制台助手"
+          <button className="iconbtn" data-tip={t('game.app.topbar.expand_assistant')} data-tip-pos="below"
+                  aria-label={t('game.app.topbar.expand_assistant')}
                   onClick={onExpandAssistant}>
             <Icon name="sparkle" size={14} />
           </button>
         )}
         {panelCollapsed && (
-          <button className="iconbtn gc-topbar-expand-right" data-tip="展开右侧面板" data-tip-pos="below" onClick={onExpandPanel}>
+          <button className="iconbtn gc-topbar-expand-right" data-tip={t('game.app.topbar.expand_panel')} data-tip-pos="below" onClick={onExpandPanel}>
             <Icon name="chevron_left" size={14} />
           </button>
         )}

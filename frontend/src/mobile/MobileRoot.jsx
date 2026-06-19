@@ -16,6 +16,7 @@
      PAGES[localId]       — nav.push 进栈的实体详情页(P4+ 注册) */
 import React from 'react';
 import { useState, useCallback, useRef, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Icon } from './icons.jsx';
 import { PageHeader, Layer } from './chrome.jsx';
 import { launchSave } from './launch.js';
@@ -32,11 +33,11 @@ import { MobileAdmin } from './pages/MobileAdmin.jsx';
 import { MobileNewGame } from './pages/MobileNewGame.jsx';
 
 const TAB_DEFS = [
-  { id: 'home', label: '主页', icon: 'home', root: 'profile' },
-  { id: 'scripts', label: '剧本', icon: 'book', root: 'scripts' },
-  { id: 'saves', label: '游戏', icon: 'play', center: true, root: 'saves' },
-  { id: 'cards', label: '角色', icon: 'cards', root: 'cards' },
-  { id: 'me', label: '我的', icon: 'user', root: 'me' },
+  { id: 'home', labelKey: 'mobile.root.tab.home', icon: 'home', root: 'profile' },
+  { id: 'scripts', labelKey: 'mobile.root.tab.scripts', icon: 'book', root: 'scripts' },
+  { id: 'saves', labelKey: 'mobile.root.tab.saves', icon: 'play', center: true, root: 'saves' },
+  { id: 'cards', labelKey: 'mobile.root.tab.cards', icon: 'cards', root: 'cards' },
+  { id: 'me', labelKey: 'mobile.root.tab.me', icon: 'user', root: 'me' },
 ];
 const TAB_ROOT = { home: 'profile', scripts: 'scripts', saves: 'saves', cards: 'cards', me: 'me' };
 const ROOT_PAGES = new Set(['profile', 'scripts', 'saves', 'cards', 'me']);
@@ -73,26 +74,40 @@ const MOBILE_PAGES = {
   me: MobileMe, 'me-edit': MobileMe, 'me-settings': MobileMe, usage: MobileMe, wall: MobileMe,
   tavern: MobileTavern,
 };
-// 占位文案(按 Tab / 路由)
+// 占位文案(按 Tab / 路由)——titleKey/descKey 在组件内经 t() 解析
 const PLACEHOLDER = {
-  scripts: { title: '剧本', icon: 'book', desc: '剧本库 / 详情 / 导入的移动版正在迁移中。', phase: 'P4' },
-  cards: { title: '角色卡', icon: 'cards', desc: '用户卡 / NPC / 在线卡库的移动版正在迁移中。', phase: 'P4' },
-  me: { title: '我的', icon: 'user', desc: '个人主页 / 用量 / 成就 / 设置的移动版正在迁移中。', phase: 'P6' },
-  tavern: { title: '酒馆', icon: 'feedback', desc: '1:1 角色对话的移动版正在迁移中。', phase: 'P3' },
-  settings: { title: '设置', icon: 'settings', desc: '设置与模型管理的移动版正在迁移中。', phase: 'P6' },
+  scripts: { titleKey: 'mobile.root.placeholder.scripts.title', icon: 'book', descKey: 'mobile.root.placeholder.scripts.desc', phase: 'P4' },
+  cards: { titleKey: 'mobile.root.placeholder.cards.title', icon: 'cards', descKey: 'mobile.root.placeholder.cards.desc', phase: 'P4' },
+  me: { titleKey: 'mobile.root.placeholder.me.title', icon: 'user', descKey: 'mobile.root.placeholder.me.desc', phase: 'P6' },
+  tavern: { titleKey: 'mobile.root.placeholder.tavern.title', icon: 'feedback', descKey: 'mobile.root.placeholder.tavern.desc', phase: 'P3' },
+  settings: { titleKey: 'mobile.root.placeholder.settings.title', icon: 'settings', descKey: 'mobile.root.placeholder.settings.desc', phase: 'P6' },
 };
-const PAGE_TITLE = {
-  'scripts-import': '导入剧本', 'scripts-library': '剧本库', modules: '技能模组',
-  'saves-branches': '分支', 'cards-online': '在线角色卡库', 'cards-npc': 'NPC 卡',
-  'me-edit': '编辑资料', 'me-settings': '账户设置', usage: '用量', feedback: '反馈',
-  'settings-models': '模型', 'settings-memory': '记忆', 'settings-permissions': '权限',
-  plugins: '插件', mcp: 'MCP', skills: 'Skill', apis: 'API', wall: '成就墙',
+const PAGE_TITLE_KEYS = {
+  'scripts-import': 'mobile.root.page_title.scripts_import',
+  'scripts-library': 'mobile.root.page_title.scripts_library',
+  modules: 'mobile.root.page_title.modules',
+  'saves-branches': 'mobile.root.page_title.saves_branches',
+  'cards-online': 'mobile.root.page_title.cards_online',
+  'cards-npc': 'mobile.root.page_title.cards_npc',
+  'me-edit': 'mobile.root.page_title.me_edit',
+  'me-settings': 'mobile.root.page_title.me_settings',
+  usage: 'mobile.root.page_title.usage',
+  feedback: 'mobile.root.page_title.feedback',
+  'settings-models': 'mobile.root.page_title.settings_models',
+  'settings-memory': 'mobile.root.page_title.settings_memory',
+  'settings-permissions': 'mobile.root.page_title.settings_permissions',
+  plugins: 'mobile.root.page_title.plugins',
+  mcp: 'mobile.root.page_title.mcp',
+  skills: 'mobile.root.page_title.skills',
+  apis: 'mobile.root.page_title.apis',
+  wall: 'mobile.root.page_title.wall',
 };
 
 // nav.push 进栈的实体详情页(键为 push 的逻辑 id)
 const PAGES = { 'new-game': MobileNewGame };
 
 export function MobileRoot({ page = 'profile', setPage }) {
+  const { t } = useTranslation();
   const [stack, setStack] = useState([]);   // 页内实体详情局部栈(不改 URL)
   const [toast, setToast] = useState(null);
   const seen = useRef(new Set());
@@ -170,11 +185,16 @@ export function MobileRoot({ page = 'profile', setPage }) {
     const Comp = MOBILE_PAGES[page];
     if (Comp) return <Comp nav={nav} />;
     const isRoot = ROOT_PAGES.has(page) || page === TAB_ROOT[tab];
-    const ph = PLACEHOLDER[page] || PLACEHOLDER[tab] || { title: PAGE_TITLE[page] || page, icon: 'layers', desc: '移动版迁移中。' };
+    const pageTitleStr = PAGE_TITLE_KEYS[page] ? t(PAGE_TITLE_KEYS[page]) : page;
+    const ph = PLACEHOLDER[page] || PLACEHOLDER[tab];
+    const phTitle = ph ? t(ph.titleKey) : pageTitleStr;
+    const phDesc = ph ? t(ph.descKey) : t('mobile.root.placeholder.generic_desc');
+    const phIcon = ph ? ph.icon : 'layers';
+    const phPhase = ph ? ph.phase : undefined;
     return (
       <>
-        {!isRoot && <PageHeader title={PAGE_TITLE[page] || ph.title} onBack={() => goRoute(TAB_ROOT[tab] || 'profile')} />}
-        <Placeholder title={ph.title} icon={ph.icon} desc={ph.desc} phase={ph.phase} />
+        {!isRoot && <PageHeader title={pageTitleStr || phTitle} onBack={() => goRoute(TAB_ROOT[tab] || 'profile')} />}
+        <Placeholder title={phTitle} icon={phIcon} desc={phDesc} phase={phPhase} />
       </>
     );
   };
@@ -186,7 +206,7 @@ export function MobileRoot({ page = 'profile', setPage }) {
     return (
       <>
         <PageHeader title={item.params?.title || item.page} onBack={popLocal} />
-        <div className="pl-body"><div className="pl-pad pl-empty">页面占位</div></div>
+        <div className="pl-body"><div className="pl-pad pl-empty">{t('mobile.root.page_placeholder')}</div></div>
       </>
     );
   };
@@ -219,10 +239,10 @@ export function MobileRoot({ page = 'profile', setPage }) {
                 ) : (
                   <>
                     <span className="ic"><Icon name={td.icon} size={22} /></span>
-                    <span>{td.label}</span>
+                    <span>{t(td.labelKey)}</span>
                   </>
                 )}
-                {td.center && <span style={{ marginTop: 2 }}>{td.label}</span>}
+                {td.center && <span style={{ marginTop: 2 }}>{t(td.labelKey)}</span>}
               </button>
             ))}
           </div>

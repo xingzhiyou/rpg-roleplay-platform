@@ -17,6 +17,7 @@
  */
 import React from 'react';
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import CSButton from '@cloudscape-design/components/button';
 
@@ -39,6 +40,7 @@ import './tavern-platform.css';
 /* 专门的「选择角色」面板 —— 点一张卡即建对话并进入聊天。
  * 与「角色卡」编辑页(UserCardsView)分离:这里只负责"挑谁聊",不做增删改。 */
 function TavernCharacterSelect({ onPick, onCreateNew, onImport }) {
+  const { t } = useTranslation();
   const [cards, setCards] = useState(null);
   const [busy, setBusy] = useState(false);
   useEffect(() => {
@@ -59,16 +61,16 @@ function TavernCharacterSelect({ onPick, onCreateNew, onImport }) {
   return (
     <div className="tvp-select-wrap">
       <div className="tvp-select-head">
-        <h2 className="tvp-select-title serif">想和谁聊聊？</h2>
+        <h2 className="tvp-select-title serif">{t('tavern_page.select.heading')}</h2>
         <div className="tvp-select-actions">
-          <CSButton iconName="add-plus" onClick={onCreateNew}>新建角色卡</CSButton>
-          <CSButton iconName="upload" onClick={onImport}>导入角色卡</CSButton>
+          <CSButton iconName="add-plus" onClick={onCreateNew}>{t('tavern_page.select.new_card_btn')}</CSButton>
+          <CSButton iconName="upload" onClick={onImport}>{t('tavern_page.select.import_card_btn')}</CSButton>
         </div>
       </div>
-      {cards == null && <div className="muted-2 tvp-select-empty">加载中…</div>}
+      {cards == null && <div className="muted-2 tvp-select-empty">{t('common.loading')}</div>}
       {cards != null && cards.length === 0 && (
         <div className="tvp-select-empty muted-2">
-          还没有角色卡。点「新建角色卡」手动创建,或「导入角色卡」拖入 SillyTavern 角色卡(.png / .json / .webp)。
+          {t('tavern_page.select.empty_hint')}
         </div>
       )}
       {cards != null && cards.length > 0 && (
@@ -76,10 +78,10 @@ function TavernCharacterSelect({ onPick, onCreateNew, onImport }) {
           {cards.map((c) => (
             <button
               key={c.id} className="tvp-select-card" disabled={busy}
-              onClick={() => pick(c)} title={`与 ${c.name || '角色'} 对话`}
+              onClick={() => pick(c)} title={t('tavern_page.select.card_title', { name: c.name || t('tavern_page.char_fallback') })}
             >
               <span className="tvp-select-avatar" aria-hidden="true">{(c.name || '?').trim().slice(0, 1)}</span>
-              <span className="tvp-select-name">{c.name || '未命名角色'}</span>
+              <span className="tvp-select-name">{c.name || t('tavern_page.select.unnamed_card')}</span>
               {c.identity ? <span className="tvp-select-identity muted-2">{c.identity}</span> : null}
             </button>
           ))}
@@ -90,6 +92,7 @@ function TavernCharacterSelect({ onPick, onCreateNew, onImport }) {
 }
 
 export default function TavernPage() {
+  const { t } = useTranslation();
   /* ── 列表 / 激活态 ───────────────────────────────────────────────── */
   const [chats, setChats] = useState([]);
   const [archivedChats, setArchivedChats] = useState([]);
@@ -230,7 +233,7 @@ export default function TavernPage() {
         }
       } catch (_) {}
     } catch (e) {
-      window.__apiToast?.('打开对话失败', { kind: 'danger', detail: e?.message });
+      window.__apiToast?.(t('tavern_page.toast.open_chat_failed'), { kind: 'danger', detail: e?.message });
     }
   }, [applyState]);
 
@@ -249,7 +252,7 @@ export default function TavernPage() {
     } catch (_) {}
     if (pendingSaveId != null) {
       const hit = chats.find((c) => String(c.id) === String(pendingSaveId));
-      openChat(hit || { id: pendingSaveId, title: '新对话', character_name: '' });
+      openChat(hit || { id: pendingSaveId, title: t('tavern_page.new_chat_title'), character_name: '' });
       return;
     }
     if (chats.length > 0) { openChat(chats[0]); }
@@ -290,7 +293,7 @@ export default function TavernPage() {
   /* ── 新对话:导入卡 / 现有卡 → 拿 save_id 后打开 ───────────────────── */
   const openSaveId = useCallback(async (saveId, fallbackName) => {
     await reloadList();
-    await openChat({ id: saveId, title: fallbackName || `对话 #${saveId}`, character_name: fallbackName || '' });
+    await openChat({ id: saveId, title: fallbackName || t('tavern_page.chat_id_fallback', { id: saveId }), character_name: fallbackName || '' });
   }, [reloadList, openChat]);
 
   const onImportConfirm = useCallback(async (payload) => {
@@ -298,22 +301,22 @@ export default function TavernPage() {
     try {
       if (payload.type === 'card') {
         const r = await window.api.tavern.importCharacter(payload.file);
-        if (r && r.ok === false) throw new Error(r.error || '导入失败');
+        if (r && r.ok === false) throw new Error(r.error || t('tavern_page.toast.import_failed'));
         await openSaveId(r.save_id, r.character_name);
-        window.__apiToast?.(`已导入「${r.character_name || '角色'}」`, { kind: 'ok', duration: 2000 });
+        window.__apiToast?.(t('tavern_page.toast.imported_card', { name: r.character_name || t('tavern_page.char_fallback') }), { kind: 'ok', duration: 2000 });
       } else if (payload.type === 'card_json') {
         const r = await window.api.tavern.importCharacter({ json_string: payload.json_string });
-        if (r && r.ok === false) throw new Error(r.error || '导入失败');
+        if (r && r.ok === false) throw new Error(r.error || t('tavern_page.toast.import_failed'));
         await openSaveId(r.save_id, r.character_name);
-        window.__apiToast?.(`已导入「${r.character_name || '角色'}」`, { kind: 'ok', duration: 2000 });
+        window.__apiToast?.(t('tavern_page.toast.imported_card', { name: r.character_name || t('tavern_page.char_fallback') }), { kind: 'ok', duration: 2000 });
       } else if (payload.type === 'chat') {
         const r = await window.api.tavern.importJsonl(payload.jsonl, payload.charName);
-        if (r && r.ok === false) throw new Error(r.error || '导入失败');
+        if (r && r.ok === false) throw new Error(r.error || t('tavern_page.toast.import_failed'));
         await openSaveId(r.save_id, payload.charName);
-        window.__apiToast?.(`已导入聊天记录(${r.commits_imported || 0} 条)`, { kind: 'ok', duration: 2200 });
+        window.__apiToast?.(t('tavern_page.toast.imported_chat', { count: r.commits_imported || 0 }), { kind: 'ok', duration: 2200 });
       }
     } catch (e) {
-      window.__apiToast?.('导入失败', { kind: 'danger', detail: e?.message });
+      window.__apiToast?.(t('tavern_page.toast.import_failed'), { kind: 'danger', detail: e?.message });
     }
   }, [openSaveId]);
 
@@ -321,16 +324,16 @@ export default function TavernPage() {
   const onDropCard = useCallback(async (file) => {
     if (!file) return;
     if (!/\.(png|json|webp)$/i.test(file.name || '')) {
-      window.__apiToast?.('仅支持 .png / .json / .webp 角色卡', { kind: 'warn', duration: 2400 });
+      window.__apiToast?.(t('tavern_page.toast.unsupported_file'), { kind: 'warn', duration: 2400 });
       return;
     }
     try {
       const r = await window.api.tavern.importCharacter(file);
-      if (r && r.ok === false) throw new Error(r.error || '导入失败');
+      if (r && r.ok === false) throw new Error(r.error || t('tavern_page.toast.import_failed'));
       await openSaveId(r.save_id, r.character_name);
-      window.__apiToast?.(`已导入「${r.character_name || '角色'}」`, { kind: 'ok', duration: 2000 });
+      window.__apiToast?.(t('tavern_page.toast.imported_card', { name: r.character_name || t('tavern_page.char_fallback') }), { kind: 'ok', duration: 2000 });
     } catch (e) {
-      window.__apiToast?.('导入失败', { kind: 'danger', detail: e?.message });
+      window.__apiToast?.(t('tavern_page.toast.import_failed'), { kind: 'danger', detail: e?.message });
     }
   }, [openSaveId]);
 
@@ -383,7 +386,7 @@ export default function TavernPage() {
       // tool-op:flush 模型(turnToolOps 整组快照)。
       onToolCall: (data, ctx) => {
         turnToolOpsRef.current.push({
-          tool: (data && data.tool) || '工具',
+          tool: (data && data.tool) || t('tavern_page.tool_fallback'),
           args: data && data.arguments,
           result: undefined, ok: undefined, error: undefined, _pending: true,
         });
@@ -393,7 +396,7 @@ export default function TavernPage() {
         const turnToolOps = turnToolOpsRef.current;
         let op = null;
         for (let i = turnToolOps.length - 1; i >= 0; i--) { if (turnToolOps[i]._pending) { op = turnToolOps[i]; break; } }
-        if (!op) { op = { tool: '工具', args: undefined }; turnToolOps.push(op); }
+        if (!op) { op = { tool: t('tavern_page.tool_fallback'), args: undefined }; turnToolOps.push(op); }
         op._pending = false;
         op.ok = data ? data.ok !== false : true;
         op.result = data && data.result;
@@ -433,10 +436,10 @@ export default function TavernPage() {
         if (isCredentialsError(realMsg)) {
           setNeedsCreds(true);
           h.setHasError(false);
-          window.__apiToast?.('需要配置模型 Key', { kind: 'warn', detail: '请先添加一把对话模型的 API Key,再重试。', duration: 4500 });
+          window.__apiToast?.(t('tavern_page.toast.needs_key_title'), { kind: 'warn', detail: t('tavern_page.toast.needs_key_detail'), duration: 4500 });
         } else {
           h.setHasError(realMsg || true);
-          window.__apiToast?.('生成失败', { kind: 'danger', detail: realMsg || '请重试' });
+          window.__apiToast?.(t('tavern_page.toast.gen_failed'), { kind: 'danger', detail: realMsg || t('tavern_page.toast.retry_hint') });
         }
         h.restoreFailedDraft();
       },
@@ -448,7 +451,7 @@ export default function TavernPage() {
     if (!text.trim() && !attachments.length && !pickedCommand) return;
     const opts = { attachments: attachments.slice(), command: pickedCommand?.id || null };
     setAttachments([]); setPickedCommand(null);
-    startRun(text.trim() || (pickedCommand ? (pickedCommand.trigger || '').trim() : '（仅附件,请基于本轮上下文推进。）'), opts);
+    startRun(text.trim() || (pickedCommand ? (pickedCommand.trigger || '').trim() : t('tavern_page.attachment_only_msg')), opts);
   };
   const onSendRaw = useCallback((raw) => {
     const t2 = (raw || '').trim();
@@ -516,16 +519,16 @@ export default function TavernPage() {
           [`${cap.prefPrefix}.api_id`]: aid,
           [`${cap.prefPrefix}.model_real_name`]: model,
         });
-      } catch (e) { window.__apiToast?.('保存偏好失败', { kind: 'danger', detail: e?.message }); }
+      } catch (e) { window.__apiToast?.(t('tavern_page.toast.save_prefs_failed'), { kind: 'danger', detail: e?.message }); }
     }
     await _clearConfig(handleId);
-    if (!running) startRun(`用 ${model || cap.label} 生成`);
+    if (!running) startRun(t('tavern_page.config_gen_prompt', { model: model || cap.label }));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [running, startRun]);
   // mode "missing_key":配好后「继续」
   const onConfigContinue = useCallback(async (handleId, item, label) => {
     await _clearConfig(handleId);
-    if (!running) startRun(label || '继续');
+    if (!running) startRun(label || t('tavern_page.config_continue_prompt'));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [running, startRun]);
   const onConfigSettings = useCallback(() => { try { window.location.hash = 'settings-models'; } catch (_) {} }, []);
@@ -535,14 +538,14 @@ export default function TavernPage() {
     const item = hardConfigItem; if (!item) return;
     setHardConfigItem(null);
     await _clearConfig({ id: item.id != null ? item.id : null, index: null });
-    if (!running) startRun(`用 ${chosenModel || item.model || ''} 生成`);
+    if (!running) startRun(t('tavern_page.config_gen_prompt', { model: chosenModel || item.model || '' }));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hardConfigItem, running, startRun]);
   const onHardCancel = useCallback(async () => {
     const item = hardConfigItem; if (!item) { setHardConfigItem(null); return; }
     setHardConfigItem(null);
     await _clearConfig({ id: item.id != null ? item.id : null, index: null });
-    window.__apiToast?.('已取消生成', { kind: 'info', duration: 2000 });
+    window.__apiToast?.(t('tavern_page.toast.gen_cancelled'), { kind: 'info', duration: 2000 });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hardConfigItem]);
 
@@ -569,14 +572,14 @@ export default function TavernPage() {
       }
       return;
     }
-    const fixtures = { world: { name: '世界书', kind: 'world' }, mcp: { name: 'MCP', kind: 'mcp' }, skill: { name: 'Skill', kind: 'skill' } };
-    setAttachments((a) => [...a, fixtures[item.id] || { name: item.label || '附件', kind: 'file' }]);
+    const fixtures = { world: { name: t('tavern_page.attach.worldbook'), kind: 'world' }, mcp: { name: 'MCP', kind: 'mcp' }, skill: { name: 'Skill', kind: 'skill' } };
+    setAttachments((a) => [...a, fixtures[item.id] || { name: item.label || t('tavern_page.attach.file_fallback'), kind: 'file' }]);
   };
   const onFilePicked = (e) => {
     const f = e.target && e.target.files && e.target.files[0];
     if (!f) return;
     const kind = (pendingAttachRef.current && pendingAttachRef.current.kind) || 'file';
-    if (f.size > 12 * 1024 * 1024) { window.__apiToast?.('文件过大(上限 12MB)', { kind: 'warn', duration: 2400 }); return; }
+    if (f.size > 12 * 1024 * 1024) { window.__apiToast?.(t('tavern_page.toast.file_too_large'), { kind: 'warn', duration: 2400 }); return; }
     const reader = new FileReader();
     reader.onload = () => setAttachments((a) => [...a, { name: f.name, type: f.type || 'application/octet-stream', data_url: String(reader.result || ''), kind }]);
     reader.readAsDataURL(f);
@@ -590,7 +593,7 @@ export default function TavernPage() {
         if (history[i]?.role === 'user' && (history[i].content || '').trim()) { t2 = history[i].content.trim(); break; }
       }
     }
-    if (!t2) { window.__apiToast?.('没有可重试的输入', { kind: 'warn', duration: 2000 }); return; }
+    if (!t2) { window.__apiToast?.(t('tavern_page.toast.no_retry_input'), { kind: 'warn', duration: 2000 }); return; }
     setHasError(false);
     setHistory((h) => {
       const out = [...h];
@@ -612,40 +615,40 @@ export default function TavernPage() {
   const doRename = useCallback(async (chat, title) => {
     try {
       await window.api.tavern.rename(chat.id, title);
-      window.__apiToast?.('已重命名', { kind: 'ok', duration: 1500 });
+      window.__apiToast?.(t('tavern_page.toast.renamed'), { kind: 'ok', duration: 1500 });
       reloadList();
       if (String(chat.id) === String(activeId)) setActiveChat((p) => ({ ...(p || {}), title }));
-    } catch (e) { window.__apiToast?.('重命名失败', { kind: 'danger', detail: e?.message }); }
+    } catch (e) { window.__apiToast?.(t('tavern_page.toast.rename_failed'), { kind: 'danger', detail: e?.message }); }
   }, [reloadList, activeId]);
 
   const doArchive = useCallback(async (chat, archived) => {
     try {
       await window.api.tavern.archive(chat.id, archived);
-      window.__apiToast?.(archived ? '已归档' : '已取消归档', { kind: 'ok', duration: 1500 });
+      window.__apiToast?.(archived ? t('tavern_page.toast.archived') : t('tavern_page.toast.unarchived'), { kind: 'ok', duration: 1500 });
       reloadList();
-    } catch (e) { window.__apiToast?.('归档失败', { kind: 'danger', detail: e?.message }); }
+    } catch (e) { window.__apiToast?.(t('tavern_page.toast.archive_failed'), { kind: 'danger', detail: e?.message }); }
   }, [reloadList]);
 
   const doDelete = useCallback(async (chat) => {
     setDeleteTarget(null);
     try {
       await window.api.tavern.remove(chat.id);
-      window.__apiToast?.('已删除', { kind: 'ok', duration: 1500 });
+      window.__apiToast?.(t('tavern_page.toast.deleted'), { kind: 'ok', duration: 1500 });
       if (String(chat.id) === String(activeId)) {
         setActiveId(null); setActiveChat(null); setHistory([]); setCharacter(null); setPersona(null);
       }
       reloadList();
-    } catch (e) { window.__apiToast?.('删除失败', { kind: 'danger', detail: e?.message }); }
+    } catch (e) { window.__apiToast?.(t('tavern_page.toast.delete_failed'), { kind: 'danger', detail: e?.message }); }
   }, [reloadList, activeId]);
 
   const onSavePersona = useCallback(async (payload) => {
     try {
       const saved = await window.api.cards.myUpsert(payload);
-      window.__apiToast?.('persona 已保存', { kind: 'ok', duration: 1500 });
+      window.__apiToast?.(t('tavern_page.toast.persona_saved'), { kind: 'ok', duration: 1500 });
       try { const d = await window.api.game.state(); applyState(d); } catch (_) {}
       return saved;
     } catch (e) {
-      window.__apiToast?.('保存失败', { kind: 'danger', detail: e?.message });
+      window.__apiToast?.(t('tavern_page.toast.save_failed'), { kind: 'danger', detail: e?.message });
       throw e;
     }
   }, [applyState]);
@@ -659,19 +662,19 @@ export default function TavernPage() {
     if (activeId == null) return;
     try {
       await window.api.tavern.setSystemPrompt(activeId, val);
-      window.__apiToast?.('系统提示词已保存', { kind: 'ok', duration: 1500 });
+      window.__apiToast?.(t('tavern_page.toast.system_prompt_saved'), { kind: 'ok', duration: 1500 });
       try { const d = await window.api.game.state(); applyState(d); } catch (_) {}
     } catch (e) {
-      window.__apiToast?.('保存失败', { kind: 'danger', detail: e?.message });
+      window.__apiToast?.(t('tavern_page.toast.save_failed'), { kind: 'danger', detail: e?.message });
       throw e;
     }
   }, [activeId, applyState]);
 
   /* ── 派生 ──────────────────────────────────────────────────────── */
-  const charName = (character && character.name) || (activeChat && activeChat.character_name) || '角色';
+  const charName = (character && character.name) || (activeChat && activeChat.character_name) || t('tavern_page.char_fallback');
   const charInitial = charName.trim().slice(0, 1);
   const charAvatar = (character && character.avatar_path) || (activeChat && activeChat.avatar_path) || null;
-  const personaName = (persona && persona.name) || '你';
+  const personaName = (persona && persona.name) || t('tavern_page.persona_fallback');
   const exportUrl = activeId != null ? window.api.tavern.exportJsonl(activeId) : null;
 
   // 空起手(决策1):新建对话默认建「无角色」对话,由 agent 在对话里用 set_tavern_character
@@ -679,11 +682,11 @@ export default function TavernPage() {
   const newChat = async () => {
     try {
       const r = await window.api.tavern.create({});
-      if (r && r.ok === false) throw new Error(r.error || '新建失败');
+      if (r && r.ok === false) throw new Error(r.error || t('tavern_page.toast.new_chat_failed'));
       const sid = r && r.save && r.save.id;
       if (sid != null) { setView('chat'); await openSaveId(sid, ''); }
     } catch (e) {
-      window.__apiToast?.('新建对话失败', { kind: 'danger', detail: e?.message });
+      window.__apiToast?.(t('tavern_page.toast.new_chat_failed'), { kind: 'danger', detail: e?.message });
     }
   };
 
@@ -692,11 +695,11 @@ export default function TavernPage() {
     if (!card || card.id == null) return;
     try {
       const r = await window.api.tavern.create({ character_card_id: card.id });
-      if (r && r.ok === false) throw new Error(r.error || '开始对话失败');
+      if (r && r.ok === false) throw new Error(r.error || t('tavern_page.toast.start_chat_failed'));
       const sid = r && r.save && r.save.id;
       if (sid != null) { setView('chat'); await openSaveId(sid, card.name || ''); }
     } catch (e) {
-      window.__apiToast?.('开始对话失败', { kind: 'danger', detail: e?.message });
+      window.__apiToast?.(t('tavern_page.toast.start_chat_failed'), { kind: 'danger', detail: e?.message });
     }
   };
 
@@ -716,7 +719,7 @@ export default function TavernPage() {
   // 生成中的实时计时改在「正在思考」气泡里显示,都不再浮在页脚右下角。
   const _fmtK = (n) => { n = Number(n) || 0; return n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(n); };
   const lastMeta = (!running && lastUsage && (lastUsage.input_tokens || lastUsage.output_tokens))
-    ? `⏱ ${fmtElapsed(elapsedMs)} · ↑${_fmtK(lastUsage.input_tokens)}${lastUsage.cached_input_tokens ? `(缓存${_fmtK(lastUsage.cached_input_tokens)})` : ''} ↓${_fmtK(lastUsage.output_tokens)}${lastUsage.cost_usd ? ` · $${Number(lastUsage.cost_usd).toFixed(4)}` : ''}`
+    ? `⏱ ${fmtElapsed(elapsedMs)} · ↑${_fmtK(lastUsage.input_tokens)}${lastUsage.cached_input_tokens ? `(${t('tavern_page.meta.cached')}${_fmtK(lastUsage.cached_input_tokens)})` : ''} ↓${_fmtK(lastUsage.output_tokens)}${lastUsage.cost_usd ? ` · $${Number(lastUsage.cost_usd).toFixed(4)}` : ''}`
     : null;
 
   /* ══════════════════════════════════════════════════════════════ */
@@ -730,7 +733,7 @@ export default function TavernPage() {
         {/* 上段(固定):新建 / 角色卡 / 快捷模型 */}
         <div className="tvp-side-top">
           <CSButton variant="primary" iconName="add-plus" onClick={newChat} fullWidth>
-            新建对话
+            {t('tavern_page.sidebar.new_chat')}
           </CSButton>
           <CSButton
             variant={view === 'select' ? 'normal' : 'link'}
@@ -738,7 +741,7 @@ export default function TavernPage() {
             onClick={() => setView('select')}
             fullWidth
           >
-            选择角色
+            {t('tavern_page.sidebar.select_char')}
           </CSButton>
           <CSButton
             variant={view === 'cards' ? 'normal' : 'link'}
@@ -746,7 +749,7 @@ export default function TavernPage() {
             onClick={() => setView('cards')}
             fullWidth
           >
-            角色卡(编辑)
+            {t('tavern_page.sidebar.char_cards')}
           </CSButton>
           <CSButton
             variant="link"
@@ -754,7 +757,7 @@ export default function TavernPage() {
             onClick={() => setParamsOpen(true)}
             fullWidth
           >
-            模型参数
+            {t('tavern_page.sidebar.model_params')}
           </CSButton>
         </div>
 
@@ -765,13 +768,13 @@ export default function TavernPage() {
           onDragLeave={(e) => e.currentTarget.classList.remove('tvp-drop')}
           onDrop={(e) => { e.preventDefault(); e.currentTarget.classList.remove('tvp-drop'); const f = e.dataTransfer?.files?.[0]; if (f) onDropCard(f); }}
         >
-          <div className="tvp-list-label">历史对话</div>
-          {loadingList && <div className="tv-rail-empty muted-2">加载中…</div>}
+          <div className="tvp-list-label">{t('tavern_page.sidebar.history_label')}</div>
+          {loadingList && <div className="tv-rail-empty muted-2">{t('common.loading')}</div>}
           {!loadingList && chats.length === 0 && (
             <div className="tv-rail-empty muted-2">
               <Icon name="upload" size={20} style={{ opacity: 0.5, marginBottom: 6 }} />
-              <div>还没有对话</div>
-              <div style={{ fontSize: 11.5, marginTop: 4 }}>点「新建对话」或拖入一张角色卡</div>
+              <div>{t('tavern_page.sidebar.no_chats')}</div>
+              <div style={{ fontSize: 11.5, marginTop: 4 }}>{t('tavern_page.sidebar.no_chats_hint')}</div>
             </div>
           )}
           {chats.map((c) => (
@@ -789,7 +792,7 @@ export default function TavernPage() {
             <div className="tv-archived-section">
               <button className="tv-archived-toggle" onClick={() => setShowArchived((v) => !v)}>
                 <Icon name={showArchived ? 'chevron_down' : 'chevron_right'} size={12} />
-                已归档 ({archivedChats.length})
+                {t('tavern_page.sidebar.archived_label', { count: archivedChats.length })}
               </button>
               {showArchived && archivedChats.map((c) => (
                 <TavernChatItem
@@ -829,11 +832,11 @@ export default function TavernPage() {
           <div className="tvp-hero">
             <div className="tvp-hero-inner">
               <div className="tvp-hero-mark" aria-hidden="true">✻</div>
-              <h1 className="tvp-hero-title serif">想和谁聊聊？</h1>
-              <p className="tvp-hero-sub muted">新建一段对话,或从角色卡里挑一位。</p>
+              <h1 className="tvp-hero-title serif">{t('tavern_page.hero.heading')}</h1>
+              <p className="tvp-hero-sub muted">{t('tavern_page.hero.sub')}</p>
               <div className="tvp-hero-actions">
-                <CSButton variant="primary" iconName="add-plus" onClick={newChat}>新建对话</CSButton>
-                <CSButton iconName="user-profile" onClick={() => setView('select')}>选择角色</CSButton>
+                <CSButton variant="primary" iconName="add-plus" onClick={newChat}>{t('tavern_page.sidebar.new_chat')}</CSButton>
+                <CSButton iconName="user-profile" onClick={() => setView('select')}>{t('tavern_page.sidebar.select_char')}</CSButton>
               </div>
               <div
                 className="tvp-hero-drop"
@@ -844,30 +847,30 @@ export default function TavernPage() {
                 role="button" tabIndex={0}
               >
                 <Icon name="upload" size={22} style={{ color: 'var(--accent)' }} />
-                <div className="tvp-hero-drop-sub muted-2">或把角色卡(.png / .json / .webp)拖到这里</div>
+                <div className="tvp-hero-drop-sub muted-2">{t('tavern_page.hero.drop_hint')}</div>
               </div>
             </div>
           </div>
         ) : (
           <>
             <header className="tvp-chat-head">
-              <button className="tvp-chat-title" onClick={() => setDrawerOpen(true)} data-tip="角色 / persona">
+              <button className="tvp-chat-title" onClick={() => setDrawerOpen(true)} data-tip={t('tavern_page.header.char_persona_tip')}>
                 <span className="tvp-chat-name">{charName}</span>
                 <Icon name="chevron_down" size={12} style={{ opacity: 0.5 }} />
               </button>
               <div className="tvp-chat-head-actions">
                 {running && (
-                  <span className="tvp-timer" aria-live="polite" data-tip="本轮用时">
+                  <span className="tvp-timer" aria-live="polite" data-tip={t('tavern_page.header.elapsed_tip')}>
                     <span className="tvp-timer-dot" />
                     {fmtElapsed(elapsedMs)}
                   </span>
                 )}
                 {exportUrl && (
-                  <button className="iconbtn" onClick={() => setExportTarget(activeChat || { id: activeId })} data-tip="导出 JSONL">
+                  <button className="iconbtn" onClick={() => setExportTarget(activeChat || { id: activeId })} data-tip={t('tavern_page.header.export_tip')}>
                     <Icon name="download" size={15} />
                   </button>
                 )}
-                <button className="iconbtn" onClick={() => setDrawerOpen(true)} data-tip="角色卡 / persona">
+                <button className="iconbtn" onClick={() => setDrawerOpen(true)} data-tip={t('tavern_page.header.char_persona_tip')}>
                   <Icon name="cards" size={15} />
                 </button>
               </div>
@@ -901,8 +904,8 @@ export default function TavernPage() {
                   <div className="gc-confirm-marker"><Icon name="warn" size={12} /></div>
                   <div className="gc-confirm-body">
                     <div className="gc-confirm-row1">
-                      <span className="gc-confirm-tag">需要 KEY</span>
-                      <span className="gc-confirm-text serif">还没有可用的对话模型 Key。添加一把后即可继续对话。</span>
+                      <span className="gc-confirm-tag">{t('tavern_page.creds_card.tag')}</span>
+                      <span className="gc-confirm-text serif">{t('tavern_page.creds_card.body')}</span>
                     </div>
                     <div className="gc-config-inline">
                       <AgentModelPicker
@@ -912,15 +915,15 @@ export default function TavernPage() {
                       />
                       <div className="gc-confirm-actions">
                         <button className="gc-chip-btn gc-chip-primary" onClick={() => { setNeedsCreds(false); onRetry(); }}>
-                          重试
+                          {t('tavern_page.creds_card.retry_btn')}
                         </button>
                         <button className="gc-chip-btn" onClick={() => { try { window.location.hash = 'settings-models'; } catch (_) {} }}>
-                          <Icon name="settings" size={11} /> 去设置
+                          <Icon name="settings" size={11} /> {t('tavern_page.creds_card.settings_btn')}
                         </button>
                       </div>
                     </div>
                   </div>
-                  <button className="iconbtn" onClick={() => setNeedsCreds(false)} title="忽略"><Icon name="close" size={11} /></button>
+                  <button className="iconbtn" onClick={() => setNeedsCreds(false)} title={t('tavern_page.creds_card.dismiss_tip')}><Icon name="close" size={11} /></button>
                 </div>
               )}
               {/* 完全复用游戏页 Composer:同一组件、同一组控件(+ / 继续 / 完全访问 / 模型 / context 圆环),
@@ -966,8 +969,8 @@ export default function TavernPage() {
         <div className="tv-drawer-backdrop" onClick={() => setParamsOpen(false)}>
           <div className="tv-drawer" onClick={(e) => e.stopPropagation()}>
             <header className="tv-drawer-head">
-              <strong style={{ fontSize: 14 }}>模型参数</strong>
-              <button className="iconbtn" onClick={() => setParamsOpen(false)} data-tip="关闭">
+              <strong style={{ fontSize: 14 }}>{t('tavern_page.params_drawer.title')}</strong>
+              <button className="iconbtn" onClick={() => setParamsOpen(false)} data-tip={t('common.close')}>
                 <Icon name="close" size={15} />
               </button>
             </header>
@@ -984,9 +987,9 @@ export default function TavernPage() {
 
       <ConfirmModal
         open={!!deleteTarget}
-        title="删除对话?"
-        body={<>这将永久删除「<strong>{deleteTarget?.title || deleteTarget?.character_name || ''}</strong>」及其全部聊天记录,无法恢复。</>}
-        confirmLabel="删除"
+        title={t('tavern_page.delete_modal.title')}
+        body={<>{t('tavern_page.delete_modal.body_prefix')}<strong>{deleteTarget?.title || deleteTarget?.character_name || ''}</strong>{t('tavern_page.delete_modal.body_suffix')}</>}
+        confirmLabel={t('common.delete')}
         danger
         onClose={() => setDeleteTarget(null)}
         onConfirm={() => deleteTarget && doDelete(deleteTarget)}
@@ -994,9 +997,9 @@ export default function TavernPage() {
 
       <ConfirmModal
         open={!!exportTarget}
-        title="导出聊天记录?"
-        body={<>将「<strong>{exportTarget?.title || exportTarget?.character_name || charName}</strong>」的完整对话(含开场)导出为 SillyTavern JSONL 文件,可重新导入。</>}
-        confirmLabel="导出"
+        title={t('tavern_page.export_modal.title')}
+        body={<>{t('tavern_page.export_modal.body_prefix')}<strong>{exportTarget?.title || exportTarget?.character_name || charName}</strong>{t('tavern_page.export_modal.body_suffix')}</>}
+        confirmLabel={t('tavern_page.export_modal.confirm_btn')}
         onClose={() => setExportTarget(null)}
         onConfirm={() => { const u = exportUrl; setExportTarget(null); if (u) window.open(u, '_blank', 'noopener'); }}
       />

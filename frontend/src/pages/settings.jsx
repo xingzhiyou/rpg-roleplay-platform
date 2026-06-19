@@ -748,7 +748,7 @@ function ModelsSection() {
               } catch (e) {
                 if (e?.status === 403) {
                   // 普通用户改全局 catalog 被拒,提示但不阻断 key 保存
-                  window.__apiToast?.("提供商 base_url 需管理员修改,你的 API 密钥仍会保存", { kind: "warn", duration: 3500 });
+                  window.__apiToast?.(t('settings.more.edit_api.admin_base_url_warn'), { kind: "warn", duration: 3500 });
                 } else {
                   throw e;
                 }
@@ -1014,7 +1014,7 @@ function EditApiModal({ open, api, isNew, isAdminUser = false, onClose, onConfir
             {isAgentPlatform ? (
               <CSFormField
                 label="Service Account JSON"
-                description={api?.key_set ? `已配置 SA (${api.key_hint || '已加密'})，留空保持不变` : '请粘贴 Google Cloud Service Account JSON 文件内容'}
+                description={api?.key_set ? t('settings.more.edit_api.sa_desc_set', { hint: api.key_hint || t('settings.more.edit_api.sa_encrypted') }) : t('settings.more.edit_api.sa_desc_new')}
               >
                 <textarea
                   rows={6}
@@ -1027,12 +1027,12 @@ function EditApiModal({ open, api, isNew, isAdminUser = false, onClose, onConfir
                 />
                 {form.api_key.trim() && !_saJsonValid && (
                   <div style={{ color: 'var(--color-text-status-error, #d91515)', fontSize: '12px', marginTop: '4px' }}>
-                    JSON 格式错误或缺少必填字段 (project_id / client_email / private_key)
+                    {t('settings.more.edit_api.sa_json_invalid')}
                   </div>
                 )}
                 {_saJsonValid && (
                   <div style={{ color: 'var(--color-text-status-success, #1a7e3c)', fontSize: '12px', marginTop: '4px' }}>
-                    SA JSON 有效 · project: {(() => { try { return JSON.parse(form.api_key).project_id; } catch { return ''; } })()}
+                    {t('settings.more.edit_api.sa_json_valid', { project: (() => { try { return JSON.parse(form.api_key).project_id; } catch { return ''; } })() })}
                   </div>
                 )}
               </CSFormField>
@@ -1440,7 +1440,7 @@ function ApiModelsList({ api, onToggleModel, onRenameModel }) {
               key={c}
               className={`pl-cap-tag clickable ${capFilter === c ? "active" : ""}`}
               onClick={() => setCapFilter(capFilter === c ? null : c)}
-              data-tip={`筛选含『${t('settings.capabilities.' + c, { defaultValue: CAP_LABEL[c] || c })}』能力的模型`}
+              data-tip={t('settings.more.model_list.cap_filter_tip', { cap: t('settings.capabilities.' + c, { defaultValue: CAP_LABEL[c] || c }) })}
             >
               {t('settings.capabilities.' + c, { defaultValue: CAP_LABEL[c] || c })}
             </button>
@@ -1499,7 +1499,7 @@ function ApiModelsList({ api, onToggleModel, onRenameModel }) {
                 <span className="mono muted">
                   {/* Wave 11-C: 优先展示 typed ModelInfo pricing(per million),兼容旧 price 字符串 */}
                   {m.input_cost_per_million != null
-                    ? <span data-tip={`输入 $${m.input_cost_per_million}/M · 输出 $${m.output_cost_per_million ?? "?"}/M`}>
+                    ? <span data-tip={t('settings.more.model_list.price_tip', { input: m.input_cost_per_million, output: m.output_cost_per_million ?? '?' })}>
                         {fmtPrice(m.input_cost_per_million)} / {fmtPrice(m.output_cost_per_million)}
                       </span>
                     : (m.price || "—")}
@@ -1514,7 +1514,7 @@ function ApiModelsList({ api, onToggleModel, onRenameModel }) {
                   {/* Wave 11-C: 优先展示 typed context_window,兼容旧 context 字符串 */}
                   {m.context_window != null ? fmtCtx(m.context_window) : (m.context || "—")}
                   {m.max_output_tokens != null && (
-                    <div className="muted-2" style={{fontSize: 10}} data-tip={`最大输出 ${fmtCtx(m.max_output_tokens)} tokens`}>
+                    <div className="muted-2" style={{fontSize: 10}} data-tip={t('settings.more.model_list.max_output_tip', { n: fmtCtx(m.max_output_tokens) })}>
                       ↑{fmtCtx(m.max_output_tokens)}
                     </div>
                   )}
@@ -1531,8 +1531,8 @@ function ApiModelsList({ api, onToggleModel, onRenameModel }) {
                   <span style={{fontSize: 11}} className="muted-2">
                     {/* Wave 11-C: catalog 数据来源 */}
                     {m.source ? (
-                      <span className="pl-cap-tag" data-tip={`数据来源: ${sourceLabel(m.source)}`} style={{fontSize: 10}}>
-                        {sourceLabel(m.source)}
+                      <span className="pl-cap-tag" data-tip={`${t('settings.more.source_label_tip')}: ${sourceLabel(m.source, t)}`} style={{fontSize: 10}}>
+                        {sourceLabel(m.source, t)}
                       </span>
                     ) : "—"}
                     {isDeprecated && (
@@ -1693,11 +1693,11 @@ const CAP_LABEL = window.CAP_LABEL;
 const capFlags = window.capFlags;
 
 /** @param {import("../types/rust/catalog/CatalogSource").CatalogSource} source */
-function sourceLabel(source) {
+function sourceLabel(source, _t) {
   const MAP = {
     LiveApi:        "Live API",
     StaticCatalog:  "Static",
-    UserOverride:   "用户覆盖",
+    UserOverride:   _t ? _t('settings.more.source_user_override') : "User Override",
     OpenRouterProxy:"OpenRouter Proxy",
   };
   return MAP[source] || source || "—";
@@ -1835,7 +1835,7 @@ const PROVIDERS_CONFIG = [
     defaultBase: "https://openrouter.ai/api/v1",
     keyEnv: "OPENROUTER_API_KEY",
     special: "openrouter",
-    note: "可填中转站 OpenAI-compat 端点（如 https://your-proxy.com/v1），鉴权方式不变（Bearer）",
+    noteKey: "settings.more.providers.note_openrouter",
   },
   {
     id: "deepseek",     name: "DeepSeek",       kind: "openai_compat",
@@ -1875,14 +1875,14 @@ const PROVIDERS_CONFIG = [
     special: "agent_platform",
     // 用户级 SA 已真接通 (vertex.py / embedding.py / model_probe 全部走用户 SA)
     // EditApiModal 检测 special === 'agent_platform' 时自动隐藏 base_url + api_key 改 SA JSON textarea
-    note: "上传 Service Account JSON（含 client_email / private_key / project_id）",
+    noteKey: "settings.more.providers.note_agent_platform",
   },
   {
     id: "dashscope",  name: "DashScope (Qwen)", kind: "openai_compat",
     defaultBase: "https://dashscope.aliyuncs.com/compatible-mode/v1",
     keyEnv: "DASHSCOPE_API_KEY",
     special: "alibaba_qwen",
-    note: "支持 OpenAI-compat 模式（/compatible-mode/v1）或 native DashScope 协议",
+    noteKey: "settings.more.providers.note_dashscope",
   },
 ];
 
@@ -2023,7 +2023,7 @@ function ProviderCard({ provider: p, cred, isSaving, agentPlatformJson, agentPla
           <CSSpaceBetween direction="horizontal" size="xs" alignItems="center">
             <div>
               <CSBox fontWeight="bold">{p.name}</CSBox>
-              <CSBox color="text-body-secondary" fontSize="body-s">{p.note}</CSBox>
+              <CSBox color="text-body-secondary" fontSize="body-s">{p.noteKey ? t(p.noteKey) : p.note}</CSBox>
             </div>
             {cred.has_key && <CSStatusIndicator type="success">{t('settings.providers.configured')}</CSStatusIndicator>}
           </CSSpaceBetween>
@@ -2069,7 +2069,7 @@ function ProviderCard({ provider: p, cred, isSaving, agentPlatformJson, agentPla
           <CSSpaceBetween direction="horizontal" size="xs" alignItems="center">
             <div>
               <CSBox fontWeight="bold">{p.name}</CSBox>
-              <CSBox color="text-body-secondary" fontSize="body-s">{p.note}</CSBox>
+              <CSBox color="text-body-secondary" fontSize="body-s">{p.noteKey ? t(p.noteKey) : p.note}</CSBox>
             </div>
             {cred.has_key && <CSStatusIndicator type="success">{t('settings.providers.configured')}</CSStatusIndicator>}
           </CSSpaceBetween>
@@ -2113,7 +2113,7 @@ function ProviderCard({ provider: p, cred, isSaving, agentPlatformJson, agentPla
         <CSSpaceBetween key="hdr" direction="horizontal" size="xs" alignItems="center">
           <div>
             <CSBox fontWeight="bold">{p.name}</CSBox>
-            {p.note && <CSBox color="text-body-secondary" fontSize="body-s">{p.note}</CSBox>}
+            {(p.note || p.noteKey) && <CSBox color="text-body-secondary" fontSize="body-s">{p.noteKey ? t(p.noteKey) : p.note}</CSBox>}
           </div>
           {cred.has_key && <CSStatusIndicator type="success">{t('settings.providers.configured')}</CSStatusIndicator>}
         </CSSpaceBetween>
@@ -2456,28 +2456,28 @@ function ModuleModelsSection() {
   // agent-modules.js(语义统一 #19);label / tip 文案为桌面端专属(比移动端详尽,且后续 i18n),
   // 故保留在本地按 id 取 → 显示零变化。
   const LABELS = {
-    gm: "主 GM 默认模型", sub_agent: "上下文子代理", set_parser: "指令解析代理",
-    console: "剧本编辑器 · AI 助手", editor: "剧本编辑器 · AI 续写/改写", extractor: "叙事提取器", card_gen: "角色卡生成器",
-    card_import: "AI 整理卡字段", critic: "一致性评分", verifier: "接受条件验证",
-    phase_digest: "阶段浓缩 (compact)", black_swan: "黑天鹅事件代理", agent: "通用子代理兜底",
-    embedder: "向量嵌入 (RAG)", image_gen: "图像生成模型",
+    gm: t('settings.more.modules.label_gm'), sub_agent: t('settings.more.modules.label_sub_agent'), set_parser: t('settings.more.modules.label_set_parser'),
+    console: t('settings.more.modules.label_console'), editor: t('settings.more.modules.label_editor'), extractor: t('settings.more.modules.label_extractor'), card_gen: t('settings.more.modules.label_card_gen'),
+    card_import: t('settings.more.modules.label_card_import'), critic: t('settings.more.modules.label_critic'), verifier: t('settings.more.modules.label_verifier'),
+    phase_digest: t('settings.more.modules.label_phase_digest'), black_swan: t('settings.more.modules.label_black_swan'), agent: t('settings.more.modules.label_agent'),
+    embedder: t('settings.more.modules.label_embedder'), image_gen: t('settings.more.modules.label_image_gen'),
   };
   const TIPS = {
-    gm: "玩家对话默认使用的主模型。这里选择后会写入个人默认模型,新开局和未单独切模型的存档会优先使用它。",
-    sub_agent: "整理玩家意图 + 检索计划的子代理;跟随主 GM = 跟主 GM 共享实例。",
-    set_parser: "/set 命令自然语言解析子代理。",
-    console: "剧本编辑器右栏 AI 助手(直接改库:角色卡/世界书/正文)使用的模型;跟随主 GM。",
-    editor: "剧本编辑器正文 AI 续写/改写(⌘K / 侧栏按钮)使用的模型;跟随主 GM。",
-    extractor: "GM 叙事二次解析抽 ops (两步式 GM 第二步)。",
-    card_gen: "侧栏创意工具:生成 / 微调角色卡。",
-    card_import: "导入酒馆卡时,用 LLM 把一整段自由文本档案整理成结构化字段(身份/背景/外貌/性格等)。仅在导入勾选「用 AI 整理字段」时调用;跟随主 GM。",
-    critic: "角色卡生成的一致性评分子代理 (0-1 阈值 0.6)。",
-    verifier: "GM 输出是否满足 curator 设置的 acceptance 条件。",
-    phase_digest: "长局历史按阶段浓缩成摘要(compact),供 GM 记忆远期剧情;跟随主 GM = 系统默认。",
-    black_swan: "主动触发世界突发事件的子代理;跟随主 GM = 系统默认。",
-    agent: "未单独配置模型的其它子代理统一兜底用它;跟随主 GM / 系统默认。",
-    embedder: "向量嵌入模型，用于 RAG 召回 + 拆书后的语义检索。系统默认 Vertex text-embedding-004，需要在「API 密钥」配 Vertex SA JSON 才能用。可改成其他 embedding 模型。",
-    image_gen: "生图功能(聊天内 AI 生图 / 角色卡头像 / 剧本封面 / 人设图)默认使用的 provider 和模型;聊天里 GM 自主调用生图工具也走它。需在「API 密钥」配置对应 BYOK key 才能生成(未配会提示去配)。与生图弹窗里的模型选择同步。",
+    gm: t('settings.more.modules.tip_gm'),
+    sub_agent: t('settings.more.modules.tip_sub_agent'),
+    set_parser: t('settings.more.modules.tip_set_parser'),
+    console: t('settings.more.modules.tip_console'),
+    editor: t('settings.more.modules.tip_editor'),
+    extractor: t('settings.more.modules.tip_extractor'),
+    card_gen: t('settings.more.modules.tip_card_gen'),
+    card_import: t('settings.more.modules.tip_card_import'),
+    critic: t('settings.more.modules.tip_critic'),
+    verifier: t('settings.more.modules.tip_verifier'),
+    phase_digest: t('settings.more.modules.tip_phase_digest'),
+    black_swan: t('settings.more.modules.tip_black_swan'),
+    agent: t('settings.more.modules.tip_agent'),
+    embedder: t('settings.more.modules.tip_embedder'),
+    image_gen: t('settings.more.modules.tip_image_gen'),
   };
   const MODULES = AGENT_MODULES.map((m) => ({ ...m, label: LABELS[m.id], tip: TIPS[m.id] }));
 
@@ -2526,28 +2526,26 @@ function ModuleModelsSection() {
               <div style={{marginTop: 6}}>
                 {embedderStatus.fallback_active ? (
                   <div style={{fontSize: 11, color: "#0972d3"}}>
-                    配置不可用,已自动切到 <strong>平台兜底</strong>(admin/vip 福利,免费 Gemini API 配额)。
+                    {t('settings.more.modules.embedder_fallback_active')}
                   </div>
                 ) : embedderStatus.is_admin && embedderStatus.user_configured ? (
                   <div style={{fontSize: 11, color: "#1a7e3c"}}>
-                    用你自己配的 embedder。调用失败时自动 fallback 平台 Gemini(仅 admin/vip)。
+                    {t('settings.more.modules.embedder_admin_configured')}
                   </div>
                 ) : embedderStatus.is_admin && !embedderStatus.user_configured ? (
                   <div style={{fontSize: 11, color: "#0972d3"}}>
-                    用 <strong>平台兜底</strong>(admin/vip 福利)。配自己 key 可用自己额度。
+                    {t('settings.more.modules.embedder_admin_fallback')}
                   </div>
                 ) : !embedderStatus.user_configured ? (
                   <div style={{fontSize: 11, color: "#d18a00"}}>
-                    普通用户不享受平台兜底。请配自己的 embedder key(Gemini 免费 1500 RPM / OpenAI $0.02/M / Cohere),否则 RAG 召回降级。
+                    {t('settings.more.modules.embedder_user_no_key')}
                   </div>
                 ) : null}
               </div>
             )}
             {mod.id === "embedder" && (
               <div style={{marginTop: 6, fontSize: 11, color: "var(--muted)"}}>
-                所有 embedding 统一输出 768 维(与向量库对齐;OpenAI/通义自动降维)。
-                Anthropic、DeepSeek 无 embedding 接口,故不在此列。
-                <strong> 切换 embedder 后,已嵌过的剧本需重新嵌入才会用新模型</strong>(旧向量与新模型不互通)。
+                {t('settings.more.modules.embedder_note')}
               </div>
             )}
           </div>
@@ -3119,8 +3117,8 @@ function DeploySection() {
               options={[
                 { value: "custom",   label: t('settings.deploy.smtp_custom') },
                 { value: "gmail",    label: "Gmail（smtp.gmail.com:587 · STARTTLS）" },
-                { value: "qq",       label: "QQ 邮箱（smtp.qq.com:465 · SSL）" },
-                { value: "163",      label: "163 邮箱（smtp.163.com:465 · SSL）" },
+                { value: "qq",       label: t('settings.more.deploy.smtp_qq') },
+                { value: "163",      label: t('settings.more.deploy.smtp_163') },
                 { value: "aws",      label: "AWS SES（email-smtp.us-east-1.amazonaws.com:587）" },
                 { value: "resend",   label: "Resend（smtp.resend.com:587）" },
                 { value: "sendgrid", label: "SendGrid（smtp.sendgrid.net:587）" },
@@ -3384,7 +3382,12 @@ function DataMigrationSection() {
     }
   };
 
-  const STAGE_LABELS = { scripts: '导入剧本', saves: '导入存档', cards: '导入角色卡', done: '完成' };
+  const STAGE_LABELS = {
+    scripts: t('settings.more.migrate.stage_scripts'),
+    saves: t('settings.more.migrate.stage_saves'),
+    cards: t('settings.more.migrate.stage_cards'),
+    done: t('settings.more.migrate.stage_done'),
+  };
 
   const finishJob = async (jobId) => {
     if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
@@ -3395,7 +3398,7 @@ function DataMigrationSection() {
       const summary = (job.usage_actual && job.usage_actual.summary) || {};
       setImportResult({ scripts: summary.scripts ?? 0, saves: summary.saves ?? 0, cards: summary.cards ?? 0, warnings: job.warnings || [] });
       window.__apiToast?.(t('settings.migrate.import_done', { defaultValue: '导入完成' }), { kind: 'ok', duration: 2600,
-        detail: `剧本 ${summary.scripts ?? 0} · 存档 ${summary.saves ?? 0} · 角色卡 ${summary.cards ?? 0}` });
+        detail: t('settings.more.migrate.import_done_detail', { scripts: summary.scripts ?? 0, saves: summary.saves ?? 0, cards: summary.cards ?? 0 }) });
     } catch (e) {
       window.__apiToast?.(t('settings.migrate.import_fail', { defaultValue: '导入失败' }), { kind: 'danger', detail: e?.message });
     } finally {
@@ -3410,7 +3413,7 @@ function DataMigrationSection() {
     try {
       const r = await window.api.account.migrateImport(importFile);
       jobId = r?.job_id;
-      if (!jobId) throw new Error(r?.error || '未返回作业号');
+      if (!jobId) throw new Error(r?.error || t('settings.more.migrate.no_job_id'));
     } catch (e) {
       setImporting(false); setImportJob(null);
       window.__apiToast?.(t('settings.migrate.import_fail', { defaultValue: '导入失败' }), { kind: 'danger', detail: e?.payload?.error || e?.message });
@@ -3486,7 +3489,7 @@ function DataMigrationSection() {
       {importJob && (
         <CSBox>
           <div style={{ fontSize: 13, marginBottom: 4 }}>
-            {(STAGE_LABELS[importJob.stage] || importJob.stage || '处理中')}
+            {(STAGE_LABELS[importJob.stage] || importJob.stage || t('settings.more.migrate.stage_processing'))}
             {importJob.stage_total ? ` ${importJob.stage_progress || 0}/${importJob.stage_total}` : '…'}
           </div>
           <div style={{ height: 6, background: 'var(--line,#36322d)', borderRadius: 3, overflow: 'hidden' }}>
@@ -3502,7 +3505,7 @@ function DataMigrationSection() {
           {(importResult.warnings || []).length > 0 && (
             <ul style={{ margin: '6px 0 0', paddingLeft: 18, fontSize: 12 }}>
               {importResult.warnings.slice(0, 20).map((w, i) => <li key={i}>{w}</li>)}
-              {importResult.warnings.length > 20 && <li>… 其余 {importResult.warnings.length - 20} 条已省略</li>}
+              {importResult.warnings.length > 20 && <li>{t('settings.more.migrate.warnings_truncated', { count: importResult.warnings.length - 20 })}</li>}
             </ul>
           )}
         </CSAlert>
@@ -3515,6 +3518,7 @@ function DataMigrationSection() {
 const DEFAULT_ONLINE_BASE = 'https://rpg-roleplay.stellatrix.icu';
 
 function OnlineLibrarySection() {
+  const { t } = useTranslation();
   const [conn, setConn] = useStatePL(null);            // {connected, base_url}
   const [isProvider, setIsProvider] = useStatePL(false); // 本实例是否为在线库提供方(server 模式)
   const reload = useCallbackPL(async () => {
@@ -3532,8 +3536,8 @@ function OnlineLibrarySection() {
   if (isProvider) {
     return (
       <SetGroup
-        title="在线剧本库 · 提供方"
-        description="本实例是在线服务,管理外部客户端(本地部署 / CLI)的接入。设备授权请用独立授权页 /device 完成。"
+        title={t('settings.more.online_lib.provider_title')}
+        description={t('settings.more.online_lib.provider_desc')}
       >
         <PatManager />
       </SetGroup>
@@ -3541,8 +3545,8 @@ function OnlineLibrarySection() {
   }
   return (
     <SetGroup
-      title="在线剧本库(连接在线服务)"
-      description="连接在线服务,浏览 / 完整导入公开剧本,或把自有剧本发布到在线库。"
+      title={t('settings.more.online_lib.client_title')}
+      description={t('settings.more.online_lib.client_desc')}
     >
       <ConnectorConnect conn={conn} onChange={reload} />
       {conn?.connected && <OnlineBrowse />}
@@ -3552,6 +3556,7 @@ function OnlineLibrarySection() {
 }
 
 function ConnectorConnect({ conn, onChange }) {
+  const { t } = useTranslation();
   const [base, setBase] = useStatePL(conn?.base_url || DEFAULT_ONLINE_BASE);
   const [token, setToken] = useStatePL('');
   const [busy, setBusy] = useStatePL(false);
@@ -3561,20 +3566,20 @@ function ConnectorConnect({ conn, onChange }) {
   useEffectPL(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
 
   const savePat = async () => {
-    if (!token.trim()) { window.__apiToast?.('请粘贴访问令牌', { kind: 'warn' }); return; }
+    if (!token.trim()) { window.__apiToast?.(t('settings.more.online_lib.paste_token_warn'), { kind: 'warn' }); return; }
     setBusy(true);
     try {
       await window.api.federation.connectorSet(base.trim(), token.trim());
-      window.__apiToast?.('已连接在线剧本库', { kind: 'ok' });
+      window.__apiToast?.(t('settings.more.online_lib.connected_ok'), { kind: 'ok' });
       setToken(''); onChange?.();
-    } catch (e) { window.__apiToast?.('连接失败', { kind: 'danger', detail: e?.payload?.error || e?.message }); }
+    } catch (e) { window.__apiToast?.(t('settings.more.online_lib.connect_fail'), { kind: 'danger', detail: e?.payload?.error || e?.message }); }
     finally { setBusy(false); }
   };
 
   const disconnect = async () => {
     setBusy(true);
-    try { await window.api.federation.connectorSet(base.trim(), ''); window.__apiToast?.('已断开', { kind: 'ok' }); onChange?.(); }
-    catch (e) { window.__apiToast?.('操作失败', { kind: 'danger', detail: e?.message }); }
+    try { await window.api.federation.connectorSet(base.trim(), ''); window.__apiToast?.(t('settings.more.online_lib.disconnected'), { kind: 'ok' }); onChange?.(); }
+    catch (e) { window.__apiToast?.(t('settings.more.online_lib.op_fail'), { kind: 'danger', detail: e?.message }); }
     finally { setBusy(false); }
   };
 
@@ -3590,48 +3595,48 @@ function ConnectorConnect({ conn, onChange }) {
           const r = await window.api.federation.devicePoll(d.base_url || base.trim(), d.device_code);
           if (r.connected) {
             clearInterval(pollRef.current); pollRef.current = null;
-            setDevice(null); window.__apiToast?.('已连接在线剧本库', { kind: 'ok' }); onChange?.();
+            setDevice(null); window.__apiToast?.(t('settings.more.online_lib.connected_ok'), { kind: 'ok' }); onChange?.();
           } else if (r.status && !['authorization_pending', 'pending'].includes(r.status)) {
             clearInterval(pollRef.current); pollRef.current = null;
-            setDevice(null); window.__apiToast?.('授权未完成:' + r.status, { kind: 'warn' });
+            setDevice(null); window.__apiToast?.(t('settings.more.online_lib.auth_incomplete', { status: r.status }), { kind: 'warn' });
           }
         } catch { /* 继续轮询 */ }
       }, iv);
-    } catch (e) { window.__apiToast?.('设备码流启动失败', { kind: 'danger', detail: e?.payload?.error || e?.message }); }
+    } catch (e) { window.__apiToast?.(t('settings.more.online_lib.device_start_fail'), { kind: 'danger', detail: e?.payload?.error || e?.message }); }
     finally { setBusy(false); }
   };
 
   if (conn?.connected) {
     return (
       <CSSpaceBetween size="s">
-        <CSBox>已连接:<strong>{conn.base_url}</strong></CSBox>
-        <CSButton iconName="unlocked" loading={busy} onClick={disconnect}>断开连接</CSButton>
+        <CSBox>{t('settings.more.online_lib.connected_to')}<strong>{conn.base_url}</strong></CSBox>
+        <CSButton iconName="unlocked" loading={busy} onClick={disconnect}>{t('settings.more.online_lib.disconnect')}</CSButton>
       </CSSpaceBetween>
     );
   }
 
   return (
     <CSSpaceBetween size="m">
-      <SetRow label="在线服务地址" description="默认官方;可改为你自建的在线节点(强制 https,禁私网地址)。">
+      <SetRow label={t('settings.more.online_lib.server_url')} description={t('settings.more.online_lib.server_url_desc')}>
         <CSInput value={base} onChange={({ detail }) => setBase(detail.value)} placeholder={DEFAULT_ONLINE_BASE} />
       </SetRow>
 
-      <SetRow label="方式一 · 设备码连接(推荐)" description="点连接 → 在浏览器登录在线服务并输入下面的配对码授权,无需手动复制令牌。">
+      <SetRow label={t('settings.more.online_lib.device_method')} description={t('settings.more.online_lib.device_method_desc')}>
         {device ? (
-          <CSAlert type="info" header="在浏览器完成授权">
-            <div>1. 打开授权页:<a href={device.verification_uri_complete || device.verification_uri} target="_blank" rel="noopener noreferrer">{device.verification_uri_complete || device.verification_uri}</a>(已带配对码,点开确认即可)</div>
-            <div>2. 配对码:<strong style={{ fontSize: 18, letterSpacing: 2 }}>{device.user_code}</strong>(如未自动填入则手动输入)</div>
-            <div style={{ marginTop: 6, color: 'var(--text-quiet)' }}>批准后本页自动连接…</div>
+          <CSAlert type="info" header={t('settings.more.online_lib.device_auth_header')}>
+            <div>{t('settings.more.online_lib.device_step1')} <a href={device.verification_uri_complete || device.verification_uri} target="_blank" rel="noopener noreferrer">{device.verification_uri_complete || device.verification_uri}</a></div>
+            <div>{t('settings.more.online_lib.device_step2')} <strong style={{ fontSize: 18, letterSpacing: 2 }}>{device.user_code}</strong></div>
+            <div style={{ marginTop: 6, color: 'var(--text-quiet)' }}>{t('settings.more.online_lib.device_waiting')}</div>
           </CSAlert>
         ) : (
-          <CSButton variant="primary" iconName="external" loading={busy} onClick={startDevice}>用设备码连接</CSButton>
+          <CSButton variant="primary" iconName="external" loading={busy} onClick={startDevice}>{t('settings.more.online_lib.device_connect_btn')}</CSButton>
         )}
       </SetRow>
 
-      <SetRow label="方式二 · 粘贴个人访问令牌(PAT)" description="在线服务「个人访问令牌」里生成一个,粘贴到此。">
+      <SetRow label={t('settings.more.online_lib.pat_method')} description={t('settings.more.online_lib.pat_method_desc')}>
         <CSSpaceBetween size="xs">
           <CSInput value={token} type="password" onChange={({ detail }) => setToken(detail.value)} placeholder="rpgpat_…" />
-          <CSButton loading={busy} onClick={savePat}>保存并连接</CSButton>
+          <CSButton loading={busy} onClick={savePat}>{t('settings.more.online_lib.pat_save_btn')}</CSButton>
         </CSSpaceBetween>
       </SetRow>
     </CSSpaceBetween>
@@ -3639,6 +3644,7 @@ function ConnectorConnect({ conn, onChange }) {
 }
 
 function OnlineBrowse() {
+  const { t } = useTranslation();
   const [q, setQ] = useStatePL('');
   const [items, setItems] = useStatePL(null);
   const [loading, setLoading] = useStatePL(false);
@@ -3646,38 +3652,38 @@ function OnlineBrowse() {
   const load = useCallbackPL(async (query) => {
     setLoading(true);
     try { const r = await window.api.federation.connectorScripts(query); setItems(r?.items || []); }
-    catch (e) { window.__apiToast?.('加载在线库失败', { kind: 'danger', detail: e?.payload?.error || e?.message }); setItems([]); }
+    catch (e) { window.__apiToast?.(t('settings.more.online_lib.browse_load_fail'), { kind: 'danger', detail: e?.payload?.error || e?.message }); setItems([]); }
     finally { setLoading(false); }
   }, []);
   const doImport = async (it) => {
     setImporting((p) => ({ ...p, [it.id]: true }));
     try {
       const r = await window.api.federation.connectorImport(it.id);
-      window.__apiToast?.('已完整导入到本地', { kind: 'ok', detail: `「${it.title}」→ 本地剧本 #${r.script_id}` });
-    } catch (e) { window.__apiToast?.('导入失败', { kind: 'danger', detail: e?.payload?.error || e?.message }); }
+      window.__apiToast?.(t('settings.more.online_lib.browse_import_ok'), { kind: 'ok', detail: `「${it.title}」→ ${t('settings.more.online_lib.browse_import_local')} #${r.script_id}` });
+    } catch (e) { window.__apiToast?.(t('settings.more.online_lib.browse_import_fail'), { kind: 'danger', detail: e?.payload?.error || e?.message }); }
     finally { setImporting((p) => ({ ...p, [it.id]: false })); }
   };
   return (
-    <CSExpandableSection headerText="浏览在线剧本库 → 完整导入到本地" defaultExpanded
+    <CSExpandableSection headerText={t('settings.more.online_lib.browse_header')} defaultExpanded
       onChange={({ detail }) => { if (detail.expanded && items == null) load(''); }}>
       <CSSpaceBetween size="s">
         <div style={{ display: 'flex', gap: 8, maxWidth: 460 }}>
           <div style={{ flex: 1 }}>
-            <CSInput value={q} type="search" placeholder="搜剧本标题…" onChange={({ detail }) => setQ(detail.value)}
+            <CSInput value={q} type="search" placeholder={t('settings.more.online_lib.browse_search_placeholder')} onChange={({ detail }) => setQ(detail.value)}
               onKeyDown={(e) => { if (e.detail.key === 'Enter') load(q); }} />
           </div>
-          <CSButton loading={loading} onClick={() => load(q)}>搜索</CSButton>
+          <CSButton loading={loading} onClick={() => load(q)}>{t('settings.more.online_lib.browse_search_btn')}</CSButton>
         </div>
-        {items && items.length === 0 && <CSBox color="text-body-secondary">在线库暂无公开剧本。</CSBox>}
+        {items && items.length === 0 && <CSBox color="text-body-secondary">{t('settings.more.online_lib.browse_empty')}</CSBox>}
         {(items || []).map((it) => (
           <div key={it.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '8px 10px', border: '1px solid var(--line,#36322d)', borderRadius: 8 }}>
             <div style={{ minWidth: 0 }}>
-              <div style={{ fontWeight: 600 }}>{it.title || '(未命名)'}</div>
+              <div style={{ fontWeight: 600 }}>{it.title || t('settings.more.online_lib.untitled')}</div>
               <div style={{ fontSize: 12, color: 'var(--text-quiet)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {it.owner_name ? `by ${it.owner_name} · ` : ''}♥ {it.clone_count || 0}{it.description ? ' · ' + String(it.description).slice(0, 50) : ''}
               </div>
             </div>
-            <CSButton variant="primary" loading={!!importing[it.id]} onClick={() => doImport(it)}>导入</CSButton>
+            <CSButton variant="primary" loading={!!importing[it.id]} onClick={() => doImport(it)}>{t('settings.more.online_lib.browse_import_btn')}</CSButton>
           </div>
         ))}
       </CSSpaceBetween>
@@ -3686,13 +3692,14 @@ function OnlineBrowse() {
 }
 
 function OnlinePublish() {
+  const { t } = useTranslation();
   const [scripts, setScripts] = useStatePL([]);
   const [sel, setSel] = useStatePL(null);
   const [busy, setBusy] = useStatePL(false);
   useEffectPL(() => {
     window.api.scripts.list().then((r) => {
       const list = Array.isArray(r) ? r : (r?.items || r?.scripts || []);
-      setScripts(list.filter((s) => s.is_owner !== false).map((s) => ({ value: String(s.id), label: s.title || `剧本 #${s.id}` })));
+      setScripts(list.filter((s) => s.is_owner !== false).map((s) => ({ value: String(s.id), label: s.title || `${t('settings.more.online_lib.script_prefix')} #${s.id}` })));
     }).catch(() => {});
   }, []);
   const publish = async () => {
@@ -3700,40 +3707,41 @@ function OnlinePublish() {
     setBusy(true);
     try {
       const r = await window.api.federation.connectorPublish(Number(sel.value));
-      window.__apiToast?.('已发布到在线库', { kind: 'ok', detail: `在线剧本 #${r.script_id}` });
-    } catch (e) { window.__apiToast?.('发布失败', { kind: 'danger', detail: e?.payload?.error || e?.message }); }
+      window.__apiToast?.(t('settings.more.online_lib.publish_ok'), { kind: 'ok', detail: `${t('settings.more.online_lib.online_script_prefix')} #${r.script_id}` });
+    } catch (e) { window.__apiToast?.(t('settings.more.online_lib.publish_fail'), { kind: 'danger', detail: e?.payload?.error || e?.message }); }
     finally { setBusy(false); }
   };
   return (
-    <SetRow label="发布自有剧本到在线库" description="把本地一个自有剧本完整上传到在线库并公开(需令牌含发布权限)。">
+    <SetRow label={t('settings.more.online_lib.publish_label')} description={t('settings.more.online_lib.publish_desc')}>
       <div style={{ display: 'flex', gap: 8, maxWidth: 460 }}>
         <div style={{ flex: 1 }}>
-          <CSSelect selectedOption={sel} options={scripts} placeholder="选择本地剧本…"
+          <CSSelect selectedOption={sel} options={scripts} placeholder={t('settings.more.online_lib.publish_select_placeholder')}
             onChange={({ detail }) => setSel(detail.selectedOption)} />
         </div>
-        <CSButton iconName="upload" loading={busy} disabled={!sel} onClick={publish}>发布</CSButton>
+        <CSButton iconName="upload" loading={busy} disabled={!sel} onClick={publish}>{t('settings.more.online_lib.publish_btn')}</CSButton>
       </div>
     </SetRow>
   );
 }
 
 function DeviceApprove() {
+  const { t } = useTranslation();
   const [code, setCode] = useStatePL('');
   const [info, setInfo] = useStatePL(null);
   const [busy, setBusy] = useStatePL(false);
   const lookup = async () => {
     setBusy(true); setInfo(null);
     try { const r = await window.api.federation.deviceLookup(code.trim().toUpperCase()); setInfo(r.device); }
-    catch (e) { window.__apiToast?.('未找到配对码', { kind: 'warn', detail: e?.payload?.error || e?.message }); }
+    catch (e) { window.__apiToast?.(t('settings.more.online_lib.device_code_not_found'), { kind: 'warn', detail: e?.payload?.error || e?.message }); }
     finally { setBusy(false); }
   };
   const decide = async (deny) => {
     setBusy(true);
     try {
       await window.api.federation.deviceApprove(code.trim().toUpperCase(), deny);
-      window.__apiToast?.(deny ? '已拒绝' : '已批准,客户端将自动连接', { kind: 'ok' });
+      window.__apiToast?.(deny ? t('settings.more.online_lib.device_denied') : t('settings.more.online_lib.device_approved'), { kind: 'ok' });
       setInfo(null); setCode('');
-    } catch (e) { window.__apiToast?.('操作失败', { kind: 'danger', detail: e?.payload?.error || e?.message }); }
+    } catch (e) { window.__apiToast?.(t('settings.more.online_lib.op_fail'), { kind: 'danger', detail: e?.payload?.error || e?.message }); }
     finally { setBusy(false); }
   };
   return (
@@ -3742,14 +3750,14 @@ function DeviceApprove() {
         <div style={{ flex: 1 }}>
           <CSInput value={code} placeholder="WXYZ-7K9M" onChange={({ detail }) => setCode(detail.value)} />
         </div>
-        <CSButton loading={busy} disabled={!code.trim()} onClick={lookup}>查询</CSButton>
+        <CSButton loading={busy} disabled={!code.trim()} onClick={lookup}>{t('settings.more.online_lib.device_lookup_btn')}</CSButton>
       </div>
       {info && (
-        <CSAlert type="info" header="确认授权">
-          <div>客户端:{info.client_name || '未命名'} · 权限:{(info.scopes || []).join(', ')}</div>
+        <CSAlert type="info" header={t('settings.more.online_lib.device_confirm_header')}>
+          <div>{t('settings.more.online_lib.device_confirm_client')}{info.client_name || t('settings.more.online_lib.untitled')} · {t('settings.more.online_lib.device_confirm_scopes')}{(info.scopes || []).join(', ')}</div>
           <CSSpaceBetween direction="horizontal" size="xs">
-            <CSButton variant="primary" loading={busy} onClick={() => decide(false)}>批准</CSButton>
-            <CSButton loading={busy} onClick={() => decide(true)}>拒绝</CSButton>
+            <CSButton variant="primary" loading={busy} onClick={() => decide(false)}>{t('settings.more.online_lib.device_approve_btn')}</CSButton>
+            <CSButton loading={busy} onClick={() => decide(true)}>{t('settings.more.online_lib.device_deny_btn')}</CSButton>
           </CSSpaceBetween>
         </CSAlert>
       )}
@@ -3758,6 +3766,7 @@ function DeviceApprove() {
 }
 
 function PatManager() {
+  const { t } = useTranslation();
   const [items, setItems] = useStatePL([]);
   const [name, setName] = useStatePL('');
   const [scopes, setScopes] = useStatePL({ read: true, publish: false });
@@ -3769,46 +3778,46 @@ function PatManager() {
   useEffectPL(() => { reload(); }, [reload]);
   const create = async () => {
     const sc = [scopes.read && 'library:read', scopes.publish && 'library:publish'].filter(Boolean);
-    if (!sc.length) { window.__apiToast?.('至少选一个权限', { kind: 'warn' }); return; }
+    if (!sc.length) { window.__apiToast?.(t('settings.more.online_lib.pat_scope_warn'), { kind: 'warn' }); return; }
     setBusy(true);
     try {
       const r = await window.api.federation.patCreate({ name: name.trim(), scopes: sc });
       setCreated(r.token); setName(''); reload();
-    } catch (e) { window.__apiToast?.('生成失败', { kind: 'danger', detail: e?.payload?.error || e?.message }); }
+    } catch (e) { window.__apiToast?.(t('settings.more.online_lib.pat_create_fail'), { kind: 'danger', detail: e?.payload?.error || e?.message }); }
     finally { setBusy(false); }
   };
   const revoke = async (id) => {
-    try { await window.api.federation.patRevoke(id); reload(); window.__apiToast?.('已吊销', { kind: 'ok' }); }
-    catch (e) { window.__apiToast?.('操作失败', { kind: 'danger', detail: e?.message }); }
+    try { await window.api.federation.patRevoke(id); reload(); window.__apiToast?.(t('settings.more.online_lib.pat_revoked'), { kind: 'ok' }); }
+    catch (e) { window.__apiToast?.(t('settings.more.online_lib.op_fail'), { kind: 'danger', detail: e?.message }); }
   };
   return (
     <CSSpaceBetween size="s">
       {created && (
-        <CSAlert type="success" header="令牌已生成(仅显示这一次,请立即复制)" dismissible onDismiss={() => setCreated(null)}>
+        <CSAlert type="success" header={t('settings.more.online_lib.pat_created_header')} dismissible onDismiss={() => setCreated(null)}>
           <code style={{ wordBreak: 'break-all' }}>{created}</code>
         </CSAlert>
       )}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
         <div style={{ width: 180 }}>
-          <CSInput value={name} placeholder="令牌名称(如:我的本地实例)" onChange={({ detail }) => setName(detail.value)} />
+          <CSInput value={name} placeholder={t('settings.more.online_lib.pat_name_placeholder')} onChange={({ detail }) => setName(detail.value)} />
         </div>
-        <CSToggle checked={scopes.read} onChange={({ detail }) => setScopes((s) => ({ ...s, read: detail.checked }))}>读取</CSToggle>
-        <CSToggle checked={scopes.publish} onChange={({ detail }) => setScopes((s) => ({ ...s, publish: detail.checked }))}>发布</CSToggle>
-        <CSButton loading={busy} onClick={create}>生成令牌</CSButton>
+        <CSToggle checked={scopes.read} onChange={({ detail }) => setScopes((s) => ({ ...s, read: detail.checked }))}>{t('settings.more.online_lib.pat_scope_read')}</CSToggle>
+        <CSToggle checked={scopes.publish} onChange={({ detail }) => setScopes((s) => ({ ...s, publish: detail.checked }))}>{t('settings.more.online_lib.pat_scope_publish')}</CSToggle>
+        <CSButton loading={busy} onClick={create}>{t('settings.more.online_lib.pat_create_btn')}</CSButton>
       </div>
-      {items.length === 0 && <CSBox color="text-body-secondary" fontSize="body-s">还没有令牌。生成一个供本地实例/CLI 连接,或在另一台设备上用设备码连接(会自动出现在这里)。</CSBox>}
+      {items.length === 0 && <CSBox color="text-body-secondary" fontSize="body-s">{t('settings.more.online_lib.pat_empty')}</CSBox>}
       {items.map((p) => (
         <div key={p.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, fontSize: 13 }}>
           <span style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-            <CSBadge color={p.source === 'device' ? 'green' : 'grey'}>{p.source === 'device' ? '设备授权' : '手动令牌'}</CSBadge>
-            <strong>{p.name || '(未命名)'}</strong>
+            <CSBadge color={p.source === 'device' ? 'green' : 'grey'}>{p.source === 'device' ? t('settings.more.online_lib.pat_source_device') : t('settings.more.online_lib.pat_source_manual')}</CSBadge>
+            <strong>{p.name || t('settings.more.online_lib.untitled')}</strong>
             <span style={{ color: 'var(--text-quiet)' }}>{(p.scopes || []).join(', ')}</span>
             <span style={{ color: 'var(--text-quiet)', fontSize: 12 }}>
-              {p.last_used_at ? '· 最近使用 ' + (window.__fmt?.ago(p.last_used_at) || p.last_used_at) : '· 从未使用'}
-              {p.revoked_at ? ' · 已吊销' : ''}
+              {p.last_used_at ? `· ${t('settings.more.online_lib.pat_last_used')} ` + (window.__fmt?.ago(p.last_used_at) || p.last_used_at) : `· ${t('settings.more.online_lib.pat_never_used')}`}
+              {p.revoked_at ? ` · ${t('settings.more.online_lib.pat_revoked_badge')}` : ''}
             </span>
           </span>
-          {!p.revoked_at && <CSButton variant="inline-link" onClick={() => revoke(p.id)}>吊销</CSButton>}
+          {!p.revoked_at && <CSButton variant="inline-link" onClick={() => revoke(p.id)}>{t('settings.more.online_lib.pat_revoke_btn')}</CSButton>}
         </div>
       ))}
     </CSSpaceBetween>

@@ -12,6 +12,7 @@
  *   文案锁定为 CONSENT_TEXT 常量，升版时同步修改此常量即可。
  */
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import CSModal        from '@cloudscape-design/components/modal';
 import CSBox          from '@cloudscape-design/components/box';
 import CSButton       from '@cloudscape-design/components/button';
@@ -44,6 +45,7 @@ const CONSENT_TEXT =
 // ── FeedbackDrawer ────────────────────────────────────────────────────────────
 
 export function FeedbackDrawer({ open, onClose }) {
+  const { t } = useTranslation();
   const [freeText, setFreeText]           = React.useState('');
   const [includeExcerpts, setIncludeExcerpts] = React.useState(false);
   const [selectedExcerpts, setSelectedExcerpts] = React.useState([]);  // indices
@@ -75,17 +77,17 @@ export function FeedbackDrawer({ open, onClose }) {
       const res = await fetch('/api/me/feedback?limit=50', { credentials: 'include' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      if (!data || !data.ok) throw new Error(data?.error || '读取历史反馈失败');
+      if (!data || !data.ok) throw new Error(data?.error || t('components.feedback_drawer.history.load_error'));
       const items = Array.isArray(data.items) ? data.items : [];
       setFeedbackHistory(items);
       setNewlyReviewed(items.filter(it => it.review_decision && it.id > lastSeen));
       setMaxReviewedId(items.reduce((m, it) => Math.max(m, it.id || 0), 0));
     } catch (e) {
-      setHistoryError(e?.message || '读取历史反馈失败');
+      setHistoryError(e?.message || t('components.feedback_drawer.history.load_error'));
     } finally {
       setHistoryLoading(false);
     }
-  }, []);
+  }, [t]);
 
   // 打开时重置状态 + 取一份运行环境快照预览(只读,实际提交时再取一次保证新鲜)
   React.useEffect(() => {
@@ -152,7 +154,7 @@ export function FeedbackDrawer({ open, onClose }) {
           session_id: saveId,
           range: String(n.turn_index ?? n.turn ?? i),
           plaintext: ((n.content || n.text || '') + '').slice(0, 200),
-          label: n.role === 'user' ? '玩家' : 'GM',
+          label: n.role === 'user' ? t('components.feedback_drawer.excerpt.role_player') : 'GM',
         }));
         if (!cancelled) setRecentTurns(turns);
       } catch (_) {
@@ -186,7 +188,7 @@ export function FeedbackDrawer({ open, onClose }) {
       setDone(true);
       await loadFeedbackHistory();
     } catch (e) {
-      setError(e?.message || '提交失败，请稍后重试');
+      setError(e?.message || t('components.feedback_drawer.submit_error'));
     } finally {
       setBusy(false);
     }
@@ -215,12 +217,12 @@ export function FeedbackDrawer({ open, onClose }) {
       visible={open}
       onDismiss={onClose}
       size="medium"
-      header="提交反馈"
+      header={t('components.feedback_drawer.title')}
       footer={
         <CSBox float="right">
           <CSSpaceBetween direction="horizontal" size="xs">
             <CSButton variant="link" onClick={onClose} disabled={busy}>
-              {done ? '关闭' : '取消'}
+              {done ? t('common.close') : t('common.cancel')}
             </CSButton>
             {!done && (
               <CSButton
@@ -229,7 +231,7 @@ export function FeedbackDrawer({ open, onClose }) {
                 loading={busy}
                 disabled={!canSubmit}
               >
-                提交
+                {t('components.feedback_drawer.submit_btn')}
               </CSButton>
             )}
           </CSSpaceBetween>
@@ -238,9 +240,8 @@ export function FeedbackDrawer({ open, onClose }) {
     >
       <CSSpaceBetween size="m">
         {/* ── 红线警告 ── */}
-        <CSAlert type="warning" header="反馈渠道内容限制">
-          反馈渠道不得包含性、露骨性、NSFW 或其他成人专属材料（无论你是否年满 18 周岁）。
-          违反将导致永久终止账号并加入禁注表。详见{' '}
+        <CSAlert type="warning" header={t('components.feedback_drawer.aup_warning.header')}>
+          {t('components.feedback_drawer.aup_warning.body')}{' '}
           <a href={AUP_LINK} target="_blank" rel="noopener noreferrer">AUP §2.J</a>。
         </CSAlert>
 
@@ -248,15 +249,15 @@ export function FeedbackDrawer({ open, onClose }) {
         {newlyReviewed.length > 0 && (
           <CSAlert
             type={newlyReviewed.some(r => r.review_decision === 'nsfw_terminate') ? 'warning' : 'success'}
-            header={`管理员已处理你的 ${newlyReviewed.length} 条反馈`}>
+            header={t('components.feedback_drawer.reviewed_notice.header', { count: newlyReviewed.length })}>
             <CSSpaceBetween size="xxs">
               {newlyReviewed.slice(0, 5).map(r => (
                 <CSBox key={r.id} fontSize="body-s">
                   <strong>#{r.id}</strong>
                   {' · '}
-                  {r.review_decision === 'ok' ? '✓ 已采纳' :
-                   r.review_decision === 'spam' ? '✗ 标为 spam' :
-                   r.review_decision === 'nsfw_terminate' ? '⚠ NSFW 违规' :
+                  {r.review_decision === 'ok' ? t('components.feedback_drawer.reviewed_notice.decision_ok') :
+                   r.review_decision === 'spam' ? t('components.feedback_drawer.reviewed_notice.decision_spam') :
+                   r.review_decision === 'nsfw_terminate' ? t('components.feedback_drawer.reviewed_notice.decision_nsfw') :
                    r.review_decision}
                   {' · '}
                   <span style={{ color: 'var(--color-text-body-secondary)' }}>
@@ -266,7 +267,7 @@ export function FeedbackDrawer({ open, onClose }) {
               ))}
               {newlyReviewed.length > 5 && (
                 <CSBox fontSize="body-s" color="text-body-secondary">
-                  还有 {newlyReviewed.length - 5} 条…
+                  {t('components.feedback_drawer.reviewed_notice.more', { count: newlyReviewed.length - 5 })}
                 </CSBox>
               )}
             </CSSpaceBetween>
@@ -274,27 +275,27 @@ export function FeedbackDrawer({ open, onClose }) {
         )}
 
         {done ? (
-          <CSAlert type="success" header="已收到您的反馈">
-            感谢您的反馈！我们会在审核后处理。
+          <CSAlert type="success" header={t('components.feedback_drawer.success.header')}>
+            {t('components.feedback_drawer.success.body')}
           </CSAlert>
         ) : (
           <>
             {error && (
-              <CSAlert type="error" header="提交失败">
+              <CSAlert type="error" header={t('components.feedback_drawer.error.header')}>
                 {error}
               </CSAlert>
             )}
 
             {/* ── 自由文本 ── */}
             <CSFormField
-              label="问题 / 建议"
-              description={`最多 ${MAX_FREE_TEXT} 字`}
-              errorText={freeText.length > MAX_FREE_TEXT ? `超过 ${MAX_FREE_TEXT} 字限制` : undefined}
+              label={t('components.feedback_drawer.freetext.label')}
+              description={t('components.feedback_drawer.freetext.description', { max: MAX_FREE_TEXT })}
+              errorText={freeText.length > MAX_FREE_TEXT ? t('components.feedback_drawer.freetext.over_limit', { max: MAX_FREE_TEXT }) : undefined}
             >
               <CSTextarea
                 value={freeText}
                 onChange={({ detail }) => setFreeText(detail.value)}
-                placeholder="请描述您遇到的问题或建议…"
+                placeholder={t('components.feedback_drawer.freetext.placeholder')}
                 rows={6}
                 disabled={busy}
               />
@@ -303,8 +304,8 @@ export function FeedbackDrawer({ open, onClose }) {
             {/* ── 自部署:选填联系邮箱(用于收处理回执)── */}
             {selfHost && (
               <CSFormField
-                label="联系邮箱(选填)"
-                description="自部署反馈会发送到官方服务器处理。留下邮箱可收到处理回执;若与您的登录邮箱一致,将自动归并到该账户。"
+                label={t('components.feedback_drawer.contact_email.label')}
+                description={t('components.feedback_drawer.contact_email.description')}
               >
                 <CSInput
                   value={contactEmail}
@@ -323,16 +324,16 @@ export function FeedbackDrawer({ open, onClose }) {
               onChange={({ detail }) => setIncludeRuntime(detail.checked)}
               disabled={busy}
             >
-              附带运行环境信息(强烈建议:页面 URL + 活动剧本/存档 + 最近错误 + 最近 3 轮对话,只发给管理员)
+              {t('components.feedback_drawer.runtime.checkbox_label')}
             </CSCheckbox>
             {includeRuntime && runtimePreview && (
               <CSContainer
-                header={<CSHeader variant="h3" description="只对管理员可见,不会公开">运行环境切片预览</CSHeader>}>
+                header={<CSHeader variant="h3" description={t('components.feedback_drawer.runtime.preview_description')}>{t('components.feedback_drawer.runtime.preview_header')}</CSHeader>}>
                 <CSBox fontSize="body-s" color="text-body-secondary">
-                  <div>页面: <code>{runtimePreview.hash || runtimePreview.url || '—'}</code></div>
-                  <div>剧本/存档: script={String(runtimePreview.active?.script_id ?? '—')} · save={String(runtimePreview.active?.save_id ?? '—')} · turn={String(runtimePreview.active?.turn ?? '—')}</div>
-                  <div>错误堆栈: {runtimePreview.errors?.length || 0} 条 · 失败 API: {runtimePreview.api_failures?.length || 0} 条</div>
-                  <div>视窗: {runtimePreview.viewport} · 语言: {runtimePreview.locale} · 时区: {runtimePreview.tz}</div>
+                  <div>{t('components.feedback_drawer.runtime.page')}: <code>{runtimePreview.hash || runtimePreview.url || '—'}</code></div>
+                  <div>{t('components.feedback_drawer.runtime.script_save')}: script={String(runtimePreview.active?.script_id ?? '—')} · save={String(runtimePreview.active?.save_id ?? '—')} · turn={String(runtimePreview.active?.turn ?? '—')}</div>
+                  <div>{t('components.feedback_drawer.runtime.errors')}: {runtimePreview.errors?.length || 0} · {t('components.feedback_drawer.runtime.failed_api')}: {runtimePreview.api_failures?.length || 0}</div>
+                  <div>{t('components.feedback_drawer.runtime.viewport')}: {runtimePreview.viewport} · {t('components.feedback_drawer.runtime.locale')}: {runtimePreview.locale} · {t('components.feedback_drawer.runtime.tz')}: {runtimePreview.tz}</div>
                 </CSBox>
               </CSContainer>
             )}
@@ -343,28 +344,28 @@ export function FeedbackDrawer({ open, onClose }) {
               onChange={({ detail }) => setIncludeExcerpts(detail.checked)}
               disabled={busy}
             >
-              包含对话节选
+              {t('components.feedback_drawer.excerpt.checkbox_label')}
             </CSCheckbox>
 
             {includeExcerpts && (
               <CSContainer
-                header={<CSHeader variant="h3">选择要包含的对话节选（最多 5 段）</CSHeader>}
+                header={<CSHeader variant="h3">{t('components.feedback_drawer.excerpt.section_header')}</CSHeader>}
               >
                 {recentTurns.length === 0 ? (
-                  <CSBox color="text-body-secondary">暂无可用对话节选</CSBox>
+                  <CSBox color="text-body-secondary">{t('components.feedback_drawer.excerpt.empty')}</CSBox>
                 ) : (
                   <CSSpaceBetween size="xs">
-                    {recentTurns.map((t) => (
+                    {recentTurns.map((turn) => (
                       <CSCheckbox
-                        key={t.idx}
-                        checked={selectedExcerpts.includes(t.idx)}
-                        onChange={() => toggleExcerpt(t.idx)}
+                        key={turn.idx}
+                        checked={selectedExcerpts.includes(turn.idx)}
+                        onChange={() => toggleExcerpt(turn.idx)}
                         disabled={busy}
                       >
                         <CSBox>
-                          <strong>{t.label}</strong>
+                          <strong>{turn.label}</strong>
                           <CSBox color="text-body-secondary" fontSize="body-s">
-                            {t.plaintext.slice(0, 80)}{t.plaintext.length > 80 ? '…' : ''}
+                            {turn.plaintext.slice(0, 80)}{turn.plaintext.length > 80 ? '…' : ''}
                           </CSBox>
                         </CSBox>
                       </CSCheckbox>
@@ -376,38 +377,38 @@ export function FeedbackDrawer({ open, onClose }) {
 
             {/* ── 同意复选框 ── */}
             <CSFormField
-              errorText={!consent && freeText.trim() ? '请先勾选同意以启用提交' : undefined}
+              errorText={!consent && freeText.trim() ? t('components.feedback_drawer.consent.error') : undefined}
             >
               <CSCheckbox
                 checked={consent}
                 onChange={({ detail }) => setConsent(detail.checked)}
                 disabled={busy}
               >
-                {CONSENT_TEXT}
+                {t('components.feedback_drawer.consent.label')}
               </CSCheckbox>
             </CSFormField>
           </>
         )}
 
         {/* ── 玩家交流 QQ 群 ── */}
-        <CSContainer header={<CSHeader variant="h3">玩家交流群</CSHeader>}>
+        <CSContainer header={<CSHeader variant="h3">{t('components.feedback_drawer.qq.header')}</CSHeader>}>
           <CSSpaceBetween size="s">
             <CSBox fontSize="body-s" color="text-body-secondary">
-              遇到问题、想交流玩法，欢迎加入玩家 QQ 群（群号 {QQ_GROUP_NUMBER}）。
+              {t('components.feedback_drawer.qq.description', { group: QQ_GROUP_NUMBER })}
             </CSBox>
             <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
               <img
                 src={QQ_QR_SRC}
-                alt={`QQ 群二维码 ${QQ_GROUP_NUMBER}`}
+                alt={t('components.feedback_drawer.qq.qr_alt', { group: QQ_GROUP_NUMBER })}
                 loading="lazy"
                 style={{ width: 150, height: 'auto', borderRadius: 10, border: '1px solid var(--color-border-divider-default, #2a2e33)' }}
               />
               <CSSpaceBetween size="xs">
                 <CSButton variant="primary" href={QQ_JOIN_URL} target="_blank" iconName="external">
-                  用 QQ 加入群聊
+                  {t('components.feedback_drawer.qq.join_btn')}
                 </CSButton>
                 <CSBox fontSize="body-s" color="text-body-secondary">
-                  或在 QQ 中搜索群号 {QQ_GROUP_NUMBER}
+                  {t('components.feedback_drawer.qq.search_hint', { group: QQ_GROUP_NUMBER })}
                 </CSBox>
               </CSSpaceBetween>
             </div>
@@ -417,16 +418,16 @@ export function FeedbackDrawer({ open, onClose }) {
         <CSExpandableSection
           variant="container"
           defaultExpanded={false}
-          headerText="历史反馈"
+          headerText={t('components.feedback_drawer.history.header')}
           headerCounter={feedbackHistory.length ? `(${feedbackHistory.length})` : undefined}
-          headerActions={<CSButton iconName="refresh" onClick={loadFeedbackHistory} loading={historyLoading}>刷新</CSButton>}
+          headerActions={<CSButton iconName="refresh" onClick={loadFeedbackHistory} loading={historyLoading}>{t('common.refresh')}</CSButton>}
         >
           {historyError ? (
-            <CSAlert type="error" header="历史反馈读取失败">{historyError}</CSAlert>
+            <CSAlert type="error" header={t('components.feedback_drawer.history.error_header')}>{historyError}</CSAlert>
           ) : historyLoading && feedbackHistory.length === 0 ? (
-            <CSBox color="text-body-secondary">正在读取历史反馈…</CSBox>
+            <CSBox color="text-body-secondary">{t('components.feedback_drawer.history.loading')}</CSBox>
           ) : feedbackHistory.length === 0 ? (
-            <CSBox color="text-body-secondary">暂无历史反馈</CSBox>
+            <CSBox color="text-body-secondary">{t('components.feedback_drawer.history.empty')}</CSBox>
           ) : (
             <CSSpaceBetween size="xs">
               {feedbackHistory.map((item) => (
@@ -437,15 +438,15 @@ export function FeedbackDrawer({ open, onClose }) {
                 >
                   <CSSpaceBetween size="xxs">
                     <CSBox fontSize="body-s" color="text-body-secondary">
-                      提交: {formatFeedbackTime(item.created_at)}
-                      {item.reviewed_at ? ` · 处理: ${formatFeedbackTime(item.reviewed_at)}` : ''}
+                      {t('components.feedback_drawer.history.submitted_at')}: {formatFeedbackTime(item.created_at)}
+                      {item.reviewed_at ? ` · ${t('components.feedback_drawer.history.reviewed_at')}: ${formatFeedbackTime(item.reviewed_at)}` : ''}
                     </CSBox>
                     <CSBox fontSize="body-s">
-                      {item.free_text_preview || '（无文字内容）'}
+                      {item.free_text_preview || t('components.feedback_drawer.history.no_text')}
                     </CSBox>
                     {item.admin_reply && (
                       <div style={{ marginTop: 4, padding: '6px 10px', borderRadius: 6, background: 'rgba(74,120,214,0.12)', borderLeft: '3px solid #4a78d6', fontSize: 13, lineHeight: 1.5 }}>
-                        <strong>官方回复</strong>{item.replied_at ? ` · ${formatFeedbackTime(item.replied_at)}` : ''}
+                        <strong>{t('components.feedback_drawer.history.admin_reply')}</strong>{item.replied_at ? ` · ${formatFeedbackTime(item.replied_at)}` : ''}
                         <div style={{ marginTop: 2, whiteSpace: 'pre-wrap' }}>{item.admin_reply}</div>
                       </div>
                     )}

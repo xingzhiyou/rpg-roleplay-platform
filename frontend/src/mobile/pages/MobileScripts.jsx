@@ -7,6 +7,8 @@
    - 样式只用 mobile.css 已有 class + inline style + 返回 neededCss 中的新 class */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
+import i18n from '../../i18n';
 import { Icon } from '../icons.jsx';
 import { usePlatformData } from '../../platform-app.jsx';
 import { isCredentialsError } from '../../lib/creds.js';
@@ -15,21 +17,21 @@ import { isCredentialsError } from '../../lib/creds.js';
 const fmtWan = (w) => {
   const n = Number(w) || 0;
   return n >= 10000
-    ? (n / 10000).toFixed(n >= 100000 ? 0 : 1).replace(/\.0$/, '') + ' 万字'
-    : n > 0 ? n + ' 字' : '—';
+    ? (n / 10000).toFixed(n >= 100000 ? 0 : 1).replace(/\.0$/, '') + i18n.t('mobile.scripts.unit.wan_chars')
+    : n > 0 ? n + i18n.t('mobile.scripts.unit.chars') : '—';
 };
 const fmtN = (n) => (n == null ? '—' : Number(n).toLocaleString());
 
 const ACTIVE_STATUSES = new Set(['queued', 'pending', 'running', 'processing', 'importing', 'started']);
 const TERMINAL_STATUSES = new Set(['done', 'done_with_errors', 'partial', 'failed', 'cancelled']);
-const SPLIT_RULES = [
-  { id: 'auto',       label: '自动识别(推荐)' },
-  { id: 'corpus',     label: '语料库模式' },
-  { id: 'chapter_cn', label: '中文章节标题' },
-  { id: 'chapter_en', label: '英文章节标题' },
-  { id: 'number_dot', label: '数字点号规则' },
-  { id: 'paren_num',  label: '括号数字规则' },
-  { id: 'custom',     label: '自定义正则' },
+const getSplitRules = () => [
+  { id: 'auto',       label: i18n.t('mobile.scripts.split_rule.auto') },
+  { id: 'corpus',     label: i18n.t('mobile.scripts.split_rule.corpus') },
+  { id: 'chapter_cn', label: i18n.t('mobile.scripts.split_rule.chapter_cn') },
+  { id: 'chapter_en', label: i18n.t('mobile.scripts.split_rule.chapter_en') },
+  { id: 'number_dot', label: i18n.t('mobile.scripts.split_rule.number_dot') },
+  { id: 'paren_num',  label: i18n.t('mobile.scripts.split_rule.paren_num') },
+  { id: 'custom',     label: i18n.t('mobile.scripts.split_rule.custom') },
 ];
 
 function isPlayBlocked(s) {
@@ -37,12 +39,12 @@ function isPlayBlocked(s) {
   const status = String(
     s.import_status || s.job_status || s.active_job?.status || s.readiness?.active_job?.status || ''
   ).toLowerCase();
-  if (status && ACTIVE_STATUSES.has(status) && !TERMINAL_STATUSES.has(status)) return '正在导入中，请稍候';
+  if (status && ACTIVE_STATUSES.has(status) && !TERMINAL_STATUSES.has(status)) return i18n.t('mobile.scripts.play_block.importing');
   const missing = Array.isArray(s.readiness?.missing) ? s.readiness.missing : [];
   const BLOCKING = new Set(['chunks', 'anchors']);
   const blocked = missing.filter(k => BLOCKING.has(k));
-  if (blocked.length) return `缺少必要数据：${blocked.join('、')}`;
-  if (Number(s.chapter_count || 0) <= 0) return '章节数据缺失，请先完成导入';
+  if (blocked.length) return i18n.t('mobile.scripts.play_block.missing_data', { items: blocked.join(', ') });
+  if (Number(s.chapter_count || 0) <= 0) return i18n.t('mobile.scripts.play_block.no_chapters');
   return '';
 }
 
@@ -60,6 +62,7 @@ function EmptyState({ icon = 'book_open', title, desc, action }) {
 
 /* ─── 章节列表子视图 ──────────────────────────── */
 function ChaptersView({ script, onBack, nav }) {
+  const { t } = useTranslation();
   const [chapters, setChapters] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeIdx, setActiveIdx] = useState(0);
@@ -76,7 +79,7 @@ function ChaptersView({ script, onBack, nav }) {
         const r = await window.api.scripts.chapters(script.id, { limit: 5000 });
         setChapters((r && (r.chapters || r.items)) || []);
       } catch (e) {
-        setErr(e?.message || '加载失败');
+        setErr(e?.message || t('mobile.scripts.chapters.load_error'));
       } finally { setLoading(false); }
     })();
   }, [script?.id, reloadTick]);
@@ -104,47 +107,47 @@ function ChaptersView({ script, onBack, nav }) {
 
   const onRename = async () => {
     if (!cur) return;
-    const newTitle = window.prompt('新标题', cur.title || '');
+    const newTitle = window.prompt(t('mobile.scripts.chapters.rename_prompt'), cur.title || '');
     if (!newTitle || newTitle === cur.title) return;
     try {
       await window.api.scripts.updateChapter(script.id, curIdx, { title: newTitle });
-      nav.toast('已重命名', 'ok', 'check');
+      nav.toast(t('mobile.scripts.chapters.renamed'), 'ok', 'check');
       setReloadTick(x => x + 1);
-    } catch (e) { nav.toast(e?.message || '操作失败', 'danger', 'warn'); }
+    } catch (e) { nav.toast(e?.message || t('mobile.scripts.op_failed'), 'danger', 'warn'); }
   };
 
   const onMergeNext = async () => {
     if (!cur || activeIdx >= chapters.length - 1) return;
-    if (!window.confirm(`确认合并第 ${activeIdx + 1} 章与第 ${activeIdx + 2} 章？`)) return;
+    if (!window.confirm(t('mobile.scripts.chapters.confirm_merge_next', { a: activeIdx + 1, b: activeIdx + 2 }))) return;
     try {
       const nextCh = chapters[activeIdx + 1];
       const nextIdx = nextCh ? (nextCh.chapter_index ?? nextCh.index ?? (activeIdx + 1)) : (activeIdx + 1);
       await window.api.scripts.mergeChapter(script.id, { first_index: curIdx, second_index: nextIdx });
-      nav.toast('已合并', 'ok', 'check');
+      nav.toast(t('mobile.scripts.chapters.merged'), 'ok', 'check');
       setReloadTick(x => x + 1);
-    } catch (e) { nav.toast(e?.message || '操作失败', 'danger', 'warn'); }
+    } catch (e) { nav.toast(e?.message || t('mobile.scripts.op_failed'), 'danger', 'warn'); }
   };
   // 合并上一章:把前面那章折进当前章,保留当前章标题(序章/前言折进第一章)。
   const onMergePrev = async () => {
     if (!cur || activeIdx <= 0) return;
-    if (!window.confirm(`把第 ${activeIdx} 章合并进当前第 ${activeIdx + 1} 章(保留当前标题)？`)) return;
+    if (!window.confirm(t('mobile.scripts.chapters.confirm_merge_prev', { a: activeIdx, b: activeIdx + 1 }))) return;
     try {
       const prevCh = chapters[activeIdx - 1];
       const prevIdx = prevCh ? (prevCh.chapter_index ?? prevCh.index ?? (activeIdx - 1)) : (activeIdx - 1);
       await window.api.scripts.mergeChapter(script.id, { first_index: prevIdx, second_index: curIdx, keep_title_index: curIdx });
-      nav.toast('已合并', 'ok', 'check');
+      nav.toast(t('mobile.scripts.chapters.merged'), 'ok', 'check');
       setReloadTick(x => x + 1);
-    } catch (e) { nav.toast(e?.message || '操作失败', 'danger', 'warn'); }
+    } catch (e) { nav.toast(e?.message || t('mobile.scripts.op_failed'), 'danger', 'warn'); }
   };
 
   const onResplit = async () => {
-    const rule = window.prompt('重切分规则 (auto/chapter_cn/chapter_en/number_dot)', 'auto');
+    const rule = window.prompt(t('mobile.scripts.chapters.resplit_prompt'), 'auto');
     if (!rule) return;
     try {
       await window.api.scripts.resplit(script.id, { split_rule: rule });
-      nav.toast('已重新切分', 'ok', 'check');
+      nav.toast(t('mobile.scripts.chapters.resplit_done'), 'ok', 'check');
       setReloadTick(x => x + 1);
-    } catch (e) { nav.toast(e?.message || '操作失败', 'danger', 'warn'); }
+    } catch (e) { nav.toast(e?.message || t('mobile.scripts.op_failed'), 'danger', 'warn'); }
   };
 
   if (loading) {
@@ -152,9 +155,9 @@ function ChaptersView({ script, onBack, nav }) {
       <>
         <div className="pl-head">
           <button className="pl-back" onClick={onBack}><Icon name="chevron_left" size={20} /></button>
-          <div className="pl-head-title"><strong>章节列表</strong></div>
+          <div className="pl-head-title"><strong>{t('mobile.scripts.chapters.title')}</strong></div>
         </div>
-        <div className="pl-body"><div className="pl-pad"><div className="muted" style={{ fontSize: 13 }}>加载中…</div></div></div>
+        <div className="pl-body"><div className="pl-pad"><div className="muted" style={{ fontSize: 13 }}>{t('common.loading')}</div></div></div>
       </>
     );
   }
@@ -164,17 +167,17 @@ function ChaptersView({ script, onBack, nav }) {
       <div className="pl-head">
         <button className="pl-back" onClick={onBack}><Icon name="chevron_left" size={20} /></button>
         <div className="pl-head-title">
-          <strong>章节列表</strong>
-          <span className="sub">{chapters.length} 章 · 第 {activeIdx + 1} 章</span>
+          <strong>{t('mobile.scripts.chapters.title')}</strong>
+          <span className="sub">{t('mobile.scripts.chapters.subtitle', { total: chapters.length, current: activeIdx + 1 })}</span>
         </div>
         <div className="pl-head-actions">
-          <button className="pl-headbtn" onClick={onResplit} title="重新切分"><Icon name="refresh" size={18} /></button>
+          <button className="pl-headbtn" onClick={onResplit} title={t('mobile.scripts.chapters.resplit_title')}><Icon name="refresh" size={18} /></button>
         </div>
       </div>
       <div className="pl-body tabbed">
         {err && <div style={{ padding: '12px 16px', color: 'var(--danger)', fontSize: 13 }}>{err}</div>}
         {chapters.length === 0 ? (
-          <div className="pl-pad"><EmptyState icon="file" title="暂无章节" desc="导入剧本后将在此显示章节列表" /></div>
+          <div className="pl-pad"><EmptyState icon="file" title={t('mobile.scripts.chapters.empty_title')} desc={t('mobile.scripts.chapters.empty_desc')} /></div>
         ) : (
           <div style={{ display: 'grid', gridTemplateRows: '1fr', height: '100%' }}>
             {/* 章节选择器 */}
@@ -194,7 +197,7 @@ function ChaptersView({ script, onBack, nav }) {
                   <span className="mono" style={{ fontSize: 11 }}>#{String(i + 1).padStart(3, '0')}</span>
                   {' '}
                   <span style={{ maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', display: 'inline-block', verticalAlign: 'middle' }}>
-                    {c.title || '无标题'}
+                    {c.title || t('mobile.scripts.no_title')}
                   </span>
                 </button>
               ))}
@@ -203,22 +206,22 @@ function ChaptersView({ script, onBack, nav }) {
             {cur && (
               <div className="pl-pad" style={{ overflow: 'auto' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
-                  <strong style={{ fontFamily: 'var(--font-serif)', fontSize: 15 }}>{cur.title || '无标题'}</strong>
-                  <span className="mono muted-2" style={{ fontSize: 11 }}>{fmtN(cur.word_count || 0)} 字</span>
+                  <strong style={{ fontFamily: 'var(--font-serif)', fontSize: 15 }}>{cur.title || t('mobile.scripts.no_title')}</strong>
+                  <span className="mono muted-2" style={{ fontSize: 11 }}>{fmtN(cur.word_count || 0)}{t('mobile.scripts.unit.chars')}</span>
                   <div style={{ marginLeft: 'auto', display: 'flex', gap: 7 }}>
-                    <button className="pl-pill" style={{ height: 28 }} onClick={onRename}><Icon name="edit" size={13} /> 改名</button>
+                    <button className="pl-pill" style={{ height: 28 }} onClick={onRename}><Icon name="edit" size={13} /> {t('mobile.scripts.chapters.rename_btn')}</button>
                     {activeIdx > 0 && (
-                      <button className="pl-pill" style={{ height: 28 }} onClick={onMergePrev}><Icon name="link" size={13} /> 合并上章</button>
+                      <button className="pl-pill" style={{ height: 28 }} onClick={onMergePrev}><Icon name="link" size={13} /> {t('mobile.scripts.chapters.merge_prev_btn')}</button>
                     )}
                     {activeIdx < chapters.length - 1 && (
-                      <button className="pl-pill" style={{ height: 28 }} onClick={onMergeNext}><Icon name="link" size={13} /> 合并下章</button>
+                      <button className="pl-pill" style={{ height: 28 }} onClick={onMergeNext}><Icon name="link" size={13} /> {t('mobile.scripts.chapters.merge_next_btn')}</button>
                     )}
                   </div>
                 </div>
                 <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'var(--font-serif)', fontSize: 13.5, lineHeight: 1.75, margin: 0, color: 'var(--text-quiet)' }}>
                   {activeLoading
-                    ? (cur.content_preview || '') + '\n\n加载全文中…'
-                    : ((activeContent || cur.content_preview || '').slice(0, 8000) + ((activeContent?.length > 8000) ? '\n\n[正文过长，已截断前 8000 字]' : ''))}
+                    ? (cur.content_preview || '') + '\n\n' + t('mobile.scripts.chapters.loading_full')
+                    : ((activeContent || cur.content_preview || '').slice(0, 8000) + ((activeContent?.length > 8000) ? '\n\n' + t('mobile.scripts.chapters.truncated') : ''))}
                 </pre>
               </div>
             )}
@@ -231,6 +234,7 @@ function ChaptersView({ script, onBack, nav }) {
 
 /* ─── 世界书子视图 ─────────────────────────────── */
 function WorldbookView({ script, onBack }) {
+  const { t } = useTranslation();
   const [entries, setEntries] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -250,25 +254,25 @@ function WorldbookView({ script, onBack }) {
       <div className="pl-head">
         <button className="pl-back" onClick={onBack}><Icon name="chevron_left" size={20} /></button>
         <div className="pl-head-title center">
-          <strong>世界书</strong>
+          <strong>{t('mobile.scripts.worldbook.title')}</strong>
           <span className="sub">{script?.title}</span>
         </div>
       </div>
       <div className="pl-body tabbed">
         <div className="pl-pad">
-          {loading && <div className="muted" style={{ fontSize: 13 }}>加载中…</div>}
+          {loading && <div className="muted" style={{ fontSize: 13 }}>{t('common.loading')}</div>}
           {!loading && (!entries || entries.length === 0) && (
-            <EmptyState icon="world" title="暂无世界书条目" desc="导入并抽取后将自动生成" />
+            <EmptyState icon="world" title={t('mobile.scripts.worldbook.empty_title')} desc={t('mobile.scripts.worldbook.empty_desc')} />
           )}
           {!loading && entries && entries.map((e, i) => (
             <div key={e.id || i} className="pl-card" style={{ marginBottom: 9 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
                 <strong style={{ fontFamily: 'var(--font-serif)', fontSize: 14.5, color: 'var(--text)' }}>
-                  {e.key || e.keys || e.title || e.keyword || `条目 #${i + 1}`}
+                  {e.key || e.keys || e.title || e.keyword || t('mobile.scripts.worldbook.entry_n', { n: i + 1 })}
                 </strong>
                 <span className={'pill ' + (e.enabled !== false ? 'ok' : '')} style={{ height: 20, fontSize: 10 }}>
                   <span className={'dot ' + (e.enabled !== false ? 'ok' : '')} />
-                  {e.enabled !== false ? '激活' : '休眠'}
+                  {e.enabled !== false ? t('mobile.scripts.worldbook.active') : t('mobile.scripts.worldbook.dormant')}
                 </span>
               </div>
               <p style={{ margin: 0, fontSize: 12.5, color: 'var(--muted)', lineHeight: 1.6 }}>
@@ -284,6 +288,7 @@ function WorldbookView({ script, onBack }) {
 
 /* ─── NPC 子视图 ──────────────────────────────── */
 function NpcView({ script, onBack }) {
+  const { t } = useTranslation();
   const [npcs, setNpcs] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -303,15 +308,15 @@ function NpcView({ script, onBack }) {
       <div className="pl-head">
         <button className="pl-back" onClick={onBack}><Icon name="chevron_left" size={20} /></button>
         <div className="pl-head-title center">
-          <strong>NPC 角色卡</strong>
+          <strong>{t('mobile.scripts.npc.title')}</strong>
           <span className="sub">{script?.title}</span>
         </div>
       </div>
       <div className="pl-body tabbed">
         <div className="pl-pad">
-          {loading && <div className="muted" style={{ fontSize: 13 }}>加载中…</div>}
+          {loading && <div className="muted" style={{ fontSize: 13 }}>{t('common.loading')}</div>}
           {!loading && (!npcs || npcs.length === 0) && (
-            <EmptyState icon="cards" title="暂无 NPC 角色卡" desc="导入抽取后自动生成" />
+            <EmptyState icon="cards" title={t('mobile.scripts.npc.empty_title')} desc={t('mobile.scripts.npc.empty_desc')} />
           )}
           {!loading && npcs && npcs.map((c, i) => (
             <div key={c.id || i} className="pl-card" style={{ marginBottom: 9 }}>
@@ -321,17 +326,17 @@ function NpcView({ script, onBack }) {
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontFamily: 'var(--font-serif)', fontSize: 14.5, color: 'var(--text)' }}>
-                    {c.name || '未命名'}
+                    {c.name || t('mobile.scripts.npc.unnamed')}
                     {c.metadata?.is_protagonist && (
-                      <span className="pill accent" style={{ marginLeft: 7, height: 18, fontSize: 9.5 }}>主角</span>
+                      <span className="pill accent" style={{ marginLeft: 7, height: 18, fontSize: 9.5 }}>{t('mobile.scripts.npc.protagonist')}</span>
                     )}
                     {c.enabled === false && (
-                      <span className="pill" style={{ marginLeft: 5, height: 18, fontSize: 9.5 }}>已停用</span>
+                      <span className="pill" style={{ marginLeft: 5, height: 18, fontSize: 9.5 }}>{t('mobile.scripts.npc.disabled')}</span>
                     )}
                   </div>
                   <div style={{ fontSize: 11.5, color: 'var(--muted-2)', marginTop: 2 }}>
                     {c.identity || c.role || 'NPC'}
-                    {c.first_revealed_chapter > 1 && <span className="mono" style={{ marginLeft: 6 }}>第 {c.first_revealed_chapter} 章出场</span>}
+                    {c.first_revealed_chapter > 1 && <span className="mono" style={{ marginLeft: 6 }}>{t('mobile.scripts.npc.first_appears', { ch: c.first_revealed_chapter })}</span>}
                   </div>
                 </div>
               </div>
@@ -355,6 +360,7 @@ function NpcView({ script, onBack }) {
 
 /* ─── 时间线子视图 ────────────────────────────── */
 function TimelineView({ script, onBack }) {
+  const { t } = useTranslation();
   const [phases, setPhases] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -374,22 +380,22 @@ function TimelineView({ script, onBack }) {
       <div className="pl-head">
         <button className="pl-back" onClick={onBack}><Icon name="chevron_left" size={20} /></button>
         <div className="pl-head-title center">
-          <strong>时间线锚点</strong>
+          <strong>{t('mobile.scripts.timeline.title')}</strong>
           <span className="sub">{script?.title}</span>
         </div>
       </div>
       <div className="pl-body tabbed">
         <div className="pl-pad">
-          {loading && <div className="muted" style={{ fontSize: 13 }}>加载中…</div>}
+          {loading && <div className="muted" style={{ fontSize: 13 }}>{t('common.loading')}</div>}
           {!loading && (!phases || phases.length === 0) && (
-            <EmptyState icon="timeline" title="暂无时间线" desc="完成 anchors 模块构建后显示" />
+            <EmptyState icon="timeline" title={t('mobile.scripts.timeline.empty_title')} desc={t('mobile.scripts.timeline.empty_desc')} />
           )}
           {!loading && phases && phases.map((p, i) => (
             <div key={i} style={{ marginBottom: 20 }}>
               <div style={{ marginBottom: 9 }}>
                 <strong style={{ fontFamily: 'var(--font-serif)', fontSize: 14 }}>{p.phase_label}</strong>
                 <span className="mono muted-2" style={{ fontSize: 11, marginLeft: 8 }}>
-                  第 {p.chapter_min}–{p.chapter_max} 章
+                  {t('mobile.scripts.timeline.chapter_range', { min: p.chapter_min, max: p.chapter_max })}
                 </span>
               </div>
               {p.summary && <p style={{ margin: '0 0 10px', fontSize: 12.5, color: 'var(--muted)', lineHeight: 1.6 }}>{p.summary}</p>}
@@ -402,7 +408,7 @@ function TimelineView({ script, onBack }) {
                     </div>
                     <div className="branch-card" style={{ width: '100%' }}>
                       <div className="branch-top">
-                        <span className="branch-label serif">{a.story_time_label || `第 ${a.chapter_min}–${a.chapter_max} 章`}</span>
+                        <span className="branch-label serif">{a.story_time_label || t('mobile.scripts.timeline.chapter_range', { min: a.chapter_min, max: a.chapter_max })}</span>
                       </div>
                       {a.sample_summary && (
                         <div className="branch-msg" style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
@@ -423,6 +429,7 @@ function TimelineView({ script, onBack }) {
 
 /* ─── 版本历史子视图 ───────────────────────────── */
 function VersionsView({ script, currentUserId, onBack, nav }) {
+  const { t } = useTranslation();
   const [commits, setCommits] = useState([]);
   const [loading, setLoading] = useState(true);
   const [cursor, setCursor] = useState(null);
@@ -442,7 +449,7 @@ function VersionsView({ script, currentUserId, onBack, nav }) {
       const nextCursor = r?.next_cursor || null;
       setCursor(nextCursor);
       setHasMore(!!nextCursor);
-    } catch (_) { nav.toast('加载版本历史失败', 'danger', 'warn'); }
+    } catch (_) { nav.toast(t('mobile.scripts.versions.load_error'), 'danger', 'warn'); }
     finally { setLoading(false); }
   }, [script?.id]);
 
@@ -451,15 +458,15 @@ function VersionsView({ script, currentUserId, onBack, nav }) {
   const isOwner = script && currentUserId && script.owner_id === currentUserId;
 
   const onRollback = async (commit) => {
-    if (!window.confirm(`确认回退到版本 ${(commit.id || '').slice(0, 8)}？此操作不可撤销。`)) return;
+    if (!window.confirm(t('mobile.scripts.versions.confirm_rollback', { id: (commit.id || '').slice(0, 8) }))) return;
     setRollingBack(commit.id);
     try {
       await window.api.scripts.checkout(script.id, commit.id);
-      nav.toast('已回退到该版本', 'ok', 'check');
+      nav.toast(t('mobile.scripts.versions.rolled_back'), 'ok', 'check');
       try { window.dispatchEvent(new CustomEvent('rpg-scripts-updated')); } catch (_) {}
       onBack();
     } catch (e) {
-      nav.toast(e?.message || '回退失败', 'danger', 'warn');
+      nav.toast(e?.message || t('mobile.scripts.versions.rollback_error'), 'danger', 'warn');
     } finally { setRollingBack(null); }
   };
 
@@ -468,15 +475,15 @@ function VersionsView({ script, currentUserId, onBack, nav }) {
       <div className="pl-head">
         <button className="pl-back" onClick={onBack}><Icon name="chevron_left" size={20} /></button>
         <div className="pl-head-title center">
-          <strong>版本历史</strong>
+          <strong>{t('mobile.scripts.versions.title')}</strong>
           <span className="sub">{script?.title}</span>
         </div>
       </div>
       <div className="pl-body tabbed">
         <div className="pl-pad">
-          {loading && commits.length === 0 && <div className="muted" style={{ fontSize: 13 }}>加载中…</div>}
+          {loading && commits.length === 0 && <div className="muted" style={{ fontSize: 13 }}>{t('common.loading')}</div>}
           {!loading && commits.length === 0 && (
-            <EmptyState icon="history" title="暂无版本记录" />
+            <EmptyState icon="history" title={t('mobile.scripts.versions.empty_title')} />
           )}
           <div className="branch-tree">
             {commits.map((c, i) => (
@@ -489,7 +496,7 @@ function VersionsView({ script, currentUserId, onBack, nav }) {
                   <div className="branch-top">
                     <span className="branch-label serif">{c.message || c.kind || '—'}</span>
                     {c.id === script?.head_commit_id && (
-                      <span className="branch-ref">当前</span>
+                      <span className="branch-ref">{t('mobile.scripts.versions.current')}</span>
                     )}
                   </div>
                   <div className="branch-msg mono">{(c.id || '').slice(0, 8)} · {c.kind || ''}</div>
@@ -504,7 +511,7 @@ function VersionsView({ script, currentUserId, onBack, nav }) {
                         background: 'var(--accent-soft)',
                       }}
                     >
-                      {rollingBack === c.id ? '回退中…' : '回退到此版本'}
+                      {rollingBack === c.id ? t('mobile.scripts.versions.rolling_back') : t('mobile.scripts.versions.rollback_btn')}
                     </button>
                   )}
                 </div>
@@ -513,7 +520,7 @@ function VersionsView({ script, currentUserId, onBack, nav }) {
           </div>
           {hasMore && (
             <button className="pl-btn-ghost" style={{ marginTop: 14 }} onClick={() => loadCommits(cursor)}>
-              {loading ? '加载中…' : '加载更多'}
+              {loading ? t('common.loading') : t('common.load_more')}
             </button>
           )}
         </div>
@@ -524,6 +531,7 @@ function VersionsView({ script, currentUserId, onBack, nav }) {
 
 /* ─── 参数(overrides)子视图 ───────────────────── */
 function OverridesView({ script, onBack, nav }) {
+  const { t } = useTranslation();
   const [raw, setRaw] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -551,14 +559,14 @@ function OverridesView({ script, onBack, nav }) {
   const onSave = async () => {
     let parsed;
     try { parsed = JSON.parse(raw); } catch (e) {
-      nav.toast('JSON 格式错误：' + e.message, 'danger', 'warn'); return;
+      nav.toast(t('mobile.scripts.overrides.json_error', { msg: e.message }), 'danger', 'warn'); return;
     }
     setSaving(true);
     try {
       await window.api.scripts.saveOverrides(script.id, parsed);
-      nav.toast('已保存', 'ok', 'check');
+      nav.toast(t('mobile.scripts.overrides.saved'), 'ok', 'check');
       setDirty(false);
-    } catch (e) { nav.toast(e?.message || '保存失败', 'danger', 'warn'); }
+    } catch (e) { nav.toast(e?.message || t('mobile.scripts.overrides.save_error'), 'danger', 'warn'); }
     finally { setSaving(false); }
   };
 
@@ -567,7 +575,7 @@ function OverridesView({ script, onBack, nav }) {
       <div className="pl-head">
         <button className="pl-back" onClick={onBack}><Icon name="chevron_left" size={20} /></button>
         <div className="pl-head-title center">
-          <strong>剧本参数覆盖</strong>
+          <strong>{t('mobile.scripts.overrides.title')}</strong>
           <span className="sub">{script?.title}</span>
         </div>
         <div className="pl-head-actions">
@@ -584,11 +592,11 @@ function OverridesView({ script, onBack, nav }) {
       <div className="pl-body tabbed">
         <div className="pl-pad">
           <p style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.65, marginBottom: 12 }}>
-            script_overrides JSONB — 覆盖此剧本的全局参数，用于精细调整 GM 行为。
-            {!jsonValid && <span style={{ color: 'var(--danger)', marginLeft: 6 }}>JSON 格式有误</span>}
+            {t('mobile.scripts.overrides.desc')}
+            {!jsonValid && <span style={{ color: 'var(--danger)', marginLeft: 6 }}>{t('mobile.scripts.overrides.json_invalid')}</span>}
           </p>
           {loading ? (
-            <div className="muted" style={{ fontSize: 13 }}>加载中…</div>
+            <div className="muted" style={{ fontSize: 13 }}>{t('common.loading')}</div>
           ) : (
             <textarea
               value={raw}
@@ -609,7 +617,7 @@ function OverridesView({ script, onBack, nav }) {
             disabled={saving || !dirty || !jsonValid}
           >
             <Icon name="save" size={18} />
-            {saving ? '保存中…' : '保存'}
+            {saving ? t('mobile.scripts.overrides.saving') : t('common.save')}
           </button>
         </div>
       </div>
@@ -619,6 +627,7 @@ function OverridesView({ script, onBack, nav }) {
 
 /* ─── 发布/分享子视图 ─────────────────────────── */
 function ShareView({ script, currentUserId, onBack, onRefresh, nav }) {
+  const { t } = useTranslation();
   const [saving, setSaving] = useState(false);
   const [exporting, setExporting] = useState(false);
   const isOwner = script && currentUserId && script.owner_id === currentUserId;
@@ -628,17 +637,17 @@ function ShareView({ script, currentUserId, onBack, onRefresh, nav }) {
     if (!isOwner) return;
     const next = !isPublic;
     if (next && (script.review_status || 'unreviewed') !== 'reviewed') {
-      nav.toast('分享前需先完成剧本设定核对', 'accent', 'warn');
+      nav.toast(t('mobile.scripts.share.need_review'), 'accent', 'warn');
       return;
     }
-    if (next && !window.confirm(`确认将《${script.title}》发布到公开库？`)) return;
+    if (next && !window.confirm(t('mobile.scripts.share.confirm_publish', { title: script.title }))) return;
     setSaving(true);
     try {
       const r = await window.api.scripts.setVisibility(script.id, next);
-      if (r?.ok === false) throw new Error(r.message || r.error || '操作失败');
-      nav.toast(next ? '已发布到公开库' : '已取消发布', 'ok', 'check');
+      if (r?.ok === false) throw new Error(r.message || r.error || t('mobile.scripts.op_failed'));
+      nav.toast(next ? t('mobile.scripts.share.published') : t('mobile.scripts.share.unpublished'), 'ok', 'check');
       onRefresh?.();
-    } catch (e) { nav.toast(e?.message || '操作失败', 'danger', 'warn'); }
+    } catch (e) { nav.toast(e?.message || t('mobile.scripts.op_failed'), 'danger', 'warn'); }
     finally { setSaving(false); }
   };
 
@@ -647,20 +656,20 @@ function ShareView({ script, currentUserId, onBack, onRefresh, nav }) {
     try {
       const filename = (script.title || 'script').replace(/[\\/:*?"<>|]/g, '_') + '_pack.zip';
       await window.api.scripts.exportPack(script.id, filename);
-      nav.toast('导出成功：' + filename, 'ok', 'check');
-    } catch (e) { nav.toast(e?.message || '导出失败', 'danger', 'warn'); }
+      nav.toast(t('mobile.scripts.share.export_ok', { filename }), 'ok', 'check');
+    } catch (e) { nav.toast(e?.message || t('mobile.scripts.share.export_error'), 'danger', 'warn'); }
     finally { setExporting(false); }
   };
 
   const onFork = async () => {
-    if (!window.confirm(`将《${script.title}》另存为可编辑副本？`)) return;
+    if (!window.confirm(t('mobile.scripts.share.confirm_fork', { title: script.title }))) return;
     try {
-      const r = await window.api.scripts.fork(script.id, { title: `${script.title} (副本)` });
-      if (!r || r.ok === false) throw new Error(r?.error || '操作失败');
-      nav.toast('已另存为副本', 'ok', 'check');
+      const r = await window.api.scripts.fork(script.id, { title: `${script.title} (${t('mobile.scripts.share.copy_suffix')})` });
+      if (!r || r.ok === false) throw new Error(r?.error || t('mobile.scripts.op_failed'));
+      nav.toast(t('mobile.scripts.share.forked'), 'ok', 'check');
       try { window.dispatchEvent(new CustomEvent('rpg-scripts-updated')); } catch (_) {}
       onBack();
-    } catch (e) { nav.toast(e?.message || '操作失败', 'danger', 'warn'); }
+    } catch (e) { nav.toast(e?.message || t('mobile.scripts.op_failed'), 'danger', 'warn'); }
   };
 
   return (
@@ -668,7 +677,7 @@ function ShareView({ script, currentUserId, onBack, onRefresh, nav }) {
       <div className="pl-head">
         <button className="pl-back" onClick={onBack}><Icon name="chevron_left" size={20} /></button>
         <div className="pl-head-title center">
-          <strong>发布 / 导出</strong>
+          <strong>{t('mobile.scripts.share.title')}</strong>
           <span className="sub">{script?.title}</span>
         </div>
       </div>
@@ -681,8 +690,8 @@ function ShareView({ script, currentUserId, onBack, onRefresh, nav }) {
                   <Icon name="globe" size={16} />
                 </span>
                 <div className="pl-setrow-tx">
-                  <strong>发布到在线库</strong>
-                  <span>{isPublic ? '其他人可浏览并订阅此剧本' : '仅自己可见'}</span>
+                  <strong>{t('mobile.scripts.share.publish_label')}</strong>
+                  <span>{isPublic ? t('mobile.scripts.share.publish_on_desc') : t('mobile.scripts.share.publish_off_desc')}</span>
                 </div>
                 <button
                   className={'pl-toggle' + (isPublic ? ' on' : '')}
@@ -698,35 +707,35 @@ function ShareView({ script, currentUserId, onBack, onRefresh, nav }) {
               background: 'var(--info-soft)', border: '1px solid rgba(122,166,194,0.3)',
               fontSize: 13, color: 'var(--text-quiet)', lineHeight: 1.6,
             }}>
-              这是他人分享的剧本。你可以另存为副本后自由编辑。
+              {t('mobile.scripts.share.not_owner_desc')}
               <button
                 className="pl-btn-primary"
                 style={{ marginTop: 10 }}
                 onClick={onFork}
               >
-                <Icon name="copy" size={17} /> 另存为可编辑副本
+                <Icon name="copy" size={17} /> {t('mobile.scripts.share.fork_btn')}
               </button>
             </div>
           )}
 
           <div className="pl-sec">
-            <div className="pl-sec-head"><h2>导入 / 导出</h2></div>
+            <div className="pl-sec-head"><h2>{t('mobile.scripts.share.import_export_section')}</h2></div>
             <button className="pl-btn-ghost" style={{ marginBottom: 9 }} onClick={onExport} disabled={exporting}>
-              <Icon name="download" size={16} />{exporting ? '导出中…' : '导出剧本包 (.zip)'}
+              <Icon name="download" size={16} />{exporting ? t('mobile.scripts.share.exporting') : t('mobile.scripts.share.export_btn')}
             </button>
           </div>
 
           {script?.sharing_mode && script.sharing_mode !== 'private' && (
             <div className="pl-sec">
-              <div className="pl-sec-head"><h2>共享模式</h2></div>
+              <div className="pl-sec-head"><h2>{t('mobile.scripts.share.sharing_mode_section')}</h2></div>
               <div className="pl-card">
                 <div style={{ fontSize: 13, color: 'var(--text-quiet)' }}>
-                  当前模式：
+                  {t('mobile.scripts.share.current_mode')}
                   <span style={{ color: 'var(--accent)', fontWeight: 500 }}>
                     {{
-                      'public': '公开',
-                      'pinned-snapshot': '固定快照',
-                      'floating-latest': '跟随最新',
+                      'public': t('mobile.scripts.share.mode_public'),
+                      'pinned-snapshot': t('mobile.scripts.share.mode_pinned'),
+                      'floating-latest': t('mobile.scripts.share.mode_floating'),
                     }[script.sharing_mode] || script.sharing_mode}
                   </span>
                   {script.sharing_mode === 'pinned-snapshot' && script.current_pin_commit_id && (
@@ -746,6 +755,7 @@ function ShareView({ script, currentUserId, onBack, onRefresh, nav }) {
 
 /* ─── 剧本详情子视图 ───────────────────────────── */
 function ScriptDetailView({ script, saves, embedStatus, currentUserId, onBack, onRefresh, nav }) {
+  const { t } = useTranslation();
   const [subView, setSubView] = useState(null);
 
   const es = embedStatus[script?.id];
@@ -779,36 +789,36 @@ function ScriptDetailView({ script, saves, embedStatus, currentUserId, onBack, o
       const j = await r.json();
       if (j.ok === false) {
         if (isCredentialsError(j)) {
-          nav.toast('未配置向量嵌入模型，请先在设置中配置 RAG / Embedding 模型', 'accent', 'warn');
+          nav.toast(t('mobile.scripts.detail.embed_no_creds'), 'accent', 'warn');
         } else {
-          nav.toast(j.error || '向量化启动失败', 'danger', 'warn');
+          nav.toast(j.error || t('mobile.scripts.detail.embed_start_error'), 'danger', 'warn');
         }
         return;
       }
-      nav.toast('向量化任务已启动', 'ok', 'check');
+      nav.toast(t('mobile.scripts.detail.embed_started'), 'ok', 'check');
     } catch (e) { nav.toast(String(e), 'danger', 'warn'); }
   };
 
   const onDelete = async () => {
-    if (!window.confirm(`确认删除《${script.title}》？此操作不可撤销，相关存档也将无法使用。`)) return;
+    if (!window.confirm(t('mobile.scripts.detail.confirm_delete', { title: script.title }))) return;
     try {
       const r = await window.api.scripts.delete(script.id, { force: true });
-      if (!r || r.ok !== true) throw new Error(r?.error || '删除失败');
-      nav.toast('已删除', 'ok', 'check');
+      if (!r || r.ok !== true) throw new Error(r?.error || t('mobile.scripts.detail.delete_error'));
+      nav.toast(t('mobile.scripts.detail.deleted'), 'ok', 'check');
       try { window.dispatchEvent(new CustomEvent('rpg-scripts-updated')); } catch (_) {}
       onBack();
-    } catch (e) { nav.toast(e?.message || '删除失败', 'danger', 'warn'); }
+    } catch (e) { nav.toast(e?.message || t('mobile.scripts.detail.delete_error'), 'danger', 'warn'); }
   };
 
   const onUnsubscribe = async () => {
-    if (!window.confirm(`将「${script.title}」从你的剧本列表移除？原剧本不受影响，之后可在公开库重新导入。`)) return;
+    if (!window.confirm(t('mobile.scripts.detail.confirm_unsubscribe', { title: script.title }))) return;
     try {
       const r = await window.api.scripts.unsubscribe(script.id);
-      if (!r || r.ok !== true) throw new Error(r?.error || '移出失败');
-      nav.toast('已移出我的列表', 'ok', 'check');
+      if (!r || r.ok !== true) throw new Error(r?.error || t('mobile.scripts.detail.unsubscribe_error'));
+      nav.toast(t('mobile.scripts.detail.unsubscribed'), 'ok', 'check');
       try { window.dispatchEvent(new CustomEvent('rpg-scripts-updated')); } catch (_) {}
       onBack();
-    } catch (e) { nav.toast(e?.message || '移出失败', 'danger', 'warn'); }
+    } catch (e) { nav.toast(e?.message || t('mobile.scripts.detail.unsubscribe_error'), 'danger', 'warn'); }
   };
 
   if (subView === 'chapters') return <ChaptersView script={script} onBack={() => setSubView(null)} nav={nav} />;
@@ -830,15 +840,15 @@ function ScriptDetailView({ script, saves, embedStatus, currentUserId, onBack, o
           <span className="sub mono">{script.uid}</span>
         </div>
         <div className="pl-head-actions">
-          <button className="pl-headbtn" onClick={() => setSubView('share')} title="发布/导出">
+          <button className="pl-headbtn" onClick={() => setSubView('share')} title={t('mobile.scripts.detail.share_title')}>
             <Icon name={script.is_public ? 'globe' : 'upload'} size={17} />
           </button>
           {script.is_subscribed ? (
-            <button className="pl-headbtn" onClick={onUnsubscribe} title="移出我的列表" style={{ color: 'var(--danger)' }}>
+            <button className="pl-headbtn" onClick={onUnsubscribe} title={t('mobile.scripts.detail.unsubscribe_title')} style={{ color: 'var(--danger)' }}>
               <Icon name="trash" size={17} />
             </button>
           ) : (
-            <button className="pl-headbtn" onClick={onDelete} title="删除" style={{ color: 'var(--danger)' }}>
+            <button className="pl-headbtn" onClick={onDelete} title={t('common.delete')} style={{ color: 'var(--danger)' }}>
               <Icon name="trash" size={17} />
             </button>
           )}
@@ -849,23 +859,23 @@ function ScriptDetailView({ script, saves, embedStatus, currentUserId, onBack, o
           {isInternal ? (
             <div style={{ textAlign: 'center', padding: '40px 20px' }}>
               <div style={{ fontSize: 32, marginBottom: 12, opacity: 0.6 }}>🚧</div>
-              <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 8, fontFamily: 'var(--font-serif)' }}>敬请期待</div>
+              <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 8, fontFamily: 'var(--font-serif)' }}>{t('mobile.scripts.detail.coming_soon')}</div>
               <div style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.65 }}>
-                此功能模块正在开发中，公测后开放。
+                {t('mobile.scripts.detail.coming_soon_desc')}
               </div>
             </div>
           ) : (
             <>
               {/* 统计 */}
               <div className="pl-stats" style={{ marginBottom: 16 }}>
-                <div className="pl-stat"><span className="n accent">{fmtN(script.chapter_count || 0)}</span><div className="l">章节</div></div>
-                <div className="pl-stat"><span className="n">{((Number(script.word_count) || 0) / 10000).toFixed(1)}<span style={{ fontSize: 11 }}>万</span></span><div className="l">字数</div></div>
-                <div className="pl-stat"><span className="n">{savesCount}</span><div className="l">存档</div></div>
+                <div className="pl-stat"><span className="n accent">{fmtN(script.chapter_count || 0)}</span><div className="l">{t('mobile.scripts.detail.stat_chapters')}</div></div>
+                <div className="pl-stat"><span className="n">{((Number(script.word_count) || 0) / 10000).toFixed(1)}<span style={{ fontSize: 11 }}>{t('mobile.scripts.unit.wan')}</span></span><div className="l">{t('mobile.scripts.detail.stat_words')}</div></div>
+                <div className="pl-stat"><span className="n">{savesCount}</span><div className="l">{t('mobile.scripts.detail.stat_saves')}</div></div>
                 <div className="pl-stat">
                   <span className="n" style={{ fontSize: 14, color: embedDone ? 'var(--ok)' : embedRunning ? 'var(--warn)' : 'var(--muted)' }}>
                     {embedRunning ? `${embedPct}%` : embedDone ? '✓' : '—'}
                   </span>
-                  <div className="l">向量索引</div>
+                  <div className="l">{t('mobile.scripts.detail.stat_index')}</div>
                 </div>
               </div>
 
@@ -880,16 +890,16 @@ function ScriptDetailView({ script, saves, embedStatus, currentUserId, onBack, o
               {/* 导入报告 */}
               {script.import_report && (
                 <div className="pl-sec">
-                  <div className="pl-sec-head"><h2>导入报告</h2></div>
+                  <div className="pl-sec-head"><h2>{t('mobile.scripts.detail.import_report')}</h2></div>
                   <div className="pl-card">
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 12.5 }}>
-                      <span style={{ color: 'var(--muted)' }}>切分模式</span>
+                      <span style={{ color: 'var(--muted)' }}>{t('mobile.scripts.detail.split_mode')}</span>
                       <span>{script.import_report.mode_label || '—'}</span>
                     </div>
                     {script.import_report.confidence != null && (
                       <div style={{ marginBottom: 8 }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontSize: 12 }}>
-                          <span className="muted-2">置信度</span>
+                          <span className="muted-2">{t('mobile.scripts.detail.confidence')}</span>
                           <span className="mono" style={{ fontSize: 11 }}>{Math.round(script.import_report.confidence * 100)}%</span>
                         </div>
                         <div className="pl-progress">
@@ -909,17 +919,17 @@ function ScriptDetailView({ script, saves, embedStatus, currentUserId, onBack, o
               {/* readiness 状态 */}
               {script.readiness && !script.readiness.ok && (
                 <div className="pl-sec">
-                  <div className="pl-sec-head"><h2>就绪状态</h2></div>
+                  <div className="pl-sec-head"><h2>{t('mobile.scripts.detail.readiness')}</h2></div>
                   {(script.readiness.items || []).filter(it => !it.ok).map((it, i) => (
                     <button key={i} className="pl-row" onClick={() => {
                       const tabMap = { chunks: 'chapters', embeddings: 'chapters', canon: null, worldbook: 'worldbook', anchors: 'timeline' };
-                      const t = tabMap[it.key];
-                      if (t) setSubView(t);
+                      const sv = tabMap[it.key];
+                      if (sv) setSubView(sv);
                     }}>
                       <span className="pl-row-ic warn"><Icon name="warn" size={17} /></span>
                       <span className="pl-row-tx">
                         <strong>{it.key}</strong>
-                        <span>{it.total > 0 ? `${it.count}/${it.total}` : '未构建'}</span>
+                        <span>{it.total > 0 ? `${it.count}/${it.total}` : t('mobile.scripts.detail.not_built')}</span>
                       </span>
                       <span className="pl-row-chev"><Icon name="chevron_right" size={17} /></span>
                     </button>
@@ -929,56 +939,56 @@ function ScriptDetailView({ script, saves, embedStatus, currentUserId, onBack, o
 
               {/* 模块导航 */}
               <div className="pl-sec">
-                <div className="pl-sec-head"><h2>剧本模块</h2></div>
+                <div className="pl-sec-head"><h2>{t('mobile.scripts.detail.modules_section')}</h2></div>
                 <button className="pl-row" onClick={() => setSubView('chapters')}>
                   <span className="pl-row-ic accent"><Icon name="book_open" size={17} /></span>
-                  <span className="pl-row-tx"><strong>章节列表</strong><span>浏览、重命名、合并、拆分</span></span>
+                  <span className="pl-row-tx"><strong>{t('mobile.scripts.chapters.title')}</strong><span>{t('mobile.scripts.detail.chapters_desc')}</span></span>
                   <span className="pl-row-chev"><Icon name="chevron_right" size={17} /></span>
                 </button>
                 <button className="pl-row" onClick={() => setSubView('worldbook')}>
                   <span className="pl-row-ic ok"><Icon name="world" size={17} /></span>
-                  <span className="pl-row-tx"><strong>世界书</strong><span>知识条目 · 语义激活</span></span>
+                  <span className="pl-row-tx"><strong>{t('mobile.scripts.worldbook.title')}</strong><span>{t('mobile.scripts.detail.worldbook_desc')}</span></span>
                   <span className="pl-row-chev"><Icon name="chevron_right" size={17} /></span>
                 </button>
                 <button className="pl-row" onClick={() => setSubView('npc')}>
                   <span className="pl-row-ic info"><Icon name="cards" size={17} /></span>
-                  <span className="pl-row-tx"><strong>NPC 角色卡</strong><span>抽取的可玩角色卡片</span></span>
+                  <span className="pl-row-tx"><strong>{t('mobile.scripts.npc.title')}</strong><span>{t('mobile.scripts.detail.npc_desc')}</span></span>
                   <span className="pl-row-chev"><Icon name="chevron_right" size={17} /></span>
                 </button>
                 <button className="pl-row" onClick={() => setSubView('timeline')}>
                   <span className="pl-row-ic warn"><Icon name="timeline" size={17} /></span>
-                  <span className="pl-row-tx"><strong>时间线锚点</strong><span>故事时间轴 · 章节分期</span></span>
+                  <span className="pl-row-tx"><strong>{t('mobile.scripts.timeline.title')}</strong><span>{t('mobile.scripts.detail.timeline_desc')}</span></span>
                   <span className="pl-row-chev"><Icon name="chevron_right" size={17} /></span>
                 </button>
               </div>
 
               {/* 进阶 */}
               <div className="pl-sec">
-                <div className="pl-sec-head"><h2>进阶</h2></div>
+                <div className="pl-sec-head"><h2>{t('mobile.scripts.detail.advanced_section')}</h2></div>
                 <button className="pl-row" onClick={() => setSubView('overrides')}>
                   <span className="pl-row-ic"><Icon name="settings" size={17} /></span>
-                  <span className="pl-row-tx"><strong>剧本参数覆盖</strong><span>script_overrides JSONB</span></span>
+                  <span className="pl-row-tx"><strong>{t('mobile.scripts.overrides.title')}</strong><span>script_overrides JSONB</span></span>
                   <span className="pl-row-chev"><Icon name="chevron_right" size={17} /></span>
                 </button>
                 <button className="pl-row" onClick={() => setSubView('versions')}>
                   <span className="pl-row-ic"><Icon name="history" size={17} /></span>
-                  <span className="pl-row-tx"><strong>版本历史</strong><span>提交记录 · 回退 · 固定</span></span>
+                  <span className="pl-row-tx"><strong>{t('mobile.scripts.versions.title')}</strong><span>{t('mobile.scripts.detail.versions_desc')}</span></span>
                   <span className="pl-row-chev"><Icon name="chevron_right" size={17} /></span>
                 </button>
                 <button className="pl-row" onClick={() => setSubView('share')}>
                   <span className="pl-row-ic ok"><Icon name={script.is_public ? 'globe' : 'lock'} size={17} /></span>
                   <span className="pl-row-tx">
-                    <strong>发布 / 导出</strong>
-                    <span>{script.is_public ? '已发布到在线库' : '仅自己可见'} · 导出剧本包</span>
+                    <strong>{t('mobile.scripts.share.title')}</strong>
+                    <span>{script.is_public ? t('mobile.scripts.detail.share_published') : t('mobile.scripts.share.publish_off_desc')} · {t('mobile.scripts.share.export_btn')}</span>
                   </span>
                   <span className="pl-row-chev"><Icon name="chevron_right" size={17} /></span>
                 </button>
                 <button className="pl-row" onClick={onEmbed} disabled={embedRunning}>
                   <span className={'pl-row-ic ' + (embedDone ? 'ok' : '')}><Icon name="sparkle" size={17} /></span>
                   <span className="pl-row-tx">
-                    <strong>向量索引</strong>
+                    <strong>{t('mobile.scripts.detail.stat_index')}</strong>
                     <span>
-                      {embedRunning ? `向量化中 ${embedPct}%` : embedDone ? `已建索引 ${totalAll} 条` : '未建向量索引，点击开始'}
+                      {embedRunning ? t('mobile.scripts.detail.embed_running', { pct: embedPct }) : embedDone ? t('mobile.scripts.detail.embed_done', { count: totalAll }) : t('mobile.scripts.detail.embed_none')}
                     </span>
                   </span>
                   <span className="pl-row-chev"><Icon name={embedRunning ? 'refresh' : 'chevron_right'} size={17} /></span>
@@ -988,7 +998,7 @@ function ScriptDetailView({ script, saves, embedStatus, currentUserId, onBack, o
               {/* 不是自己的剧本 → 可 fork */}
               {!isOwner && script.owner_id && (
                 <div style={{ marginTop: 16, padding: '12px 14px', borderRadius: 12, background: 'var(--info-soft)', border: '1px solid rgba(122,166,194,0.3)', fontSize: 13, color: 'var(--text-quiet)', lineHeight: 1.6 }}>
-                  这是他人分享的剧本，你可将其另存为可编辑副本。
+                  {t('mobile.scripts.detail.not_owner_short')}
                 </div>
               )}
 
@@ -996,11 +1006,11 @@ function ScriptDetailView({ script, saves, embedStatus, currentUserId, onBack, o
               <div style={{ display: 'grid', gap: 9, marginTop: 22 }}>
                 <button className="pl-btn-primary" onClick={onPlay} disabled={!!playBlock}>
                   <Icon name="play" size={18} />
-                  {playBlock ? '暂时无法进入游戏' : scriptSaves.length > 0 ? `继续游戏（${scriptSaves.length} 个存档）` : '开始新游戏'}
+                  {playBlock ? t('mobile.scripts.detail.play_blocked') : scriptSaves.length > 0 ? t('mobile.scripts.detail.continue_game', { count: scriptSaves.length }) : t('mobile.scripts.detail.start_game')}
                 </button>
                 {scriptSaves.length > 0 && (
                   <button className="pl-btn-ghost" onClick={onNewGame}>
-                    <Icon name="plus" size={16} /> 新建存档
+                    <Icon name="plus" size={16} /> {t('mobile.scripts.detail.new_save')}
                   </button>
                 )}
               </div>
@@ -1014,6 +1024,7 @@ function ScriptDetailView({ script, saves, embedStatus, currentUserId, onBack, o
 
 /* ─── 导入向导视图 ─────────────────────────────── */
 function ImportView({ onBack, nav }) {
+  const { t } = useTranslation();
   const [step, setStep] = useState(0); // 0=上传 1=配置 2=预览 3=进行中/结果
   const [selectedFile, setSelectedFile] = useState(null);
   const [title, setTitle] = useState('');
@@ -1035,10 +1046,10 @@ function ImportView({ onBack, nav }) {
     if (!file) return;
     const name = (file.name || '').toLowerCase();
     if (!/\.(txt|md)$/.test(name)) {
-      nav.toast('仅支持 .txt / .md 文件', 'danger', 'warn'); return;
+      nav.toast(t('mobile.scripts.import.file_type_error'), 'danger', 'warn'); return;
     }
     if (file.size > 50 * 1024 * 1024) {
-      nav.toast('文件过大（上限 50 MB）', 'danger', 'warn'); return;
+      nav.toast(t('mobile.scripts.import.file_too_large'), 'danger', 'warn'); return;
     }
     setSelectedFile(file);
     setEstimate(null);
@@ -1052,7 +1063,7 @@ function ImportView({ onBack, nav }) {
     onProgress?.({ stage: 'init', percent: 0 });
     const init = await window.api.uploads.init({ filename: file.name, total_bytes: totalBytes, total_chunks: totalChunks });
     const uploadId = init.upload_id || init.id;
-    if (!uploadId) throw new Error('未获取到 upload_id');
+    if (!uploadId) throw new Error(t('mobile.scripts.import.no_upload_id'));
     for (let i = 0; i < totalChunks; i++) {
       const blob = file.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
       await window.api.uploads.chunk(uploadId, blob, i);
@@ -1064,14 +1075,14 @@ function ImportView({ onBack, nav }) {
   };
 
   const startPreview = async () => {
-    if (!selectedFile) { nav.toast('请先选择文件', 'accent', 'warn'); return; }
+    if (!selectedFile) { nav.toast(t('mobile.scripts.import.no_file_selected'), 'accent', 'warn'); return; }
     setPreviewBusy(true);
     setEstimate(null);
     try {
       const uploadId = await uploadChunks(selectedFile, ({ stage, done, total, percent }) => {
-        if (stage === 'init') setImportProgress('上传初始化…');
-        else if (stage === 'chunk') setImportProgress(`上传中 ${done}/${total}`);
-        else if (stage === 'finish') setImportProgress('上传完成，分析中…');
+        if (stage === 'init') setImportProgress(t('mobile.scripts.import.upload_init'));
+        else if (stage === 'chunk') setImportProgress(t('mobile.scripts.import.uploading', { done, total }));
+        else if (stage === 'finish') setImportProgress(t('mobile.scripts.import.upload_done'));
       });
       const result = await window.api.scripts.preview({
         upload_id: uploadId,
@@ -1084,7 +1095,7 @@ function ImportView({ onBack, nav }) {
       setEstimate({ chapters, words, upload_id: uploadId, preview: result.preview, report: result.report });
       setStep(2);
     } catch (e) {
-      nav.toast(e?.message || '预览失败', 'danger', 'warn');
+      nav.toast(e?.message || t('mobile.scripts.import.preview_error'), 'danger', 'warn');
     } finally {
       setPreviewBusy(false);
       setImportProgress('');
@@ -1095,17 +1106,17 @@ function ImportView({ onBack, nav }) {
     if (!selectedFile || !estimate) return;
     setImportBusy(true);
     setImportPercent(5);
-    setImportProgress('上传文件…');
+    setImportProgress(t('mobile.scripts.import.uploading_file'));
     setStep(3);
     try {
       let uploadId = estimate.upload_id;
       if (!uploadId) {
         uploadId = await uploadChunks(selectedFile, ({ stage, done, total, percent }) => {
           setImportPercent(Math.min(30, Math.round((percent || 0) * 0.30)));
-          setImportProgress(`上传中 ${done || 0}/${total || 1}`);
+          setImportProgress(t('mobile.scripts.import.uploading', { done: done || 0, total: total || 1 }));
         });
       }
-      setImportPercent(30); setImportProgress('创建剧本…');
+      setImportPercent(30); setImportProgress(t('mobile.scripts.import.creating_script'));
       const importResp = await window.api.scripts.importScript({
         upload_id: uploadId,
         title: title || selectedFile.name.replace(/\.(txt|md)$/i, ''),
@@ -1113,9 +1124,9 @@ function ImportView({ onBack, nav }) {
         custom_pattern: customPattern || '',
         require_llm_credentials: true,
       });
-      if (!importResp || importResp.ok === false) throw new Error(importResp?.error || '创建失败');
+      if (!importResp || importResp.ok === false) throw new Error(importResp?.error || t('mobile.scripts.import.create_error'));
       const sc = importResp.script || {};
-      setImportPercent(40); setImportProgress('启动抽取流水线…');
+      setImportPercent(40); setImportProgress(t('mobile.scripts.import.starting_pipeline'));
       const pipelineResp = await window.api.scripts.importPipeline(sc.id, {
         enable_cards: enableCards,
         enable_worldbook: enableWorldbook,
@@ -1123,22 +1134,22 @@ function ImportView({ onBack, nav }) {
       });
       if (!pipelineResp || pipelineResp.ok === false || !pipelineResp.job_id) {
         if (isCredentialsError(pipelineResp)) {
-          nav.toast('未配置 LLM API Key，请先在设置中配置，剧本已导入（章节已创建）', 'accent', 'warn');
+          nav.toast(t('mobile.scripts.import.no_llm_key_partial'), 'accent', 'warn');
           setJob({ status: 'paused_credentials', title: sc.title || title, script_id: sc.id });
           try { window.dispatchEvent(new CustomEvent('rpg-scripts-updated')); } catch (_) {}
           return;
         }
-        throw new Error(pipelineResp?.error || '流水线启动失败');
+        throw new Error(pipelineResp?.error || t('mobile.scripts.import.pipeline_error'));
       }
       setJob({ status: 'running', id: pipelineResp.job_id, title: sc.title || title, script_id: sc.id });
-      nav.toast('导入任务已派发后台', 'ok', 'check');
+      nav.toast(t('mobile.scripts.import.dispatched'), 'ok', 'check');
       try { window.dispatchEvent(new CustomEvent('rpg-scripts-updated')); } catch (_) {}
     } catch (e) {
       if (isCredentialsError(e)) {
-        nav.toast('未配置 LLM API Key，请先在设置中配置', 'accent', 'warn');
+        nav.toast(t('mobile.scripts.import.no_llm_key'), 'accent', 'warn');
         setJob({ status: 'paused_credentials' });
       } else {
-        nav.toast(e?.message || '导入失败', 'danger', 'warn');
+        nav.toast(e?.message || t('mobile.scripts.import.import_error'), 'danger', 'warn');
         setJob(null);
         setStep(2);
       }
@@ -1148,6 +1159,7 @@ function ImportView({ onBack, nav }) {
     }
   };
 
+  const SPLIT_RULES = getSplitRules();
   const ruleLabel = SPLIT_RULES.find(r2 => r2.id === rule)?.label || rule;
 
   return (
@@ -1157,8 +1169,8 @@ function ImportView({ onBack, nav }) {
           <Icon name="chevron_left" size={20} />
         </button>
         <div className="pl-head-title center">
-          <strong>导入剧本</strong>
-          <span className="sub">第 {step + 1} / 3 步</span>
+          <strong>{t('mobile.scripts.import.title')}</strong>
+          <span className="sub">{t('mobile.scripts.import.step', { n: step + 1 })}</span>
         </div>
       </div>
       <div className="pl-body tabbed">
@@ -1180,13 +1192,12 @@ function ImportView({ onBack, nav }) {
                   <Icon name="upload" size={26} />
                 </span>
                 <div>
-                  <strong style={{ fontSize: 15, color: 'var(--text)' }}>点击选择文件</strong>
-                  <div style={{ fontSize: 12, color: 'var(--muted-2)', marginTop: 5 }}>支持 .txt / .md · 最大 50 MB</div>
+                  <strong style={{ fontSize: 15, color: 'var(--text)' }}>{t('mobile.scripts.import.pick_file_label')}</strong>
+                  <div style={{ fontSize: 12, color: 'var(--muted-2)', marginTop: 5 }}>{t('mobile.scripts.import.pick_file_hint')}</div>
                 </div>
               </div>
               <div className="pl-note" style={{ marginTop: 16 }}>
-                导入后自动抽取 <strong>角色卡、世界书、时间线</strong>，并建立
-                <strong>向量索引（RAG）</strong>。整套脚手架就位后即可开局。
+                {t('mobile.scripts.import.intro_note')}
               </div>
             </>
           )}
@@ -1210,12 +1221,12 @@ function ImportView({ onBack, nav }) {
               </div>
 
               <div className="pl-field">
-                <label>剧本标题</label>
-                <input className="pl-input" value={title} onChange={e => setTitle(e.target.value)} placeholder="从文件名自动填入" />
+                <label>{t('mobile.scripts.import.script_title_label')}</label>
+                <input className="pl-input" value={title} onChange={e => setTitle(e.target.value)} placeholder={t('mobile.scripts.import.script_title_placeholder')} />
               </div>
 
               <div className="pl-field">
-                <label>章节切分模式</label>
+                <label>{t('mobile.scripts.import.split_mode_label')}</label>
                 <select
                   className="pl-input"
                   value={rule}
@@ -1228,32 +1239,32 @@ function ImportView({ onBack, nav }) {
 
               {rule === 'custom' && (
                 <div className="pl-field">
-                  <label>自定义正则</label>
-                  <input className="pl-input" value={customPattern} onChange={e => setCustomPattern(e.target.value)} placeholder="例: ^第.{1,10}章" />
+                  <label>{t('mobile.scripts.import.custom_regex_label')}</label>
+                  <input className="pl-input" value={customPattern} onChange={e => setCustomPattern(e.target.value)} placeholder={t('mobile.scripts.import.custom_regex_placeholder')} />
                 </div>
               )}
 
               <div className="pl-sec">
-                <div className="pl-sec-head"><h2>流水线选项</h2></div>
+                <div className="pl-sec-head"><h2>{t('mobile.scripts.import.pipeline_section')}</h2></div>
                 <div className="pl-group">
                   <div className="pl-setrow">
                     <div className="pl-setrow-tx">
-                      <strong>提取 NPC 角色卡</strong>
-                      <span>LLM 自动识别主要角色</span>
+                      <strong>{t('mobile.scripts.import.enable_cards_label')}</strong>
+                      <span>{t('mobile.scripts.import.enable_cards_desc')}</span>
                     </div>
                     <button className={'pl-toggle' + (enableCards ? ' on' : '')} onClick={() => setEnableCards(!enableCards)} />
                   </div>
                   <div className="pl-setrow">
                     <div className="pl-setrow-tx">
-                      <strong>生成世界书</strong>
-                      <span>自动抽取人物/地点/道具条目</span>
+                      <strong>{t('mobile.scripts.import.enable_worldbook_label')}</strong>
+                      <span>{t('mobile.scripts.import.enable_worldbook_desc')}</span>
                     </div>
                     <button className={'pl-toggle' + (enableWorldbook ? ' on' : '')} onClick={() => setEnableWorldbook(!enableWorldbook)} />
                   </div>
                 </div>
                 {(!enableCards || !enableWorldbook) && (
                   <div style={{ fontSize: 12, color: 'var(--warn)', marginTop: 8 }}>
-                    关闭部分选项会影响游戏中的 RAG 检索精度
+                    {t('mobile.scripts.import.pipeline_warn')}
                   </div>
                 )}
               </div>
@@ -1264,7 +1275,7 @@ function ImportView({ onBack, nav }) {
                 disabled={previewBusy || !selectedFile}
                 onClick={startPreview}
               >
-                {previewBusy ? <><Icon name="refresh" size={17} /> {importProgress || '上传中…'}</> : <><Icon name="sparkle" size={17} />预览分章</>}
+                {previewBusy ? <><Icon name="refresh" size={17} /> {importProgress || t('mobile.scripts.import.uploading_label')}</> : <><Icon name="sparkle" size={17} />{t('mobile.scripts.import.preview_btn')}</>}
               </button>
               {previewBusy && (
                 <div style={{ marginTop: 10 }}>
@@ -1282,54 +1293,54 @@ function ImportView({ onBack, nav }) {
                 <span className="pl-row-ic ok" style={{ width: 50, height: 50, margin: '0 auto 10px' }}>
                   <Icon name="check" size={24} />
                 </span>
-                <strong style={{ fontSize: 17, fontFamily: 'var(--font-serif)', color: 'var(--text)' }}>分析完成</strong>
+                <strong style={{ fontSize: 17, fontFamily: 'var(--font-serif)', color: 'var(--text)' }}>{t('mobile.scripts.import.analysis_done')}</strong>
                 <div style={{ fontSize: 12.5, color: 'var(--muted)', marginTop: 6 }}>
-                  识别 {estimate.chapters} 章
-                  {estimate.report?.confidence != null && ` · 置信 ${Math.round(estimate.report.confidence * 100)}%`}
+                  {t('mobile.scripts.import.detected_chapters', { n: estimate.chapters })}
+                  {estimate.report?.confidence != null && ` · ${t('mobile.scripts.import.confidence', { pct: Math.round(estimate.report.confidence * 100) })}`}
                 </div>
               </div>
 
               <div className="pl-kvgrid" style={{ marginBottom: 16 }}>
-                <div className="pl-kv"><div className="k">章节</div><div className="v">{fmtN(estimate.chapters)}</div></div>
-                <div className="pl-kv"><div className="k">字数</div><div className="v">{fmtWan(estimate.words)}</div></div>
-                <div className="pl-kv"><div className="k">切分模式</div><div className="v" style={{ fontSize: 12 }}>{ruleLabel}</div></div>
+                <div className="pl-kv"><div className="k">{t('mobile.scripts.detail.stat_chapters')}</div><div className="v">{fmtN(estimate.chapters)}</div></div>
+                <div className="pl-kv"><div className="k">{t('mobile.scripts.detail.stat_words')}</div><div className="v">{fmtWan(estimate.words)}</div></div>
+                <div className="pl-kv"><div className="k">{t('mobile.scripts.import.split_mode_label')}</div><div className="v" style={{ fontSize: 12 }}>{ruleLabel}</div></div>
                 <div className="pl-kv">
-                  <div className="k">提取角色卡</div>
-                  <div className="v" style={{ fontSize: 13 }}>{enableCards ? '是' : '否'}</div>
+                  <div className="k">{t('mobile.scripts.import.enable_cards_label')}</div>
+                  <div className="v" style={{ fontSize: 13 }}>{enableCards ? t('mobile.scripts.import.yes') : t('mobile.scripts.import.no')}</div>
                 </div>
               </div>
 
               {/* 章节预览列表 */}
               {Array.isArray(estimate.preview) && estimate.preview.length > 0 && (
                 <div className="pl-sec">
-                  <div className="pl-sec-head"><h2>章节预览（前 {estimate.preview.length} 章）</h2></div>
+                  <div className="pl-sec-head"><h2>{t('mobile.scripts.import.preview_section', { n: estimate.preview.length })}</h2></div>
                   {estimate.preview.slice(0, 10).map((p, i) => (
                     <div key={i} className="pl-row" style={{ cursor: 'default' }}>
                       <span className="mono muted-2" style={{ fontSize: 11, width: 32, flex: 'none' }}>#{String(p.idx || i + 1).padStart(3, '0')}</span>
                       <span className="pl-row-tx">
-                        <strong style={{ fontFamily: 'var(--font-serif)' }}>{p.title || '无标题'}</strong>
-                        <span className="mono">{fmtN(p.words || 0)} 字</span>
+                        <strong style={{ fontFamily: 'var(--font-serif)' }}>{p.title || t('mobile.scripts.no_title')}</strong>
+                        <span className="mono">{fmtN(p.words || 0)}{t('mobile.scripts.unit.chars')}</span>
                       </span>
-                      {!p.ok && <span className="pill warn" style={{ height: 19, fontSize: 10 }}>有问题</span>}
+                      {!p.ok && <span className="pill warn" style={{ height: 19, fontSize: 10 }}>{t('mobile.scripts.import.has_issue')}</span>}
                     </div>
                   ))}
                   {estimate.preview.length > 10 && (
                     <div style={{ textAlign: 'center', fontSize: 12, color: 'var(--muted-2)', padding: '8px 0' }}>
-                      还有 {estimate.preview.length - 10} 章…
+                      {t('mobile.scripts.import.more_chapters', { n: estimate.preview.length - 10 })}
                     </div>
                   )}
                 </div>
               )}
 
               <div className="pl-note" style={{ marginTop: 14 }}>
-                确认后将在后台建立向量索引及 LLM 抽取，约需数分钟。完成前可先浏览列表，索引就绪后检索更准。
+                {t('mobile.scripts.import.confirm_note')}
               </div>
               <div style={{ display: 'grid', gap: 9, marginTop: 20 }}>
                 <button className="pl-btn-primary" onClick={startImport} disabled={importBusy}>
-                  <Icon name="check" size={17} /> 确认导入（后台运行）
+                  <Icon name="check" size={17} /> {t('mobile.scripts.import.confirm_btn')}
                 </button>
                 <button className="pl-btn-ghost" onClick={() => setStep(1)}>
-                  <Icon name="chevron_left" size={16} /> 返回修改
+                  <Icon name="chevron_left" size={16} /> {t('mobile.scripts.import.back_btn')}
                 </button>
               </div>
             </>
@@ -1343,7 +1354,7 @@ function ImportView({ onBack, nav }) {
                   <div style={{ width: 56, height: 56, borderRadius: 17, display: 'grid', placeItems: 'center', background: 'var(--accent-soft)', border: '1px solid var(--accent-edge)', margin: '0 auto 16px', color: 'var(--accent)' }}>
                     <Icon name="refresh" size={26} />
                   </div>
-                  <div style={{ fontFamily: 'var(--font-serif)', fontSize: 17, color: 'var(--text)', marginBottom: 8 }}>上传中…</div>
+                  <div style={{ fontFamily: 'var(--font-serif)', fontSize: 17, color: 'var(--text)', marginBottom: 8 }}>{t('mobile.scripts.import.uploading_label')}</div>
                   <div style={{ fontSize: 12.5, color: 'var(--muted)' }}>{importProgress}</div>
                   <div className="pl-progress" style={{ marginTop: 16 }}>
                     <i style={{ width: `${importPercent}%`, transition: 'width .3s' }} />
@@ -1358,21 +1369,21 @@ function ImportView({ onBack, nav }) {
                         <Icon name={job.status === 'running' ? 'sparkle' : 'warn'} size={24} />
                       </span>
                       <div style={{ fontFamily: 'var(--font-serif)', fontSize: 16, color: 'var(--text)', marginBottom: 8 }}>
-                        {job.status === 'running' ? '后台处理中' : '需要配置 API Key'}
+                        {job.status === 'running' ? t('mobile.scripts.import.job_running_title') : t('mobile.scripts.import.job_needs_key_title')}
                       </div>
                       <div style={{ fontSize: 12.5, color: 'var(--muted)', lineHeight: 1.65 }}>
                         {job.status === 'running'
-                          ? `《${job.title || '—'}》正在后台建立索引，可前往剧本列表查看进度。`
-                          : '剧本已创建，但 LLM 抽取需要配置 API Key。请前往设置完成配置。'}
+                          ? t('mobile.scripts.import.job_running_desc', { title: job.title || '—' })
+                          : t('mobile.scripts.import.job_needs_key_desc')}
                       </div>
                     </div>
                   )}
                   <div style={{ display: 'grid', gap: 9 }}>
                     <button className="pl-btn-primary" onClick={onBack}>
-                      <Icon name="book_open" size={17} /> 前往剧本列表
+                      <Icon name="book_open" size={17} /> {t('mobile.scripts.import.go_to_list')}
                     </button>
                     <button className="pl-btn-ghost" onClick={() => { setJob(null); setEstimate(null); setSelectedFile(null); setTitle(''); setStep(0); }}>
-                      <Icon name="plus" size={16} /> 再导入一部
+                      <Icon name="plus" size={16} /> {t('mobile.scripts.import.import_another')}
                     </button>
                   </div>
                 </>
@@ -1387,6 +1398,7 @@ function ImportView({ onBack, nav }) {
 
 /* ─── 在线剧本库视图 ─────────────────────────── */
 function LibraryView({ onBack, nav }) {
+  const { t } = useTranslation();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState('');
@@ -1400,7 +1412,7 @@ function LibraryView({ onBack, nav }) {
       const r = await window.api.scripts.publicList(query ? { q: query } : undefined);
       setItems(Array.isArray(r?.items) ? r.items : []);
     } catch (e) {
-      nav.toast(e?.message || '加载失败', 'danger', 'warn');
+      nav.toast(e?.message || t('mobile.scripts.library.load_error'), 'danger', 'warn');
       setItems([]);
     } finally { setLoading(false); }
   }, []);
@@ -1411,13 +1423,13 @@ function LibraryView({ onBack, nav }) {
     setCloningId(s.id);
     try {
       const r = await window.api.scripts.cloneFromPublic(s.id);
-      if (r?.ok === false) throw new Error(r.error || '导入失败');
-      nav.toast(`已导入《${s.title}》到你的剧本库`, 'ok', 'check');
+      if (r?.ok === false) throw new Error(r.error || t('mobile.scripts.library.clone_error'));
+      nav.toast(t('mobile.scripts.library.cloned', { title: s.title }), 'ok', 'check');
       setImportedIds(m => ({ ...m, [s.id]: true }));
       setItems(arr => arr.map(x => x.id === s.id ? { ...x, clone_count: (x.clone_count || 0) + 1 } : x));
       try { window.dispatchEvent(new CustomEvent('rpg-scripts-updated')); } catch (_) {}
     } catch (e) {
-      nav.toast(e?.message || '导入失败', 'danger', 'warn');
+      nav.toast(e?.message || t('mobile.scripts.library.clone_error'), 'danger', 'warn');
     } finally { setCloningId(null); }
   };
 
@@ -1430,7 +1442,7 @@ function LibraryView({ onBack, nav }) {
           <button className="pl-back" onClick={() => setSelectedItem(null)}><Icon name="chevron_left" size={20} /></button>
           <div className="pl-head-title">
             <strong style={{ fontSize: 14.5 }}>{s.title}</strong>
-            <span className="sub">在线库 · {s.author || s.author_username || '未知作者'}</span>
+            <span className="sub">{t('mobile.scripts.library.title')} · {s.author || s.author_username || t('mobile.scripts.library.unknown_author')}</span>
           </div>
         </div>
         <div className="pl-body tabbed">
@@ -1438,34 +1450,34 @@ function LibraryView({ onBack, nav }) {
             <span className="pl-cover-spine" />
             <div style={{ position: 'relative' }}>
               <h3 style={{ fontSize: 22 }}>{s.title}</h3>
-              <div style={{ fontSize: 12, color: 'var(--text-quiet)', marginTop: 5 }}>{s.author || s.author_username || '—'}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-quiet)', marginTop: 5 }}>{s.author || s.author_username || t('mobile.scripts.library.unknown_author')}</div>
             </div>
             {alreadyImported && (
               <span className="pill ok" style={{ position: 'absolute', top: 10, right: 10, height: 20, fontSize: 10 }}>
-                <span className="dot ok" />{s.mine ? '我的剧本' : '已导入'}
+                <span className="dot ok" />{s.mine ? t('mobile.scripts.library.mine') : t('mobile.scripts.library.imported')}
               </span>
             )}
           </div>
           <div className="pl-pad">
             {s.description && <p style={{ margin: '0 0 14px', fontSize: 13.5, color: 'var(--text-quiet)', lineHeight: 1.7 }}>{s.description}</p>}
             <div className="pl-kvgrid" style={{ marginBottom: 14 }}>
-              <div className="pl-kv"><div className="k">章节</div><div className="v">{fmtN(s.chapter_count || 0)}</div></div>
-              <div className="pl-kv"><div className="k">字数</div><div className="v">{fmtWan(s.word_count || 0)}</div></div>
-              <div className="pl-kv"><div className="k">克隆数</div><div className="v">{fmtN(s.clone_count || 0)}</div></div>
+              <div className="pl-kv"><div className="k">{t('mobile.scripts.detail.stat_chapters')}</div><div className="v">{fmtN(s.chapter_count || 0)}</div></div>
+              <div className="pl-kv"><div className="k">{t('mobile.scripts.detail.stat_words')}</div><div className="v">{fmtWan(s.word_count || 0)}</div></div>
+              <div className="pl-kv"><div className="k">{t('mobile.scripts.library.clone_count')}</div><div className="v">{fmtN(s.clone_count || 0)}</div></div>
               <div className="pl-kv"><div className="k">ID</div><div className="v mono" style={{ fontSize: 11 }}>{s.uid || String(s.id).slice(0, 8)}</div></div>
             </div>
             <div style={{ display: 'grid', gap: 9 }}>
               {alreadyImported ? (
                 <button className="pl-btn-ghost" disabled style={{ color: 'var(--ok)', borderColor: 'rgba(126,184,142,0.3)' }}>
-                  <Icon name="check" size={17} /> {s.mine ? '已在我的剧本库' : '已导入'}
+                  <Icon name="check" size={17} /> {s.mine ? t('mobile.scripts.library.already_mine') : t('mobile.scripts.library.imported')}
                 </button>
               ) : (
                 <button className="pl-btn-primary" onClick={() => onClone(s)} disabled={cloningId === s.id}>
-                  <Icon name="download" size={17} />{cloningId === s.id ? '导入中…' : '导入到我的剧本库'}
+                  <Icon name="download" size={17} />{cloningId === s.id ? t('mobile.scripts.library.cloning') : t('mobile.scripts.library.clone_btn')}
                 </button>
               )}
               <button className="pl-btn-ghost" onClick={() => setSelectedItem(null)}>
-                <Icon name="chevron_left" size={16} /> 返回
+                <Icon name="chevron_left" size={16} /> {t('mobile.scripts.library.back_btn')}
               </button>
             </div>
           </div>
@@ -1479,11 +1491,11 @@ function LibraryView({ onBack, nav }) {
       <div className="pl-head">
         <button className="pl-back" onClick={onBack}><Icon name="chevron_left" size={20} /></button>
         <div className="pl-head-title center">
-          <strong>在线剧本库</strong>
-          <span className="sub">社区公开 · 导入即玩</span>
+          <strong>{t('mobile.scripts.library.title')}</strong>
+          <span className="sub">{t('mobile.scripts.library.subtitle')}</span>
         </div>
         <div className="pl-head-actions">
-          <button className="pl-headbtn" onClick={() => reload(q)} title="刷新">
+          <button className="pl-headbtn" onClick={() => reload(q)} title={t('common.refresh')}>
             <Icon name="refresh" size={18} />
           </button>
         </div>
@@ -1492,20 +1504,20 @@ function LibraryView({ onBack, nav }) {
         <div className="pl-search">
           <Icon name="search" size={16} />
           <input
-            placeholder="搜索公开剧本…"
+            placeholder={t('mobile.scripts.library.search_placeholder')}
             value={q}
             onChange={e => setQ(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && reload(q)}
           />
           {q && <button onClick={() => { setQ(''); reload(''); }}><Icon name="close" size={15} /></button>}
         </div>
-        {q && <button className="pl-pill" onClick={() => reload(q)}>搜索</button>}
+        {q && <button className="pl-pill" onClick={() => reload(q)}>{t('mobile.scripts.library.search_btn')}</button>}
       </div>
       <div className="pl-body tabbed">
         <div className="pl-pad">
-          {loading && <div className="muted" style={{ fontSize: 13, padding: '20px 0' }}>加载中…</div>}
+          {loading && <div className="muted" style={{ fontSize: 13, padding: '20px 0' }}>{t('common.loading')}</div>}
           {!loading && items.length === 0 && (
-            <EmptyState icon="globe" title={q ? '未找到匹配剧本' : '暂无公开剧本'} desc={q ? '换个关键词试试' : '还没有人分享剧本'} />
+            <EmptyState icon="globe" title={q ? t('mobile.scripts.library.no_results') : t('mobile.scripts.library.empty_title')} desc={q ? t('mobile.scripts.library.try_other_keyword') : t('mobile.scripts.library.empty_desc')} />
           )}
           {items.map(s => (
             <button
@@ -1519,7 +1531,7 @@ function LibraryView({ onBack, nav }) {
                 <h3>{s.title}</h3>
                 {(s.mine || importedIds[s.id]) && (
                   <span className="pill ok" style={{ position: 'absolute', top: 8, right: 10, height: 18, fontSize: 9.5 }}>
-                    <span className="dot ok" />{s.mine ? '已在库' : '已导入'}
+                    <span className="dot ok" />{s.mine ? t('mobile.scripts.library.in_library') : t('mobile.scripts.library.imported')}
                   </span>
                 )}
               </div>
@@ -1530,7 +1542,7 @@ function LibraryView({ onBack, nav }) {
                   {s.author || s.author_username || '—'}
                   <span className="sep">·</span>
                   <Icon name="book_open" size={11} />
-                  {fmtN(s.chapter_count || 0)} 章
+                  {fmtN(s.chapter_count || 0)} {t('mobile.scripts.unit.chapter')}
                   <span className="sep">·</span>
                   <Icon name="download" size={11} />
                   {fmtN(s.clone_count || 0)}
@@ -1546,6 +1558,7 @@ function LibraryView({ onBack, nav }) {
 
 /* ─── 主组件 ────────────────────────────────── */
 export function MobileScripts({ nav }) {
+  const { t } = useTranslation();
   const platform = usePlatformData();
   const { saves: platSaves = [] } = platform;
 
@@ -1596,10 +1609,10 @@ export function MobileScripts({ nav }) {
   }, [nav?.pageId]);
 
   const FILTERS = [
-    { id: 'all', label: '全部' },
-    { id: 'ready', label: '已就绪' },
-    { id: 'importing', label: '导入中' },
-    { id: 'public', label: '已公开' },
+    { id: 'all', label: t('common.all') },
+    { id: 'ready', label: t('mobile.scripts.filter.ready') },
+    { id: 'importing', label: t('mobile.scripts.filter.importing') },
+    { id: 'public', label: t('mobile.scripts.filter.public') },
   ];
 
   const visibleScripts = scripts.filter(s => {
@@ -1638,10 +1651,10 @@ export function MobileScripts({ nav }) {
     <>
       <div className="pl-head">
         <div className="pl-head-title">
-          <strong style={{ fontSize: 19, fontFamily: 'var(--font-serif)' }}>剧本</strong>
+          <strong style={{ fontSize: 19, fontFamily: 'var(--font-serif)' }}>{t('mobile.scripts.list.title')}</strong>
         </div>
         <div className="pl-head-actions">
-          <button className="pl-headbtn" title="在线库" onClick={() => setView('library')}>
+          <button className="pl-headbtn" title={t('mobile.scripts.library.title')} onClick={() => setView('library')}>
             <Icon name="globe" size={18} />
           </button>
           <button className="pl-headbtn" style={{ color: 'var(--accent)', border: '1px solid var(--accent-edge)', background: 'var(--accent-soft)' }} onClick={() => setView('import')}>
@@ -1654,7 +1667,7 @@ export function MobileScripts({ nav }) {
         <div className="pl-search">
           <Icon name="search" size={16} />
           <input
-            placeholder="搜索剧本…"
+            placeholder={t('mobile.scripts.list.search_placeholder')}
             value={query}
             onChange={e => setQuery(e.target.value)}
           />
@@ -1677,16 +1690,16 @@ export function MobileScripts({ nav }) {
       <div className="pl-body tabbed">
         <div className="pl-pad" style={{ paddingTop: 4 }}>
           {!loaded && (
-            <div className="muted" style={{ fontSize: 13, padding: '20px 0' }}>加载中…</div>
+            <div className="muted" style={{ fontSize: 13, padding: '20px 0' }}>{t('common.loading')}</div>
           )}
           {loaded && visibleScripts.length === 0 && (
             <EmptyState
               icon="book_open"
-              title={query ? '未找到匹配剧本' : '暂无剧本'}
-              desc={query ? '换个关键词试试' : '导入一部小说开始你的 RPG 之旅'}
+              title={query ? t('mobile.scripts.list.no_results') : t('mobile.scripts.list.empty_title')}
+              desc={query ? t('mobile.scripts.list.try_other_keyword') : t('mobile.scripts.list.empty_desc')}
               action={!query && (
                 <button className="pl-btn-primary" style={{ marginTop: 16 }} onClick={() => setView('import')}>
-                  <Icon name="upload" size={18} /> 导入剧本
+                  <Icon name="upload" size={18} /> {t('mobile.scripts.list.import_btn')}
                 </button>
               )}
             />
@@ -1711,11 +1724,11 @@ export function MobileScripts({ nav }) {
                   <span className="pl-cover-spine" />
                   <h3>{s.title}</h3>
                   {isInternal && (
-                    <span className="pill" style={{ position: 'absolute', top: 8, right: 10, height: 18, fontSize: 9.5 }}>敬请期待</span>
+                    <span className="pill" style={{ position: 'absolute', top: 8, right: 10, height: 18, fontSize: 9.5 }}>{t('mobile.scripts.detail.coming_soon')}</span>
                   )}
                   {s.is_public && !isInternal && (
                     <span className="pill ok" style={{ position: 'absolute', top: 8, right: 10, height: 18, fontSize: 9.5 }}>
-                      <span className="dot ok" />已公开
+                      <span className="dot ok" />{t('mobile.scripts.list.is_public')}
                     </span>
                   )}
                   {s.forked_from_script_id && (
@@ -1730,19 +1743,19 @@ export function MobileScripts({ nav }) {
                   </div>
                   <div className="pl-cover-meta">
                     <Icon name="book_open" size={11} />
-                    {fmtN(s.chapter_count || 0)} 章
+                    {fmtN(s.chapter_count || 0)} {t('mobile.scripts.unit.chapter')}
                     <span className="sep">·</span>
                     {fmtWan(s.word_count)}
                     {savesCount > 0 && (
-                      <><span className="sep">·</span><Icon name="save" size={11} />{savesCount} 存档</>
+                      <><span className="sep">·</span><Icon name="save" size={11} />{savesCount} {t('mobile.scripts.list.saves_unit')}</>
                     )}
                     <span style={{ flex: 1 }} />
                     {embedRunning
-                      ? <span className="pill warn" style={{ height: 18, fontSize: 9.5 }}><span className="dot warn" />索引中</span>
+                      ? <span className="pill warn" style={{ height: 18, fontSize: 9.5 }}><span className="dot warn" />{t('mobile.scripts.list.indexing')}</span>
                       : embedDone
-                        ? <span className="pill ok" style={{ height: 18, fontSize: 9.5 }}><span className="dot ok" />就绪</span>
+                        ? <span className="pill ok" style={{ height: 18, fontSize: 9.5 }}><span className="dot ok" />{t('mobile.scripts.list.ready')}</span>
                         : block
-                          ? <span className="pill" style={{ height: 18, fontSize: 9.5 }}>未就绪</span>
+                          ? <span className="pill" style={{ height: 18, fontSize: 9.5 }}>{t('mobile.scripts.list.not_ready')}</span>
                           : null}
                   </div>
                   {s.import_report?.mode_label && (
@@ -1763,15 +1776,15 @@ export function MobileScripts({ nav }) {
           {/* 统计条 */}
           {loaded && scripts.length > 0 && (
             <div style={{ textAlign: 'center', padding: '14px 0 4px', fontSize: 11.5, color: 'var(--muted-2)' }}>
-              共 {scripts.length} 部剧本
-              {visibleScripts.length !== scripts.length && ` · 显示 ${visibleScripts.length} 部`}
+              {t('mobile.scripts.list.total', { n: scripts.length })}
+              {visibleScripts.length !== scripts.length && ` · ${t('mobile.scripts.list.showing', { n: visibleScripts.length })}`}
             </div>
           )}
         </div>
       </div>
 
       {/* FAB 快捷导入 */}
-      <button className="pl-fab" onClick={() => setView('import')} title="导入新剧本">
+      <button className="pl-fab" onClick={() => setView('import')} title={t('mobile.scripts.list.fab_title')}>
         <Icon name="upload" size={22} />
       </button>
     </>

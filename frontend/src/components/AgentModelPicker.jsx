@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import CSContainer from '@cloudscape-design/components/container';
 import CSHeader from '@cloudscape-design/components/header';
 import CSColumnLayout from '@cloudscape-design/components/column-layout';
@@ -86,7 +87,7 @@ if (typeof document !== 'undefined' && !document.getElementById(AMP_POP_STYLE_ID
                               (传入 embedder/status 判定结果布尔:true=允许平台兜底) */
 export default function AgentModelPicker({
   prefPrefix,
-  header = '模型',
+  header = null,
   description = '',
   defaultModel = null,      // 不再硬编码；null 时从后端 selected 取默认值
   preferProvider = null,
@@ -99,12 +100,15 @@ export default function AgentModelPicker({
   persistShape = 'flat',    // "flat" | "dict" | "models_select"
   dictKey = null,           // persistShape="dict" 时的单 key
   allowInherit = false,     // 提供「跟随主 GM」(清空偏好)首项
-  inheritLabel = '跟随主 GM',
+  inheritLabel = null,
   saveId = null,            // persistShape="models_select" 存档级切换
   showHealth = false,       // variant="popover" health badge
   showPricing = false,      // variant="popover" 价格/ctx 行
   platformVertexAllowed = false,  // embedder:是否允许平台 vertex embedding 兜底(admin/vip)
 }) {
+  const { t } = useTranslation();
+  const effectiveHeader = header ?? t('components.agent_model_picker.default_header');
+  const effectiveInheritLabel = inheritLabel ?? t('components.agent_model_picker.inherit_label');
   const { useState, useEffect } = React;
   const [apis, setApis] = useState([]);
   const [credApiIds, setCredApiIds] = useState(new Set());
@@ -341,7 +345,7 @@ export default function AgentModelPicker({
   });
   const modelOptions = filteredModels.map((m) => ({
     value: m.real_name || m.id,
-    label: `${m.display_name || m.real_name || m.id}${m.enabled === false ? ' (禁用)' : ''}`,
+    label: `${m.display_name || m.real_name || m.id}${m.enabled === false ? ` ${t('components.agent_model_picker.model_disabled_suffix')}` : ''}`,
     disabled: m.enabled === false,
   }));
 
@@ -356,14 +360,14 @@ export default function AgentModelPicker({
   const noProviders = providerOptions.length === 0;
   // Model 下拉项:首项可选「跟随主 GM」(allowInherit),末项「自定义…」。
   const modelSelectOptions = [
-    ...(allowInherit ? [{ value: INHERIT, label: inheritLabel }] : []),
+    ...(allowInherit ? [{ value: INHERIT, label: effectiveInheritLabel }] : []),
     ...modelOptions,
-    { value: CUSTOM_MODEL, label: '自定义…(手动填写模型名)' },
+    { value: CUSTOM_MODEL, label: t('components.agent_model_picker.custom_model_option') },
   ];
   const modelSelectSelected = inherit
-    ? { value: INHERIT, label: inheritLabel }
+    ? { value: INHERIT, label: effectiveInheritLabel }
     : isCustomModel
-      ? { value: CUSTOM_MODEL, label: '自定义…' }
+      ? { value: CUSTOM_MODEL, label: t('components.agent_model_picker.custom_model_short') }
       : (() => {
           const m = modelsOf(apiId).find((x) => (x.real_name || x.id) === model);
           return m ? { value: model, label: m.display_name || m.real_name || m.id }
@@ -373,10 +377,10 @@ export default function AgentModelPicker({
   const body = (
     <>
       {showNoKeyAlert && (
-        <CSAlert type="warning" header="尚未配置任何 API key" action={
-          <CSButton iconName="settings" onClick={() => { window.location.hash = configHash; }}>去配 key</CSButton>
+        <CSAlert type="warning" header={t('components.agent_model_picker.no_key_alert_header')} action={
+          <CSButton iconName="settings" onClick={() => { window.location.hash = configHash; }}>{t('components.agent_model_picker.go_config_key')}</CSButton>
         }>
-          请先去 设置 → 模型管理 给至少一家 provider 配 key。
+          {t('components.agent_model_picker.no_key_alert_body')}
         </CSAlert>
       )}
       <CSColumnLayout columns={2}>
@@ -385,10 +389,10 @@ export default function AgentModelPicker({
             selectedOption={inherit ? null : (() => {
               const a = apiOf(apiId);
               return a ? { value: apiId, label: a.display_name || a.name || apiId }
-                : (apiId ? { value: apiId, label: apiId + ' (未配 key)' } : null);
+                : (apiId ? { value: apiId, label: `${apiId} ${t('components.agent_model_picker.provider_no_key_suffix')}` } : null);
             })()}
             options={providerOptions}
-            placeholder={noProviders ? '请先配 API key' : (inherit ? inheritLabel : '选择 provider')}
+            placeholder={noProviders ? t('components.agent_model_picker.provider_placeholder_no_key') : (inherit ? effectiveInheritLabel : t('components.agent_model_picker.provider_placeholder'))}
             onChange={({ detail }) => {
               const aid = detail.selectedOption.value;
               setApiId(aid);
@@ -402,16 +406,16 @@ export default function AgentModelPicker({
               else { setModel(''); }
             }}
             disabled={saving || noProviders}
-            empty="还没配 API key"
+            empty={t('components.agent_model_picker.provider_empty')}
           />
         </CSFormField>
-        <CSFormField label="Model" description="列表里没有你的模型时,选「自定义…」手动填写服务商实际 model 名称。">
+        <CSFormField label="Model" description={t('components.agent_model_picker.model_field_description')}>
           <div style={{ display: 'grid', gap: 8 }}>
             {(modelOptions.length > 0 || allowInherit) && (
               <CSSelect
                 selectedOption={modelSelectSelected}
                 options={modelSelectOptions}
-                placeholder="选择模型"
+                placeholder={t('components.agent_model_picker.model_placeholder')}
                 onChange={({ detail }) => {
                   const mid = detail.selectedOption.value;
                   if (mid === INHERIT) { persistInherit(); }
@@ -425,7 +429,7 @@ export default function AgentModelPicker({
               <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 8 }}>
                 <CSInput
                   value={model}
-                  placeholder="填写模型名,例如 gpt-4o-mini"
+                  placeholder={t('components.agent_model_picker.model_name_placeholder')}
                   onChange={({ detail }) => setModel(detail.value)}
                   onBlur={() => { const m = (model || '').trim(); if (apiId && m) persist(apiId, m); }}
                   disabled={saving || !apiId}
@@ -435,7 +439,7 @@ export default function AgentModelPicker({
                   disabled={saving || !apiId || !(model || '').trim()}
                   onClick={() => persist(apiId, (model || '').trim())}
                 >
-                  保存
+                  {t('common.save')}
                 </CSButton>
               </div>
             )}
@@ -448,7 +452,7 @@ export default function AgentModelPicker({
   if (variant === 'popover') return renderPopover();
   if (variant === 'bare') return body;
   return (
-    <CSContainer header={<CSHeader variant="h2" description={description}>{header}</CSHeader>}>
+    <CSContainer header={<CSHeader variant="h2" description={description}>{effectiveHeader}</CSHeader>}>
       {body}
     </CSContainer>
   );
@@ -500,7 +504,7 @@ export default function AgentModelPicker({
       : ((window.__fmt && window.__fmt.compact) ? window.__fmt.compact(n)
         : (n >= 1000000 ? `${Math.round(n / 1000000)}M` : n >= 1000 ? `${Math.round(n / 1000)}K` : String(n)));
     const fmtPrice = (m) => (m.price_in != null && m.price_out != null)
-      ? (m.price_in === 0 && m.price_out === 0 ? '免费' : `$${m.price_in.toFixed(2)} / $${m.price_out.toFixed(2)} per M`) : null;
+      ? (m.price_in === 0 && m.price_out === 0 ? t('components.agent_model_picker.price_free') : `$${m.price_in.toFixed(2)} / $${m.price_out.toFixed(2)} per M`) : null;
 
     return (
       <div ref={popRef} className="amp-pop">
@@ -509,7 +513,7 @@ export default function AgentModelPicker({
             className="amp-pop-search"
             type="text"
             value={popQuery}
-            placeholder="搜索模型…"
+            placeholder={t('components.agent_model_picker.popover_search_placeholder')}
             onChange={(e) => setPopQuery(e.target.value)}
             autoFocus
           />
@@ -517,9 +521,9 @@ export default function AgentModelPicker({
         <ul className="amp-pop-list">
           {filtered.length === 0 && (
             <li className="amp-pop-empty">{
-              !loaded ? '加载模型中…'
-                : q ? `没有匹配「${popQuery}」的模型`
-                : '没有可用模型(先配 API key)'
+              !loaded ? t('components.agent_model_picker.popover_loading')
+                : q ? t('components.agent_model_picker.popover_no_match', { query: popQuery })
+                : t('components.agent_model_picker.popover_no_models')
             }</li>
           )}
           {filtered.map((m) => {

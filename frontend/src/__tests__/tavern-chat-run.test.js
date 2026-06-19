@@ -241,13 +241,15 @@ describe('applyTavernState — 核心三段 + 宿主叠加', () => {
 
   it('persona_card_id 存在 → 拉全卡回填(成功用全卡)', async () => {
     const out = {};
-    const myGet = vi.fn(() => Promise.resolve({ id: 9, name: 'P' }));
+    // #76 修复后:persona 走 api.me.personas.get(id),解包 (r.persona || r)。
+    const get = vi.fn(() => Promise.resolve({ persona: { id: 9, name: 'P' } }));
     applyTavernState(
       { tavern: { persona_card_id: 9 }, player: { name: '投影' } },
-      { setPersona: (v) => { out.persona = v; }, api: { cards: { myGet } } },
+      { setPersona: (v) => { out.persona = v; }, api: { me: { personas: { get } } } },
     );
     await Promise.resolve();
-    expect(myGet).toHaveBeenCalledWith(9);
+    await Promise.resolve();
+    expect(get).toHaveBeenCalledWith(9);
     expect(out.persona).toEqual({ id: 9, name: 'P' });
   });
 

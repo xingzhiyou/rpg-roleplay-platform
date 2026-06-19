@@ -4,6 +4,7 @@
 
 import React from 'react';
 import { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 
 const API = () => (window.__API_BASE || '');
 
@@ -41,22 +42,24 @@ async function patchCanon(scriptId, body) {
 }
 
 function ReviewFlags({ flags }) {
+  const { t } = useTranslation();
   if (!flags) return null;
   const f = flags;
   return (
     <div className="sr-flags" style={{ display: 'flex', gap: 12, flexWrap: 'wrap', margin: '8px 0' }}>
       <span className={f.needs_review ? 'sr-flag warn' : 'sr-flag ok'}>
-        {f.needs_review ? '⚠ 需核对' : '✓ 提取正常'}
+        {f.needs_review ? t('scripts.review.flags.needs_review') : t('scripts.review.flags.extract_ok')}
       </span>
-      <span className="sr-flag">作者非正文 {(f.author_notes || []).length}</span>
-      <span className="sr-flag">怪标题 {(f.weird_titles || []).length}</span>
-      <span className="sr-flag">编号缺口 {(f.gaps || []).length}</span>
-      <span className="sr-flag">广告清洗 {((f.cleaning || {}).by_category || {}).ad || 0} 行</span>
+      <span className="sr-flag">{t('scripts.review.flags.author_notes', { count: (f.author_notes || []).length })}</span>
+      <span className="sr-flag">{t('scripts.review.flags.weird_titles', { count: (f.weird_titles || []).length })}</span>
+      <span className="sr-flag">{t('scripts.review.flags.gaps', { count: (f.gaps || []).length })}</span>
+      <span className="sr-flag">{t('scripts.review.flags.ad_cleaned', { count: ((f.cleaning || {}).by_category || {}).ad || 0 })}</span>
     </div>
   );
 }
 
 function ReviewStatusBanner({ scriptId, status, busy, onChange }) {
+  const { t } = useTranslation();
   const [acting, setActing] = useState(false);
   const isReviewed = status?.review_status === 'reviewed';
   const reviewedAt = status?.reviewed_at;
@@ -76,13 +79,13 @@ function ReviewStatusBanner({ scriptId, status, busy, onChange }) {
       <div style={{ display: 'grid', gap: 4 }}>
         <div style={{ fontWeight: 600, fontSize: 14 }}>
           {isReviewed
-            ? `✓ 此剧本的设定已核对通过${reviewedAtLabel ? ` · ${reviewedAtLabel}` : ''}`
-            : '⚠ 此剧本的设定还没核对 — 核对通过后才能用来开局 / 分享'}
+            ? t('scripts.review.banner.reviewed_title', { time: reviewedAtLabel ? ` · ${reviewedAtLabel}` : '' })
+            : t('scripts.review.banner.unreviewed_title')}
         </div>
         <div style={{ fontSize: 12, opacity: 0.7 }}>
           {isReviewed
-            ? '下面是 AI 从原文提取的人物 / 世界观 / 时间线。若发现提取错了,可「撤回确认」后重新编辑。'
-            : '下面是 AI 从你剧本原文里自动提取的【人物 / 世界观 / 时间线】设定。请抽查有没有提取错的,确认无误后点「确认设定无误」。'}
+            ? t('scripts.review.banner.reviewed_hint')
+            : t('scripts.review.banner.unreviewed_hint')}
         </div>
       </div>
       <button
@@ -103,13 +106,14 @@ function ReviewStatusBanner({ scriptId, status, busy, onChange }) {
           color: isReviewed ? 'var(--text, #ebe7df)' : '#fff',
         }}
       >
-        {isReviewed ? '↶ 撤回确认' : '✓ 确认设定无误'}
+        {isReviewed ? t('scripts.review.banner.btn_unmark') : t('scripts.review.banner.btn_mark')}
       </button>
     </div>
   );
 }
 
 export function ScriptReview({ scriptId, initialStatus, onReviewedChange }) {
+  const { t } = useTranslation();
   const [data, setData] = useState(null);
   // 用父级已知的 review_status 初始化,banner 立刻显示正确态(不必等 /my 回来)。
   const [status, setStatus] = useState(initialStatus ? { review_status: initialStatus } : null);
@@ -122,7 +126,7 @@ export function ScriptReview({ scriptId, initialStatus, onReviewedChange }) {
     setBusy(true); setErr('');
     try {
       const [d, st] = await Promise.all([getGraph(scriptId), getReviewStatus(scriptId)]);
-      if (!d.ok) { setErr(d.error || '加载失败'); }
+      if (!d.ok) { setErr(d.error || t('scripts.review.err.load_failed')); }
       else setData(d);
       if (st) setStatus(st);
     } catch (e) { setErr(String(e)); }
@@ -133,23 +137,23 @@ export function ScriptReview({ scriptId, initialStatus, onReviewedChange }) {
 
   const saveSummary = async (lk) => {
     const r = await patchCanon(scriptId, { op: 'update_entity', logical_key: lk, summary: draft });
-    if (r.ok) { setEditing(null); reload(); } else { setErr(r.error || '保存失败'); }
+    if (r.ok) { setEditing(null); reload(); } else { setErr(r.error || t('scripts.review.err.save_failed')); }
   };
   const delEntity = async (lk) => {
-    if (!(window.__confirm ? await window.__confirm({ title: '删除实体', message: `删除实体「${lk}」?`, danger: true, confirmText: '删除' }) : window.confirm(`删除实体「${lk}」?`))) return;
+    if (!(window.__confirm ? await window.__confirm({ title: t('scripts.review.entity.delete_title'), message: t('scripts.review.entity.delete_message', { key: lk }), danger: true, confirmText: t('common.delete') }) : window.confirm(t('scripts.review.entity.delete_message', { key: lk })))) return;
     const r = await patchCanon(scriptId, { op: 'delete_entity', logical_key: lk });
-    if (r.ok) reload(); else setErr(r.error || '删除失败');
+    if (r.ok) reload(); else setErr(r.error || t('scripts.review.err.delete_failed'));
   };
 
-  if (busy) return <div className="sr-loading">加载设定核对…</div>;
-  if (err) return <div className="sr-error">错误:{err}</div>;
+  if (busy) return <div className="sr-loading">{t('scripts.review.loading')}</div>;
+  if (err) return <div className="sr-error">{t('scripts.review.err.prefix')}{err}</div>;
   if (!data) return null;
 
   const ents = data.entities || [];
   const wls = data.worldlines || [];
   return (
     <div className="script-review" style={{ padding: 16 }}>
-      <h2>剧本设定核对 · {data.script?.title || scriptId}</h2>
+      <h2>{t('scripts.review.page_title', { title: data.script?.title || scriptId })}</h2>
       <ReviewStatusBanner
         scriptId={scriptId}
         status={status}
@@ -165,9 +169,9 @@ export function ScriptReview({ scriptId, initialStatus, onReviewedChange }) {
       />
       <ReviewFlags flags={data.review_flags} />
 
-      <h3>规范实体({ents.length})</h3>
+      <h3>{t('scripts.review.entities_heading', { count: ents.length })}</h3>
       <table className="sr-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
-        <thead><tr><th>名称</th><th>类型</th><th>首现章</th><th>重要度</th><th>摘要</th><th></th></tr></thead>
+        <thead><tr><th>{t('scripts.review.col.name')}</th><th>{t('scripts.review.col.type')}</th><th>{t('scripts.review.col.first_chapter')}</th><th>{t('scripts.review.col.importance')}</th><th>{t('scripts.review.col.summary')}</th><th></th></tr></thead>
         <tbody>
           {ents.map((e) => (
             <tr key={e.logical_key}>
@@ -183,13 +187,13 @@ export function ScriptReview({ scriptId, initialStatus, onReviewedChange }) {
               <td>
                 {editing === e.logical_key ? (
                   <>
-                    <button onClick={() => saveSummary(e.logical_key)}>存</button>
-                    <button onClick={() => setEditing(null)}>取消</button>
+                    <button onClick={() => saveSummary(e.logical_key)}>{t('common.save')}</button>
+                    <button onClick={() => setEditing(null)}>{t('common.cancel')}</button>
                   </>
                 ) : (
                   <>
-                    <button onClick={() => { setEditing(e.logical_key); setDraft(e.summary || ''); }}>改摘要</button>
-                    <button onClick={() => delEntity(e.logical_key)}>删</button>
+                    <button onClick={() => { setEditing(e.logical_key); setDraft(e.summary || ''); }}>{t('scripts.review.entity.edit_summary')}</button>
+                    <button onClick={() => delEntity(e.logical_key)}>{t('common.delete')}</button>
                   </>
                 )}
               </td>
@@ -198,7 +202,7 @@ export function ScriptReview({ scriptId, initialStatus, onReviewedChange }) {
         </tbody>
       </table>
 
-      <h3>规范世界线({wls.length})</h3>
+      <h3>{t('scripts.review.worldlines_heading', { count: wls.length })}</h3>
       <ul>
         {wls.map((w) => (
           <li key={w.wl_key}>

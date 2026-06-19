@@ -179,7 +179,7 @@ function SaveBranchList({ save }) {
         const activeId = r?.active_commit_id || r?.active_branch_node_id;
         const ns = (r?.nodes || r?.commits || []).map((n, i) => ({
           id: n.id,
-          summary: n.summary || n.message || n.content_preview || `节点 #${n.id}`,
+          summary: n.summary || n.message || n.content_preview || t('saves.page.node_fallback', { id: n.id }),
           turn: n.turn_index ?? i,
           current: n.id === activeId,
         }));
@@ -425,7 +425,7 @@ function SavesListView() {
   const onCreate = async (vals) => {
     try {
       const created = await window.api.saves.create({
-        title: vals.title || ('新存档 · ' + new Date().toLocaleString()),
+        title: vals.title || (t('saves.page.default_save_title') + ' · ' + new Date().toLocaleString()),
         script_id: vals.script_id || (scripts[0] && scripts[0].id),
         character_id: vals.character_id || null,
         character_kind: vals.character_kind || null,
@@ -435,7 +435,7 @@ function SavesListView() {
         identity: vals.identity || null,
       });
       if (created && created.ok === false) {
-        throw new Error(created.error || created.detail || '后端拒绝创建');
+        throw new Error(created.error || created.detail || t('saves.page.err_backend_rejected_create'));
       }
       flash.ok(t('saves.toast.created'));
       setCreateOpen(false);
@@ -460,17 +460,17 @@ function SavesListView() {
     if (!file) return;
     // accept .json (legacy) and .zip (self-contained bundle)
     if (!/\.(json|zip)$/i.test(file.name || '')) {
-      flash.err(t('saves.toast.import_fail', { err: '.json / .zip 格式才支持' }));
+      flash.err(t('saves.toast.import_fail', { err: t('saves.page.err_import_format') }));
       return;
     }
     if (file.size > 200 * 1024 * 1024) {
-      flash.err(t('saves.toast.import_fail', { err: '文件过大 (>200MB)' }));
+      flash.err(t('saves.toast.import_fail', { err: t('saves.page.err_import_too_large') }));
       return;
     }
     try {
       flash.info(t('saves.toast.importing', { name: file.name }));
       const r = await window.api.saves.importFile(file);
-      if (r && r.ok === false) throw new Error(r.error || r.detail || '后端拒绝导入');
+      if (r && r.ok === false) throw new Error(r.error || r.detail || t('saves.page.err_backend_rejected_import'));
       // bundle response includes save_id/script_id/warnings
       const isBundle = r && (r.save_id != null || r.script_id != null);
       if (isBundle) {
@@ -963,10 +963,10 @@ function ContinuePicker({ open, save, focusedNodeId, onClose }) {
           const isMain = shortRefs.includes("main") || shortRefs.includes("master");
           const branchLabel = shortRefs.length
             ? (isMain ? "main" : shortRefs[0])
-            : "(无 ref)";
+            : t('saves.page.no_ref');
           return {
             id: n.id,
-            summary: n.summary || n.message || n.content_preview || `节点 #${n.id}`,
+            summary: n.summary || n.message || n.content_preview || t('saves.page.node_fallback', { id: n.id }),
             turn_index: n.turn_index ?? i,
             kind: n.kind || "round",
             ref_names: refNames,    // 完整 ref 名(用于 hover tooltip)
@@ -1034,7 +1034,7 @@ function ContinuePicker({ open, save, focusedNodeId, onClose }) {
           commit_id: pickedNode,
         });
         if (r && r.ok === false) {
-          throw new Error(r.error || r.detail || "commit 级激活失败");
+          throw new Error(r.error || r.detail || t('saves.page.err_commit_activate_fail'));
         }
       } else {
         // 只选了 save 没选节点:fallback save 级 activate (切到该 save 的当前 active commit)
@@ -2002,7 +2002,7 @@ function NewGameModal({ open, onClose, onConfirm, defaultScriptId = null }) {
       try {
         const sc = scList.find(x => String(x.id) === pickId);
         const scTitle = (sc && (sc.title || "").replace(/^《|》$/g, "")) || "";
-        if (scTitle) setTitle(`${scTitle} · 新档`);
+        if (scTitle) setTitle(`${scTitle} · ${t('saves.page.new_save_suffix')}`);
         else setTitle(t('saves.new_game.page_title'));
       } catch (_) { setTitle(t('saves.new_game.page_title')); }
       // 反馈#4:在默认值之上覆盖本地草稿——无指定剧本(通用入口)或草稿剧本与本次一致时整体恢复,
@@ -2179,13 +2179,13 @@ function NewGameModal({ open, onClose, onConfirm, defaultScriptId = null }) {
       });
       const data = await r.json().catch(() => ({}));
       if (!r.ok || data.ok === false) {
-        throw new Error((data && (data.error || data.detail)) || `mark-reviewed 失败 (HTTP ${r.status})`);
+        throw new Error((data && (data.error || data.detail)) || t('saves.page.err_mark_reviewed_fail', { status: r.status }));
       }
       setReviewGateBlocked(false);
       // 立刻重试创建
       await handleSubmit();
     } catch (e) {
-      setSubmitErr(String(e && (e.message || e)) || "标记复核失败");
+      setSubmitErr(String(e && (e.message || e)) || t('saves.page.err_mark_reviewed_generic'));
       setSubmitting(false);
     }
   };
@@ -2325,7 +2325,7 @@ function NewGameModal({ open, onClose, onConfirm, defaultScriptId = null }) {
           rows={6}
           value={storyIntent}
           onChange={({ detail }) => setStoryIntent(detail.value)}
-          placeholder="示例:&#10;· 玩家拒绝任何战斗 — 必须找非战斗解决方案&#10;· 主角穿越者身份是绝对秘密,GM 必须保护&#10;· 优先甜文路线,避免黑深残"
+          placeholder={t('saves.page.intent_placeholder')}
         />
       </CSFormField>
     </CSSpaceBetween>

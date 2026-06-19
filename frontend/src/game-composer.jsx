@@ -152,14 +152,14 @@ function ConfirmStrip({ pendingWrites, pendingQuestions, onApprove, onReject, on
           <div className="gc-confirm-marker"><Icon name="info" size={12} /></div>
           <div className="gc-confirm-body">
             <div className="gc-confirm-row1">
-              <span className="gc-confirm-tag">套路比喻</span>
-              <span className="gc-confirm-text serif">这轮用了套路比喻（{clichePhrases.join('、')}），要重新生成吗？</span>
+              <span className="gc-confirm-tag">{t('game.composer.cliche_tag')}</span>
+              <span className="gc-confirm-text serif">{t('game.composer.cliche_notice', { phrases: clichePhrases.join('、') })}</span>
             </div>
             <div className="gc-confirm-actions">
-              <button className="gc-chip-btn gc-chip-primary" onClick={onRetryCliche}>重新生成</button>
+              <button className="gc-chip-btn gc-chip-primary" onClick={onRetryCliche}>{t('game.composer.cliche_retry')}</button>
             </div>
           </div>
-          <button className="iconbtn" onClick={onDismissCliche} title="忽略此提示"><Icon name="close" size={11} /></button>
+          <button className="iconbtn" onClick={onDismissCliche} title={t('game.composer.dismiss_tip')}><Icon name="close" size={11} /></button>
         </div>
       )}
       {visibleItems.map(it => it.kind === "config" ? (
@@ -271,10 +271,10 @@ function ConfigCard({ it, handleId, onConfigDefault, onConfigContinue, onConfigS
           <div className="gc-confirm-actions">
             <button className="gc-chip-btn gc-chip-primary"
               onClick={() => onConfigDefault && onConfigDefault(handleId, item, model)}>
-              {`用 ${model || cap.label} 生成`}
+              {t('game.composer.config_generate_with', { model: model || cap.label })}
             </button>
             <button className="gc-chip-btn" onClick={goSettings}>
-              <Icon name="settings" size={11} /> 去模型设置
+              <Icon name="settings" size={11} /> {t('game.composer.config_go_model_settings')}
             </button>
           </div>
         )}
@@ -292,17 +292,17 @@ function ConfigCard({ it, handleId, onConfigDefault, onConfigContinue, onConfigS
             />
             <div className="gc-confirm-actions">
               <button className="gc-chip-btn gc-chip-primary" disabled={!ready}
-                onClick={() => onConfigContinue && onConfigContinue(handleId, item, '继续')}>
-                继续
+                onClick={() => onConfigContinue && onConfigContinue(handleId, item, t('game.composer.config_continue_label'))}>
+                {t('game.composer.config_continue_label')}
               </button>
               <button className="gc-chip-btn" onClick={goSettings}>
-                <Icon name="settings" size={11} /> 去设置
+                <Icon name="settings" size={11} /> {t('game.composer.config_go_settings')}
               </button>
             </div>
           </div>
         )}
       </div>
-      <button className="iconbtn" onClick={() => onDismiss && onDismiss(handleId)} title="忽略此提示"><Icon name="close" size={11} /></button>
+      <button className="iconbtn" onClick={() => onDismiss && onDismiss(handleId)} title={t('game.composer.dismiss_tip')}><Icon name="close" size={11} /></button>
     </div>
   );
 }
@@ -523,13 +523,14 @@ function ModelPopover({ current, onPick, align = "left", gameState, onClose, tri
 
 
 function EffortSection({ selectedKey }) {
+  const { t } = useTranslation();
   const EFFORT_OPTIONS = [
-    { id: 'off',    label: 'Off',    desc: '禁用思考(最快/最省)' },
+    { id: 'off',    label: 'Off',    desc: t('game.composer.effort_off_desc') },
     { id: 'low',    label: 'Low',    desc: '1k tokens' },
     { id: 'medium', label: 'Medium', desc: '4k tokens' },
-    { id: 'high',   label: 'High',   desc: '8k tokens · 默认' },
+    { id: 'high',   label: 'High',   desc: t('game.composer.effort_high_desc') },
     { id: 'extra',  label: 'Extra',  desc: '16k tokens' },
-    { id: 'max',    label: 'Max',    desc: '24k tokens(最深推理/最贵)' },
+    { id: 'max',    label: 'Max',    desc: t('game.composer.effort_max_desc') },
   ];
   // selectedKey 格式: "api_id::model_real_name" — backend pref key 用 "api_id:model_id"
   const [effort, setEffort] = useStateC('high');
@@ -567,9 +568,9 @@ function EffortSection({ selectedKey }) {
       const existing = ((profileR && profileR.preferences && profileR.preferences.model_effort) || {});
       const next = { ...existing, [prefKey]: id };
       await window.api.account.preferences({ preferences: { model_effort: next } });
-      window.__apiToast?.(`思考深度 → ${id}`, { kind: 'ok', duration: 1500 });
+      window.__apiToast?.(t('game.composer.effort_saved', { id }), { kind: 'ok', duration: 1500 });
     } catch (e) {
-      window.__apiToast?.('保存失败', { kind: 'danger', detail: e?.message });
+      window.__apiToast?.(t('game.composer.effort_save_failed'), { kind: 'danger', detail: e?.message });
     } finally { setBusy(false); }
   };
 
@@ -812,7 +813,7 @@ function Composer({
       out.push({ name: n, role: String(role || "") });
     };
     const p = (gameState && gameState.player) || {};
-    if (p.name) push(p.name, (p.role || t('game.status.player')) + " · 你");
+    if (p.name) push(p.name, (p.role || t('game.status.player')) + " · " + t('game.composer.mention_you'));
     const rels = (gameState && gameState.relationships) || {};
     for (const [name, info] of Object.entries(rels)) {
       const tone = typeof info === "string" ? info : (info?.tone || "");
@@ -940,7 +941,7 @@ function Composer({
               </button>
             )}
             {!hideImageGen && (
-              <button className="iconbtn" onClick={() => setShowImageGen(true)} data-tip="AI 生图">
+              <button className="iconbtn" onClick={() => setShowImageGen(true)} data-tip={t('game.composer.image_gen_tip')}>
                 <Icon name="image" size={14} />
               </button>
             )}

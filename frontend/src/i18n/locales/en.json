@@ -485,6 +485,168 @@
       "deploy": "Deployment",
       "account": "Account",
       "danger": "Danger Zone"
+    },
+    "more": {
+      "edit_api": {
+        "admin_base_url_warn": "Base URL is locked by admin and cannot be changed",
+        "sa_desc_set": "SA JSON uploaded ({{hint}}); upload again to replace",
+        "sa_encrypted": "encrypted",
+        "sa_desc_new": "Upload a Service Account JSON file",
+        "sa_json_invalid": "Invalid JSON — must contain client_email / private_key / project_id",
+        "sa_json_valid": "Valid SA JSON · project: {{project}}"
+      },
+      "source_user_override": "User Override",
+      "source_label_tip": "Source",
+      "model_list": {
+        "cap_filter_tip": "Filter by capability: {{cap}}",
+        "price_tip": "Input ${{input}} / Output ${{output}} per million tokens",
+        "max_output_tip": "Max output: {{n}}"
+      },
+      "modules": {
+        "label_gm": "Main GM",
+        "label_sub_agent": "Sub-agent",
+        "label_set_parser": "Worldbook Parser",
+        "label_console": "Console Assistant",
+        "label_editor": "Script Editor",
+        "label_extractor": "Narrative Extractor",
+        "label_card_gen": "Card Generation",
+        "label_card_import": "Card Import",
+        "label_critic": "Critic",
+        "label_verifier": "Verifier",
+        "label_phase_digest": "Phase Digest",
+        "label_black_swan": "Black Swan",
+        "label_agent": "Agent",
+        "label_embedder": "Embedder",
+        "label_image_gen": "Image Generation",
+        "tip_gm": "Main GM model — drives narrative and responds to players",
+        "tip_sub_agent": "Sub-agent model orchestrated by the main GM",
+        "tip_set_parser": "Model used to parse worldbook entries",
+        "tip_console": "Model powering the script editor console assistant",
+        "tip_editor": "Model used for AI direct-writing in the script editor",
+        "tip_extractor": "Model used for narrative extraction and rebuild",
+        "tip_card_gen": "Model used to auto-generate character cards",
+        "tip_card_import": "Model used during character card import",
+        "tip_critic": "Model powering the critic agent",
+        "tip_verifier": "Model powering the verifier agent",
+        "tip_phase_digest": "Model used to generate phase digests",
+        "tip_black_swan": "Model powering the black-swan event agent",
+        "tip_agent": "General-purpose agent model",
+        "tip_embedder": "Embedding model used for RAG recall",
+        "tip_image_gen": "Image generation model",
+        "embedder_fallback_active": "Platform Vertex embedding fallback is active",
+        "embedder_admin_configured": "Embedder configured by admin",
+        "embedder_admin_fallback": "Admin-configured embedding fallback active",
+        "embedder_user_no_key": "No embedder API key configured — RAG recall unavailable",
+        "embedder_note": "Switching the embedder requires rebuilding the vector index"
+      },
+      "providers": {
+        "note_openrouter": "Optionally set a relay OpenAI-compat endpoint (e.g. https://your-proxy.com/v1); auth stays Bearer",
+        "note_agent_platform": "Upload a Service Account JSON containing client_email / private_key / project_id",
+        "note_dashscope": "Supports OpenAI-compat mode (/compatible-mode/v1) or native DashScope protocol"
+      },
+      "migrate": {
+        "stage_scripts": "Scripts",
+        "stage_saves": "Saves",
+        "stage_cards": "Cards",
+        "stage_done": "Done",
+        "stage_processing": "Processing",
+        "import_done_detail": "Scripts {{scripts}} · Saves {{saves}} · Cards {{cards}}",
+        "no_job_id": "No job ID returned",
+        "warnings_truncated": "…and {{count}} more warnings truncated"
+      },
+      "deploy": {
+        "smtp_qq": "QQ Mail (smtp.qq.com:465 · SSL)",
+        "smtp_163": "163 Mail (smtp.163.com:465 · SSL)"
+      },
+      "online_lib": {
+        "provider_title": "Online Script Library · Provider",
+        "provider_desc": "This instance acts as an online script library provider, allowing other instances to connect via Device Flow or PAT to browse and import your scripts.",
+        "client_title": "Online Script Library (Connect to a service)",
+        "client_desc": "Connect to another Stellatrix instance to browse and import its public script library.",
+        "paste_token_warn": "Please paste a token",
+        "connected_ok": "Connected",
+        "connect_fail": "Connection failed",
+        "disconnected": "Disconnected",
+        "op_fail": "Operation failed",
+        "connected_to": "Connected to: ",
+        "disconnect": "Disconnect",
+        "server_url": "Server URL",
+        "server_url_desc": "Root URL of the other instance (e.g. https://other.stellatrix.icu)",
+        "device_method": "Device Flow Authorization",
+        "device_method_desc": "Complete authorization on the other instance to obtain a token automatically",
+        "device_auth_header": "Complete authorization on the other instance",
+        "device_step1": "Step 1: Visit the following URL",
+        "device_step2": "Step 2: Enter the code",
+        "device_waiting": "Waiting for authorization…",
+        "device_connect_btn": "Start Device Flow",
+        "pat_method": "PAT (Personal Access Token)",
+        "pat_method_desc": "Paste a PAT issued by the other instance",
+        "pat_save_btn": "Connect",
+        "browse_load_fail": "Failed to load script list",
+        "browse_import_ok": "Import successful",
+        "browse_import_local": "local script",
+        "browse_import_fail": "Import failed",
+        "browse_header": "Browse online script library",
+        "browse_search_placeholder": "Search scripts…",
+        "browse_search_btn": "Search",
+        "browse_empty": "No scripts found",
+        "untitled": "Untitled",
+        "browse_import_btn": "Import",
+        "script_prefix": "Script",
+        "publish_ok": "Published successfully",
+        "online_script_prefix": "Online script",
+        "publish_fail": "Publish failed",
+        "publish_label": "Publish Script",
+        "publish_desc": "Publish a local script to the online library for others to browse and import",
+        "publish_select_placeholder": "Select a script to publish",
+        "publish_btn": "Publish",
+        "device_code_not_found": "Device code not found or expired",
+        "device_denied": "Authorization denied",
+        "device_approved": "Authorization approved",
+        "device_lookup_btn": "Look up",
+        "device_confirm_header": "Confirm authorization request",
+        "device_confirm_client": "App: ",
+        "device_confirm_scopes": "Scopes: ",
+        "device_approve_btn": "Approve",
+        "device_deny_btn": "Deny",
+        "pat_scope_warn": "Select at least one scope",
+        "pat_create_fail": "Failed to create PAT",
+        "pat_revoked": "Revoked",
+        "pat_created_header": "PAT created",
+        "pat_name_placeholder": "Token name (for identification)",
+        "pat_scope_read": "Browse / Import (read-only)",
+        "pat_scope_publish": "Publish (write)",
+        "pat_create_btn": "Create PAT",
+        "pat_empty": "No PATs yet",
+        "pat_source_device": "Device Flow",
+        "pat_source_manual": "Manual",
+        "pat_last_used": "Last used",
+        "pat_never_used": "Never used",
+        "pat_revoked_badge": "Revoked",
+        "pat_revoke_btn": "Revoke",
+        "auth_incomplete": "Authorization incomplete (status: {{status}})",
+        "device_start_fail": "Failed to start Device Flow"
+      }
+    },
+    "migrate": {
+      "title": "Data Migration (Export / Import)",
+      "desc": "Pack all your personal data and migrate to a self-hosted instance, or restore from an archive. API keys are not included.",
+      "note_keys": "For security reasons, exports do not include API keys (they are encrypted server-side and cannot be decrypted across instances). After migrating, re-enter your provider API keys under Settings → Models.",
+      "export_label": "Export all my data",
+      "export_counts": "Scripts {{s}} · Saves {{v}} · Character Cards {{c}} · Model entries {{m}}",
+      "est_fail": "Failed to estimate:",
+      "estimating": "Calculating…",
+      "include_chunks": "Include text chunks (larger archive; required for local vector search)",
+      "export_btn": "Export archive (.zip)",
+      "export_started": "Download started…",
+      "export_fail": "Export failed",
+      "import_label": "Import archive",
+      "import_help": "Select an account-*.zip exported from the online service. Import creates new Scripts, Saves, and Character Cards under your account without overwriting existing data.",
+      "import_btn": "Import to current account",
+      "import_done": "Import complete",
+      "import_fail": "Import failed",
+      "import_result": "Import result",
+      "import_summary": "Scripts {{s}} · Saves {{v}} · Character Cards {{c}}"
     }
   },
   "platform": {
@@ -583,7 +745,13 @@
       "cs_user_cards": "User Cards",
       "cs_play_settings": "Game Settings",
       "cs_asset_library": "Asset Library",
-      "cs_dev_api": "Developer API"
+      "cs_dev_api": "Developer API",
+      "feedback": "Support & Feedback",
+      "feedback_sub": "Submit issues and suggestions, track progress and official replies",
+      "md_editor": "Script Editor",
+      "md_editor_sub": "Inline editing of scripts, cards, chapters & timeline",
+      "tavern": "Tavern",
+      "settings_account": "Account & Data Migration"
     },
     "search": {
       "placeholder": "Search pages, scripts, saves, cards, world book, memories, models, library, settings…",
@@ -623,6 +791,20 @@
       "close_btn": "I understand, enter the platform",
       "co_builder_label": "Include me in the Beta Co-builders list (acknowledged at open-source release)",
       "co_builder_hint": "We will publicly list the usernames of testers who consent to being credited at open-source release"
+    },
+    "shell": {
+      "vsplit_title": "Drag to resize the list area",
+      "drop_files": "Drop a file here, or",
+      "choose_file": "choose a local file",
+      "announce": {
+        "update": "Update",
+        "title": "Story Experience Upgrade",
+        "line_1": "Closer to the source: the GM follows the original characters, setting, and plot more faithfully, with less off-track improvisation.",
+        "line_2": "No spoilers: characters and key events from chapters you haven't reached yet won't be revealed early.",
+        "line_3": "More accurate progress: story progress follows where you've actually played, with no unexplained chapter jumps.",
+        "note": "Existing saves are unaffected and continue as usual; to try the new system, just start a new game."
+      },
+      "prompt_title": "Input"
     }
   },
   "admin_page": {
@@ -999,6 +1181,69 @@
       "btn_close": "Close",
       "op_ok": "Success",
       "op_fail": "Operation failed"
+    },
+    "more": {
+      "reply_sent": "Reply sent",
+      "reply_withdrawn": "Reply withdrawn",
+      "reply_fail": "Failed to send reply",
+      "reply_user_label": "Reply to user",
+      "reply_user_hint": "Shown in the user's feedback history — does not affect the review decision",
+      "reply_placeholder": "Reply content… (leave blank and click Update to withdraw)",
+      "reply_update": "Update reply",
+      "reply_send": "Send reply",
+      "runtime_slice_label": "Client runtime snapshot (bug diagnostics):",
+      "nsfw_result_label": "NSFW moderation result:",
+      "achv_rule_all": "All {{count}} conditions met",
+      "achv_disable_confirm": "Disable achievement \"{{id}}\"? Users who have already unlocked it are not affected.",
+      "achv_create_btn": "New Achievement",
+      "achv_catalog_title": "Achievement Catalog",
+      "achv_col_name": "Name",
+      "achv_col_category": "Category",
+      "achv_col_tier": "Tier",
+      "achv_col_rule": "Rule",
+      "achv_col_hidden": "Hidden",
+      "achv_col_status": "Status",
+      "achv_badge_hidden": "Hidden",
+      "achv_disable_btn": "Disable",
+      "achv_empty": "No achievements defined yet",
+      "achv_modal_create": "New Achievement",
+      "achv_modal_edit": "Edit \"{{id}}\"",
+      "achv_rule_json_parse_fail": "Rule JSON parse error",
+      "achv_field_id": "ID (slug, lowercase letters/digits/underscores, immutable after creation)",
+      "achv_field_id_desc": "e.g. turns_500",
+      "achv_field_name": "Name",
+      "achv_field_icon": "Icon (emoji)",
+      "achv_field_desc": "Description (how to unlock)",
+      "achv_field_category": "Category",
+      "achv_field_tier": "Tier",
+      "achv_field_sort": "Sort order",
+      "achv_field_rule_mode": "Rule mode",
+      "achv_rule_advanced": "Advanced (composite rule JSON)",
+      "achv_field_metric": "Metric",
+      "achv_field_op": "Operator",
+      "achv_field_target": "Target value",
+      "achv_field_rule_json": "Rule JSON",
+      "achv_field_hidden": "Hidden achievement",
+      "achv_hidden_hint": "Masked until unlocked",
+      "achv_field_enabled": "Enable",
+      "achv_enabled_hint": "Show in the public achievement wall",
+      "achv_tier_none": "None",
+      "achv_cat_start": "Getting Started",
+      "achv_cat_narrative": "Narrative",
+      "achv_cat_explore": "Exploration",
+      "achv_cat_collect": "Collection",
+      "achv_cat_persist": "Dedication",
+      "achv_cat_hidden": "Hidden",
+      "metric_saves_count": "Save count",
+      "metric_total_rounds": "Total rounds",
+      "metric_branches": "Branch count",
+      "metric_branch_nodes": "Branch nodes",
+      "metric_max_branch_depth": "Max branch depth",
+      "metric_scripts": "Scripts imported",
+      "metric_words": "Words imported",
+      "metric_chapters": "Chapters imported",
+      "metric_login_streak": "Current login streak",
+      "metric_longest_login_streak": "Longest login streak"
     }
   },
   "scripts": {
@@ -1288,7 +1533,11 @@
       "tab_canon": "KB entities",
       "tab_modules": "Modules",
       "wb_from_canon": "Derive from KB entities (free)",
-      "wb_llm_rich": "LLM re-extract & enrich"
+      "wb_llm_rich": "LLM re-extract & enrich",
+      "merge_prev_btn": "Merge with Previous",
+      "merge_prev_msg": "Merge chapter {{a}} into the current chapter {{b}}? The current chapter's title will be kept.",
+      "promote_npc": "Copy to My Character Cards",
+      "set_protagonist": "Set as Protagonist"
     },
     "review": {
       "eyebrow": "Settings Review · AI Extraction",
@@ -1352,7 +1601,45 @@
       "stage_arc_extract": "Arc Extraction (Pass 1)",
       "stage_per_chapter": "Per-chapter Extraction (Pass 1)",
       "stage_resolve": "Entity Resolution (Pass 2)",
-      "stage_embed": "Embedding (Pass 3)"
+      "stage_embed": "Embedding (Pass 3)",
+      "flags": {
+        "needs_review": "⚠ Needs Review",
+        "extract_ok": "✓ Extraction OK",
+        "author_notes": "Author Notes {{count}}",
+        "weird_titles": "Odd Titles {{count}}",
+        "gaps": "Numbering Gaps {{count}}",
+        "ad_cleaned": "Ad Lines Cleaned {{count}}"
+      },
+      "banner": {
+        "reviewed_title": "✓ Settings verified{{time}}",
+        "unreviewed_title": "⚠ Settings not yet reviewed — verification required before starting a game or sharing",
+        "reviewed_hint": "Below are the characters, worldbuilding, and timeline extracted by AI from the source text. If anything looks wrong, click Undo Verification to re-edit.",
+        "unreviewed_hint": "Below are the characters, worldbuilding, and timeline automatically extracted by AI from your script. Spot-check for errors, then click Confirm Settings to proceed.",
+        "btn_unmark": "↶ Undo Verification",
+        "btn_mark": "✓ Confirm Settings"
+      },
+      "err": {
+        "load_failed": "Failed to load",
+        "save_failed": "Failed to save",
+        "delete_failed": "Failed to delete",
+        "prefix": "Error: "
+      },
+      "loading": "Loading script review…",
+      "page_title": "Script Review — {{title}}",
+      "entities_heading": "Canon Entities ({{count}})",
+      "col": {
+        "name": "Name",
+        "type": "Type",
+        "first_chapter": "First Chapter",
+        "importance": "Importance",
+        "summary": "Summary"
+      },
+      "entity": {
+        "edit_summary": "Edit Summary",
+        "delete_title": "Delete Entity",
+        "delete_message": "Delete entity \"{{key}}\"?"
+      },
+      "worldlines_heading": "Canon Worldlines ({{count}})"
     },
     "toast": {
       "deleted": "Deleted",
@@ -1395,7 +1682,12 @@
       "import_failed": "Import failed",
       "sse_disconnected": "Progress stream disconnected; switched to polling",
       "unsubscribed": "Removed from your list",
-      "unsubscribe_fail": "Remove failed"
+      "unsubscribe_fail": "Remove failed",
+      "npc_promote_fail": "Failed to copy NPC to your character cards",
+      "npc_promoted": "\"{{name}}\" has been copied to your character cards",
+      "npc_promoted_detail": "You can edit it or attach it to any script under Character Cards → Mine",
+      "protagonist_fail": "Failed to set protagonist",
+      "protagonist_set": "\"{{name}}\" has been set as the protagonist"
     },
     "confirm": {
       "delete_title": "Delete Script",
@@ -1426,7 +1718,8 @@
       "pin_fail": "Failed to save sharing settings",
       "badge_floating": "♻ Following author",
       "badge_pinned": "📌 Pinned #{{id}}",
-      "badge_public": "Public"
+      "badge_public": "Public",
+      "pin_commit_hint": "The selected version is recorded for reference. GM retrieval always reads the target script's latest content — precise version playback is a future feature. \"Floating latest\" always follows the most recent version."
     },
     "version": {
       "history_btn": "Version History",
@@ -1595,6 +1888,44 @@
         "toast_fork_fail": "Fork failed",
         "col_detail": "Detail"
       }
+    },
+    "page": {
+      "change_cover": "Change Cover",
+      "cover_empty_hint_owner": "Click to generate, upload, or pick from library",
+      "cover_empty_hint": "No cover image",
+      "badge_protagonist": "Protagonist",
+      "tab_gm_style": "Narrative Style",
+      "audit_protagonist_set": "Protagonist → {{name}}",
+      "audit_merged": "Merged {{n}} group(s)",
+      "audit_dropped": "Dropped {{n}} non-name card(s)",
+      "audit_done_detail": "AI review complete: {{detail}}",
+      "audit_done_no_changes": "AI review complete: no changes needed",
+      "publish_review_required": "Script settings must be reviewed before sharing",
+      "publish_review_required_detail": "We opened the Settings Review panel. Confirm the AI-extracted characters, world, and timeline are correct, then come back to share.",
+      "publish_review_required_fallback": "Please confirm the script settings in the Settings Review panel first.",
+      "placeholder_coming_soon": "Coming Soon",
+      "placeholder_dnd_desc": "We are developing a D&D 5E rules module with dice resolution, spells, items, character leveling, and structured combat.",
+      "placeholder_eta": "Expected to open after public launch. Share suggestions via the Feedback button in the top right.",
+      "placeholder_unavailable": "Feature preview — not yet available",
+      "placeholder_in_dev": "In Development",
+      "file_type_unsupported": "Only .txt / .md script files are supported",
+      "file_type_unsupported_detail": "Other file types are disabled during the testing phase",
+      "upload_net_error_hint": "If self-hosted or behind a reverse proxy, check that the backend is running and that nginx/caddy client_max_body_size is at least 50m.",
+      "split_mode_warn": "Split mode: {{mode}} (confidence {{conf}})",
+      "extractor_model_title": "Extraction Model",
+      "extractor_model_desc": "The LLM used to extract chapter summaries, NPC Character Cards, and Worldbook entries. Only applies during import. Changes are saved to your Extraction Model preference under Settings.",
+      "fork_title_suffix": "{{title}} (Copy)",
+      "promote_fail": "Conversion failed"
+    },
+    "audit": {
+      "btn": "AI Audit Names/Semantics",
+      "desc": "Run a one-time AI audit on all NPC cards in this script: merge duplicate cards for the same character (e.g. different aliases), identify and lock in the true protagonist, and remove cards that are titles, place names, or other non-person entries. Triggered on demand — does not affect the import pipeline or incur automatic costs.",
+      "fail": "AI audit failed",
+      "model_desc": "Select the model for this audit run. Defaults to your configured default model — a more capable model will produce more accurate results.",
+      "need_key": "No API key configured for this model",
+      "need_key_hint": "Go to Settings → API & Models to add a credential, or select a model that is already configured above.",
+      "run": "Run Audit",
+      "title": "AI Audit NPC Character Cards"
     }
   },
   "auth": {
@@ -1672,7 +2003,33 @@
     "reset_pw_mismatch": "Passwords do not match",
     "reset_success": "Password reset. Redirecting to login…",
     "reset_token_invalid_or_expired": "Reset link is invalid or expired. Please request a new one.",
-    "reset_token_used": "This reset link has already been used. Please request a new one."
+    "reset_token_used": "This reset link has already been used. Please request a new one.",
+    "app": {
+      "legal_sep": ", ",
+      "magic_verifying": "Verifying invite link…",
+      "magic_login_ok": "Logged in. Redirecting to dashboard…",
+      "magic_otp_sent": "A verification code has been sent to {{email}}. Please check your email.",
+      "magic_link_invalid": "Invalid invite link. Please check the link in your email.",
+      "magic_link_fail": "Failed to verify invite link.",
+      "magic_otp_verify_fail": "Verification failed.",
+      "magic_otp_needs_profile": "Welcome! Please set a username to complete registration.",
+      "login_redirect": "Logged in. Redirecting…",
+      "magic_otp_verify_fail_retry": "Verification failed. Please try again.",
+      "profile_required": "Please enter a username or display name.",
+      "profile_save_fail": "Failed to save.",
+      "profile_save_ok": "Profile saved. Redirecting…",
+      "profile_save_fail_retry": "Failed to save. Please try again.",
+      "magic_otp_sent_to": "A verification code has been sent to {{email}}. Valid for 10 minutes.",
+      "otp_code_label": "Verification Code",
+      "magic_otp_verifying": "Verifying…",
+      "magic_otp_submit": "Verify & Sign In",
+      "needs_profile_desc": "Welcome! Please set a username to complete registration.",
+      "username_label": "Username",
+      "display_name_label": "Display Name (optional)",
+      "profile_saving": "Saving…",
+      "profile_submit": "Complete Registration"
+    },
+    "captcha_required": "Please complete the CAPTCHA verification before submitting"
   },
   "saves": {
     "list": {
@@ -1896,7 +2253,12 @@
       "new_role_default": "New character",
       "birthpoints_empty": "No starting point anchors available",
       "birthpoints_empty_hint": "The script has no birthpoint anchors yet. Please wait for backend processing to complete, then retry.",
-      "retry": "Retry"
+      "retry": "Retry",
+      "card_kind_npc": "Script NPC",
+      "role_mode_script_npc": "Script NPC",
+      "script_npc_desc": "Play as a canon NPC from this script — selecting one automatically locks your origin to Native (you are that character; GM strictly follows the worldview).",
+      "script_npc_empty": "This script has no NPC character cards yet. You can generate or extract characters in the Script Editor.",
+      "script_npc_pick_script": "Please select a script above first."
     },
     "identity": {
       "intro": "The identity card is a positioning overlay on top of the character card (undercover / exiled noble / shelter refugee …) — unrelated to name or appearance, independent from the player origin setting below. Optional — leave blank to play as the selected character directly.",
@@ -1973,7 +2335,9 @@
       "field_bg": "Background / Motivation",
       "field_bg_placeholder": "Origin, motivation, and connection to key events in the story world",
       "btn_apply": "Use this identity",
-      "no_card_selected": "(no character selected)"
+      "no_card_selected": "(no character selected)",
+      "origin_locked_banner": "Playing Script NPC \"{{name}}\" — origin locked to Native (you are this character; GM strictly enforces the worldview).",
+      "origin_locked_npc": "Playing a script NPC — origin locked to Native"
     },
     "birthpoint": {
       "loading": "Loading starting points…",
@@ -1984,6 +2348,20 @@
     "empty": {
       "no_saves_title": "No saves yet",
       "no_saves_hint": "Go to the Scripts page, pick a script, and start a new game — the branch graph will appear once a save exists."
+    },
+    "page": {
+      "node_fallback": "Node #{{id}}",
+      "default_save_title": "New Save",
+      "err_backend_rejected_create": "Backend rejected the create request",
+      "err_import_format": "Only .json / .zip files are supported",
+      "err_import_too_large": "File too large (>200MB)",
+      "err_backend_rejected_import": "Backend rejected the import",
+      "no_ref": "(no ref)",
+      "err_commit_activate_fail": "Commit-level activation failed",
+      "new_save_suffix": "New Save",
+      "err_mark_reviewed_fail": "Mark-reviewed failed (HTTP {{status}})",
+      "err_mark_reviewed_generic": "Failed to mark as reviewed",
+      "intent_placeholder": "Examples:\n· Player refuses all combat — must find non-combat solutions\n· The protagonist's transmigrator identity is an absolute secret, GM must protect it\n· Prefer sweet romance, avoid dark/tragic routes"
     }
   },
   "game": {
@@ -2288,7 +2666,22 @@
       "perm_footer": "'Full Access' covers most writes, but next-step plans / major setting conflicts / high-risk world-line changes still trigger a non-blocking popup.",
       "ctx_loading": "Loading…",
       "ctx_no_data": "No data yet (visible after the first message)",
-      "ctx_usage_title": "Context Usage"
+      "ctx_usage_title": "Context Usage",
+      "cliche_tag": "Cliché Detected",
+      "cliche_notice": "This turn used clichéd phrases ({{phrases}}). Regenerate?",
+      "cliche_retry": "Regenerate",
+      "dismiss_tip": "Dismiss",
+      "config_generate_with": "Generate with {{model}}",
+      "config_go_model_settings": "Model Settings",
+      "config_continue_label": "Continue",
+      "config_go_settings": "Settings",
+      "effort_off_desc": "Disable thinking (fastest/cheapest)",
+      "effort_high_desc": "8k tokens · default",
+      "effort_max_desc": "24k tokens (deepest reasoning / most expensive)",
+      "effort_saved": "Thinking effort → {{id}}",
+      "effort_save_failed": "Save failed",
+      "mention_you": "You",
+      "image_gen_tip": "AI Image Generation"
     },
     "command": {
       "title": "Commands",
@@ -2357,7 +2750,8 @@
       "reject": "Reject",
       "no_answer_tip": "Don't answer",
       "later_tip": "Later",
-      "detail_tip": "Details"
+      "detail_tip": "Details",
+      "config_tag": "Config"
     },
     "panel": {
       "collapse_tip": "Collapse panel"
@@ -2375,6 +2769,348 @@
       "review_desc": "Whitelist + relationship/world variables auto; others require approval",
       "full_access_label": "Full Access",
       "full_access_desc": "All auto except hard blacklist; similar to codex full-auto"
+    },
+    "app": {
+      "rail": {
+        "collapse_tip": "Collapse sidebar",
+        "current_save": "Current Save",
+        "new_game_tip": "New game",
+        "no_save": "No save yet",
+        "no_save_hint": "Press + to start a new game",
+        "save_label": "Save #{{id}}",
+        "manual_save_tip": "Manual save",
+        "branch_tip": "Toggle branch tree view",
+        "branch_btn": "Branch",
+        "memory_mode": "Memory Mode",
+        "memory_normal": "Normal",
+        "memory_normal_tip": "Recall 6 history segments per turn",
+        "memory_normal_desc": "Balanced speed and coherence",
+        "memory_deep": "Deep",
+        "memory_deep_tip": "Recall 14 segments, slower but more coherent",
+        "memory_deep_desc": "Extra 8 segments recalled, +30% latency",
+        "memory_off_tip": "No recall, current context only",
+        "memory_off_desc": "Current panel context only",
+        "structured_updates": "Updates This Turn",
+        "no_updates": "None",
+        "back_home_tip": "Back to platform home",
+        "back_home": "Home"
+      },
+      "run": {
+        "expand": "Expand",
+        "detail_title": "Run Details",
+        "collapse": "Collapse",
+        "show_all": "All ({{count}})",
+        "click_last_detail": "Click to see last run details",
+        "idle": "Idle · Waiting for player",
+        "last_detail": "Last run"
+      },
+      "thinking": {
+        "stage_context": "Preparing context",
+        "stage_gm": "Generating",
+        "stage_save": "Rendering",
+        "done": "Done"
+      },
+      "msg": {
+        "copied": "Copied",
+        "copy": "Copy",
+        "copy_failed": "Copy failed",
+        "clipboard_denied": "Browser denied clipboard access",
+        "fork_failed": "Cannot create branch",
+        "fork_no_ctx": "Missing save context: no save_id or message index",
+        "fork_no_ctx_tip": "Missing save context — cannot branch",
+        "fork_tip": "New branch from here",
+        "regen_failed": "Cannot regenerate",
+        "regen_tip": "Regenerate this turn (try a different direction)",
+        "regen_no_ctx_tip": "Missing save context — cannot regenerate",
+        "delete_tip": "Delete this and all later messages (recoverable)",
+        "delete_no_ctx_tip": "Missing save context — cannot delete",
+        "meta_tip": "Time / tokens / cost for this turn",
+        "fork_label": "Branch from message",
+        "node_label": "Node #{{id}}",
+        "new_branch": "New branch",
+        "fork_switched": "Switched to new branch",
+        "fork_restore_input": "original message restored to input — edit and resend",
+        "fork_on_branch": "message stream is now on new branch",
+        "fork_create_failed": "Failed to create branch",
+        "delete_detail": "Deleted {{count}} message(s) · restored to turn {{turn}}",
+        "delete_trash": "old branch saved as {{name}}",
+        "deleted": "Messages deleted",
+        "delete_failed": "Delete failed"
+      },
+      "delete_modal": {
+        "eyebrow": "Danger",
+        "title": "Delete this and all later messages?",
+        "deleting": "Deleting…",
+        "confirm_delete": "Confirm Delete",
+        "irreversible": "This is irreversible.",
+        "this_gm_reply": "The GM reply below",
+        "this_message": "The message below",
+        "all_after": " and all following conversation, world-line, and phase summaries",
+        "discarded": " will be discarded.",
+        "player_input_kept": "The previous player input will be kept so you can revise or retry.",
+        "empty_msg": "(Empty message)",
+        "restore_before_gm": "The save will revert to the state before this GM reply.",
+        "restore_turn": "The save will revert to the state at the end of turn {{turn}}.",
+        "restore_start": "The save will revert to before the game started.",
+        "trash_hint": "The old branch is automatically preserved at",
+        "trash_recover": ", accessible via the branch tree."
+      },
+      "fork_modal": {
+        "eyebrow": "New branch from this message",
+        "title": "Fork at this node",
+        "new_branch": "New Branch",
+        "body": "Later messages will be kept on the original branch; the new branch continues from here."
+      },
+      "narrative": {
+        "main_agent": "Main Agent",
+        "player": "Player",
+        "preparing": "Preparing",
+        "please_wait": "Please wait…"
+      },
+      "image": {
+        "generated": "Generated image",
+        "strip_title": "Images this session ({{count}})"
+      },
+      "chat": {
+        "hidden_count": "{{count}} earlier message(s) hidden",
+        "load_more": "Load {{count}} more",
+        "full_history_hint": "Full history: use the History drawer in the top bar",
+        "waiting_gm": "Waiting for GM…",
+        "gen_failed": "Generation failed",
+        "request_aborted": "Request aborted. Your last input is preserved — retry or edit.",
+        "retry": "Retry",
+        "view_sse": "View event stream",
+        "jump_latest_tip": "Jump to latest",
+        "jump_latest": "Back to latest"
+      },
+      "branch": {
+        "load_failed": "Load failed",
+        "current_branches": "Current branches",
+        "head_history": "HEAD history",
+        "open_full_tip": "Open full branch graph in new tab (all branch paths)",
+        "error_prefix": "Load failed: ",
+        "switched": "Switched to branch",
+        "switch_failed": "Switch branch failed",
+        "continued": "New branch created from this node",
+        "continue_failed": "Continue from node failed"
+      },
+      "settings": {
+        "eyebrow": "In-game Settings · This Save",
+        "title": "Save Settings",
+        "instant_hint": "Density / font changes take effect immediately",
+        "global_settings": "Global Settings ↗",
+        "done": "Done",
+        "density_label": "Display Density",
+        "density_desc": "Adjust font size, line height and padding",
+        "density_compact": "Compact",
+        "density_default": "Default",
+        "density_spacious": "Spacious",
+        "font_label": "Narrative Font",
+        "font_desc": "Font used for GM replies",
+        "font_serif": "Serif",
+        "font_sans": "Sans",
+        "font_mono": "Mono",
+        "autosave_label": "Autosave",
+        "autosave_desc": "Automatically save progress after each GM reply",
+        "on": "On",
+        "off": "Off",
+        "show_usage_label": "Show Token Usage",
+        "show_usage_desc": "Display input/output tokens, cost, and context usage below the input box each turn",
+        "steering_label": "Steering Strength",
+        "steering_desc": "Rail = strong anchors; Guided = gentle default; Free = no injection",
+        "steer_rail": "Rail",
+        "steer_guided": "Guided",
+        "steer_free": "Free",
+        "perm_label": "LLM Write Permission",
+        "perm_desc": "Toggle via the lock icon next to the input; full options in Global Settings",
+        "perm_read_only": "Read-only · Narrative",
+        "perm_default": "Default",
+        "perm_review": "Auto Review",
+        "perm_full": "Full Access"
+      },
+      "history": {
+        "aria_label": "History",
+        "eyebrow": "This save · {{count}} message(s)",
+        "title": "History",
+        "empty": "No conversation history yet. Start talking to the GM and all turns will appear here.",
+        "footer_hint": "Esc to close · Current in-session memory; full branch history on the Platform / Branches page"
+      },
+      "search": {
+        "aria_label": "Search this save",
+        "eyebrow": "Search this save · frontend (dialog / memory / world)",
+        "placeholder": "Type a keyword and press Enter…",
+        "input_aria": "Search keyword",
+        "empty_hint": "Enter a keyword to search conversation history, memory, and known events.",
+        "no_results_prefix": "No results matching \"",
+        "no_results_suffix": "\".",
+        "result_count": "{{count}} match(es) (max 40 shown)",
+        "esc_hint": "Esc to close",
+        "group_dialog": "Dialog",
+        "group_memory": "Memory",
+        "group_world": "World",
+        "main_quest": "Main Quest",
+        "current_objective": "Current Objective",
+        "pinned_n": "Pinned #{{n}}",
+        "known_event_n": "Known Event #{{n}}"
+      },
+      "topbar": {
+        "chapter": "Ch. {{n}}",
+        "menu_tip": "Menu · Save / Memory / Branch",
+        "open_menu": "Open menu",
+        "expand_rail": "Expand sidebar",
+        "saved_ago": "Saved · {{ago}}",
+        "unsaved": "Not saved",
+        "history_tip": "History",
+        "search_tip": "Search this save",
+        "settings_tip": "In-game settings",
+        "feedback_tip": "Send feedback",
+        "expand_assistant": "Expand console assistant",
+        "expand_panel": "Expand right panel"
+      }
+    },
+    "console": {
+      "version": {
+        "switch_tip": "Switch version",
+        "header": "Current version — last {{count}} commits",
+        "checkout_not_impl": "Version checkout not yet implemented (501)",
+        "switched": "Switched to version {{sha}}",
+        "switch_failed": "Version switch failed"
+      },
+      "welcome": {
+        "eyebrow": "Platform Guide",
+        "title": "Welcome to the Beta Platform",
+        "disclaimer_title": "Beta Disclaimer",
+        "disclaimer_body": "The platform is still under active development during the beta period. Save data may be reset or migrated across versions. Please do not store important creative content solely on the platform — export and back up regularly.",
+        "feedback_title": "Report issues via feedback",
+        "feedback_body": "Click the \"Feedback\" button in the top-right corner to describe any issue or suggestion. We'll follow up promptly.",
+        "byok_title": "Bring Your Own Key (BYOK) — we don't provide API access",
+        "byok_body": "The platform itself is free to use, but AI generation requires you to supply your own API key from a supported LLM provider. We never purchase or top up keys on your behalf — your key stays in your control at all times.",
+        "configure_key_btn": "Set up API Key",
+        "got_it_btn": "Got it"
+      },
+      "stage": {
+        "context": "Loading context",
+        "generating": "Generating",
+        "rendering": "Rendering output"
+      },
+      "run": {
+        "stopped": "Stopped",
+        "gm_generating": "GM is generating narrative",
+        "disconnected_incomplete": "[Connection lost — content may be incomplete]",
+        "idle_timeout_error": "Connection timed out — content may be incomplete",
+        "idle_timeout_title": "Connection timed out",
+        "idle_timeout_detail": "No data received for an extended period — connection dropped",
+        "timed_out": "Timed out",
+        "request_failed": "Request failed",
+        "browser_abort_error": "Connection cancelled by browser — content may be incomplete",
+        "cancelled": "Cancelled",
+        "browser_abort_detail": "Browser aborted the connection",
+        "generation_cancelled": "Generation cancelled",
+        "thinking": "Thinking",
+        "rewound_toast": "Last turn rewound — replaying with your correction…",
+        "settings_updated": "Settings updated ({{count}} item(s))",
+        "updated": "Updated",
+        "interrupted_msg": "(Generation interrupted — output is incomplete)",
+        "empty_reply_msg": "(Model returned an empty reply)",
+        "interrupted": "Interrupted",
+        "empty_reply": "Empty reply",
+        "generation_interrupted": "Generation interrupted",
+        "turn_complete": "Turn complete",
+        "generation_failed": "Generation failed",
+        "please_retry": "Please try again",
+        "stream_closed_error": "Stream closed: {{detail}}"
+      },
+      "conflict": {
+        "toast_title": "Save conflict",
+        "toast_detail": "This save is already open in another window. Please close the other tab.",
+        "save_switched": "Switched to save {{id}}",
+        "save_switched_refresh": "Save switched — please refresh the page",
+        "refresh_hint": "If issues persist, please refresh",
+        "banner_text": "This save is open in another tab. Continuing may cause data conflicts. We recommend closing this window.",
+        "continue_btn": "Continue anyway",
+        "close_window_btn": "Close this window"
+      },
+      "opening": {
+        "curtain": "Raising the curtain on your story…",
+        "raising_curtain": "Raising the curtain…",
+        "waiting": "Waiting for the opening…"
+      },
+      "save": {
+        "untitled": "Save #{{id}}",
+        "save_failed": "Save failed",
+        "switch_failed": "Failed to switch save",
+        "new_confirm": "Start a new save? Your current progress will be kept."
+      },
+      "sse": {
+        "ago": "{{seconds}}s ago",
+        "last_token": "Token received",
+        "last_reasoning": "Reasoning received",
+        "last_agent": "Agent {{phase}} update",
+        "last_status": "Status received",
+        "last_usage": "Usage received",
+        "sent_no_response": "Sent, awaiting response",
+        "last_event": "Event: {{kind}}"
+      },
+      "send": {
+        "attachment_only": "(Attachment only — please continue based on this turn's context.)"
+      },
+      "retry": {
+        "still_running": "The previous turn is still running — please wait",
+        "no_input": "No input to retry",
+        "retrying": "Retrying last turn",
+        "still_generating": "Still generating — please wait"
+      },
+      "regen": {
+        "no_player_input": "No player input available to regenerate",
+        "empty_input": "Input is empty — cannot regenerate",
+        "no_save_context": "No save context available — cannot regenerate",
+        "label": "Regenerate",
+        "branch_rejected": "Branch rejected — cannot regenerate",
+        "regenerating": "Regenerating…",
+        "failed": "Regeneration failed"
+      },
+      "attach": {
+        "file_too_large": "File too large (limit: 12 MB)"
+      },
+      "write": {
+        "approve_failed": "Approval failed",
+        "reject_failed": "Rejection failed",
+        "answer_failed": "Answer submission failed"
+      },
+      "config": {
+        "save_pref_failed": "Failed to save preferences",
+        "cancelled": "Generation cancelled"
+      },
+      "sse_log": {
+        "title": "SSE Log ({{count}} events)",
+        "title_detailed": "SSE Log Details ({{count}} events)",
+        "empty": "No log entries yet",
+        "empty_detailed": "No SSE events for this turn yet",
+        "copy_json_btn": "Copy JSON",
+        "copied": "Copied",
+        "copy_failed": "Copy failed"
+      },
+      "load": {
+        "failed_msg": "Failed to load save — please retry or go back to the save list",
+        "retry_btn": "Retry",
+        "back_to_saves_btn": "Back to saves",
+        "initializing": "Initializing…"
+      },
+      "usage": {
+        "input_tip": "Input tokens",
+        "output_tip": "Output tokens",
+        "cached": "cached",
+        "thinking": "thinking",
+        "context_tip": "Context window usage",
+        "context": "Context",
+        "cost_tip": "Cost for this turn (USD)"
+      },
+      "resize_rail_tip": "Drag to resize · Double-click to reset",
+      "resize_panel_tip": "Drag to resize · Double-click to reset",
+      "open_panel_tip": "Open status panel"
+    },
+    "panels": {
+      "rules_request_failed": "Request failed: {{fn}}"
     }
   },
   "cards": {
@@ -2409,7 +3145,10 @@
       "menu_export_tavern": "Export SillyTavern JSON",
       "menu_duplicate": "Duplicate as new card",
       "tag_from_npc": "From NPC",
-      "duplicate_suffix": " Copy"
+      "duplicate_suffix": " Copy",
+      "menu_publish": "Publish to Online Library",
+      "menu_unpublish": "Unpublish",
+      "published": "Public"
     },
     "detail": {
       "type": "Type",
@@ -2552,7 +3291,10 @@
       "scope_public": "Public (shareable)",
       "enabled": "Enabled",
       "enabled_on": "Enabled",
-      "enabled_off": "Disabled"
+      "enabled_off": "Disabled",
+      "avatar_after_save": "Avatar can be set after saving",
+      "btn_promote_npc": "Convert to User Character Card",
+      "save_fail": "Failed to save"
     },
     "toast": {
       "added": "Added",
@@ -2574,7 +3316,10 @@
       "npc_load_fail": "Failed to load NPC cards",
       "load_fail_header": "Load failed",
       "name_required": "Name is required",
-      "chat_imported": "Chat history imported — new save created"
+      "chat_imported": "Chat history imported — new save created",
+      "publish_fail": "Operation failed",
+      "published": "Published to the online Character Card library",
+      "unpublished": "Unpublished"
     },
     "confirm": {
       "delete_title": "Delete Character Card",
@@ -2587,6 +3332,69 @@
       "no_npc_cards": "No NPC cards in your scripts yet.",
       "no_npc_hint": "Click \"New NPC\" to create one, or go to Scripts / Import to upload a script with character profiles.",
       "no_settings": "No profile yet — switch to Character Settings to fill it in."
+    },
+    "page": {
+      "online": {
+        "title": "Public Character Card Library",
+        "header_desc": "Browse character cards shared by other players. Clicking Import copies the full card into your own Character Cards, where you can edit and attach it to any script.",
+        "load_fail": "Failed to load",
+        "loading": "Loading public character cards…",
+        "empty": "No public character cards yet. You can set a card to public in My Character Cards to share it.",
+        "search_placeholder": "Search by name or identity…",
+        "btn_search": "Search",
+        "no_bio": "No description",
+        "anon": "Anonymous",
+        "btn_import": "Import",
+        "import_ok": "Imported to My Character Cards",
+        "import_ok_detail": "\"{{name}}\" has been copied as your own card and is ready to edit in My Character Cards.",
+        "import_fail": "Import failed"
+      },
+      "persona": {
+        "gallery_load_fail": "Failed to load persona image history",
+        "set_current_ok": "Set as current persona image",
+        "set_current_fail": "Failed to set as current",
+        "source_auto": "Auto",
+        "source_manual": "Manual",
+        "source_import": "Import",
+        "gallery_loading": "Loading history…",
+        "gallery_empty": "No persona image history yet. Click Generate Persona Image to create the first one.",
+        "badge_current": "Current",
+        "setting_in_progress": "Setting…",
+        "click_to_set_current": "Click to set as current",
+        "crop_saved": "Cropped persona image saved as current",
+        "strip_title": "Persona Images",
+        "thumb_title": "Click to preview / crop",
+        "btn_set_current": "Set as current",
+        "crop_hint": "The cropped image will be saved as the new current persona image",
+        "auto_sync_on": "Auto persona sync enabled",
+        "auto_sync_off": "Auto persona sync disabled",
+        "gen_queued": "Added to generation queue — persona image will update automatically when done",
+        "gen_fail": "Generation request failed",
+        "uploading_avatar": "Uploading avatar…",
+        "avatar_updated": "Avatar updated",
+        "upload_fail": "Upload failed",
+        "uploading_persona": "Uploading persona image…",
+        "persona_uploaded": "Persona image uploaded and set as current",
+        "btn_gen_persona": "Generate Persona Image",
+        "tab_label": "Persona Images",
+        "auto_section_title": "Auto Maintenance",
+        "auto_sync_label": "Auto-sync persona image on character update",
+        "auto_sync_desc": "When enabled, saving the character card triggers a new persona image generation whenever the character's name, appearance, personality, or background changes. Requires a configured image generation API Key.",
+        "btn_gen_now": "Generate Now",
+        "btn_upload_persona": "Upload Persona Image",
+        "manual_section_title": "Generate Persona Image Manually",
+        "manual_section_desc": "Generate a persona image based on the character's appearance and personality. The job runs asynchronously and updates the avatar when complete. You can also upload a local image directly.",
+        "history_title": "Persona Image History",
+        "history_desc": "Click a thumbnail to set it as the current persona image (also updates the avatar)"
+      },
+      "import": {
+        "too_many_files": "Up to {{max}} character cards at once — only the first {{max}} were kept",
+        "invalid_type": "Unsupported file type: {{name}}",
+        "file_too_large": "File too large: {{name}} (>{{mb}}MB)",
+        "chat_title_prefix": "[Tavern Import] {{name}}",
+        "chat_invalid_ext": "Only .jsonl / .json chat log files are supported",
+        "chat_too_large": "File too large (>20MB)"
+      }
     }
   },
   "modules": {
@@ -2678,6 +3486,3061 @@
     "embeddings": {
       "title": "Vector index",
       "desc": "pgvector embeddings, used for RAG semantic recall"
+    }
+  },
+  "md_editor": {
+    "canon_type": {
+      "character": "Character",
+      "concept": "Concept",
+      "event": "Event",
+      "faction": "Faction",
+      "item": "Item",
+      "location": "Location"
+    },
+    "chapter_prefix": "Ch.{{index}}",
+    "confirm": {
+      "chapter_batch_delete_extra": "Includes chapters: they will be renumbered after deletion; the RAG index will need to be rebuilt.",
+      "chapter_delete_extra": "After deletion the script's chapters will be renumbered (same behavior as merge/split); the RAG index will need to be rebuilt to stay in sync.",
+      "delete_item": "Delete this item?",
+      "delete_item_plain": "Delete \"{{label}}\"?",
+      "delete_script": "Delete entire script?",
+      "delete_script_msg": "\"{{title}}\" and all its saves will be permanently deleted and cannot be recovered.",
+      "delete_script_plain": "Delete entire script? (all saves will be permanently deleted)",
+      "delete_selected": "Delete {{count}} selected item(s)?",
+      "discard": "Discard",
+      "discard_and_close": "Discard and close",
+      "discard_changes": "Discard unsaved changes?",
+      "discard_tabs": "Discard {{count}} unsaved tab(s)?",
+      "discard_tabs_msg": "Unsaved changes in these tabs will be lost.",
+      "discard_tabs_plain": "Discard {{count}} unsaved change(s)?",
+      "irreversible": "This cannot be undone."
+    },
+    "copy_suffix": "Copy",
+    "ctx": {
+      "delete_selected": "Delete {{count}} selected",
+      "duplicate": "Duplicate",
+      "new_item": "New {{label}}",
+      "open_count": "Open {{count}} items",
+      "rename": "Rename"
+    },
+    "editor": {
+      "empty_hint": "Select a file from the left panel to start editing",
+      "empty_kinds": "Chapter · Character Card · Worldbook · Timeline · Canon",
+      "load_failed": "Failed to load: {{error}}"
+    },
+    "errors": {
+      "anchor_write_not_ready": "Timeline write endpoint not ready (requires backend P1)",
+      "canon_write_not_ready": "Canon write endpoint not ready (requires backend P1)",
+      "create_failed": "Failed to create",
+      "create_unsupported": "Creating this type is not supported",
+      "delete_unsupported": "Deleting this type is not supported",
+      "fm_added": "Added fields: {{fields}}",
+      "fm_frozen": "Front-matter fields are locked — you can only edit values, not add or remove fields: {{parts}}. Please restore the original field names and edit only the values after the colon.",
+      "fm_removed": "Removed/renamed fields: {{fields}}",
+      "unknown_kind": "Unknown entity type: {{kind}}"
+    },
+    "menu": {
+      "copy": "Copy",
+      "cut": "Cut",
+      "delete_script": "Delete Current Script",
+      "edit": "Edit",
+      "file": "File",
+      "find": "Find",
+      "goto_line": "Go to Line…",
+      "new_blank_script": "New Blank Script",
+      "new_chapter": "New Chapter",
+      "paste": "Paste",
+      "redo": "Redo",
+      "rename_script": "Rename Script…",
+      "select_all": "Select All",
+      "undo": "Undo"
+    },
+    "node_defaults": {
+      "anchor": "New Timepoint",
+      "canon": "New Entity",
+      "card": "New Character",
+      "script": "New Script",
+      "worldbook": "New Entry"
+    },
+    "panel": {
+      "hide_ai": "Hide AI assistant panel",
+      "show_ai": "Show AI assistant panel"
+    },
+    "prompt": {
+      "goto_line": "Go to line:",
+      "rename_script": "Rename script:"
+    },
+    "save_btn": {
+      "save": "Save ⌘S",
+      "saving": "Saving…"
+    },
+    "splitter": {
+      "left": "Drag to resize left panel",
+      "right": "Drag to resize right panel"
+    },
+    "sync": {
+      "ignore_btn": "Ignore",
+      "nudge_continue": "The continued prose may have introduced or changed settings — sync to Character Cards / Worldbook / Timeline?",
+      "nudge_rewrite": "The rewritten content may have introduced or changed settings — sync to Character Cards / Worldbook / Timeline?",
+      "prose_label": "Prose",
+      "sync_btn": "Sync Settings"
+    },
+    "tab_ctx": {
+      "close_all": "Close All",
+      "close_others": "Close Others",
+      "close_saved": "Close Saved",
+      "close_to_right": "Close to the Right"
+    },
+    "toast": {
+      "ai_edited_has_unsaved": "AI edited this item, but you have unsaved changes — skipping auto-refresh",
+      "ai_refreshed": "AI changes applied",
+      "blank_script_created": "New blank script created",
+      "chapter_batch_delete_failed": "Failed to batch-delete chapters",
+      "chapter_create_failed": "Failed to create chapter",
+      "chapter_created": "Chapter created",
+      "copied": "Duplicated",
+      "copy_failed": "Duplication failed",
+      "copy_failed_kbd": "Copy failed — try {{kbd}}",
+      "copy_unsupported": "This type cannot be duplicated",
+      "created": "Created",
+      "cut_failed_kbd": "Cut failed — try {{kbd}}",
+      "delete_failed": "Failed to delete",
+      "delete_partial": "Done — {{failed}} item(s) failed",
+      "delete_unsupported": "This type cannot be deleted",
+      "deleted": "Deleted",
+      "deleted_count": "Deleted {{count}} item(s)",
+      "nothing_to_delete": "Nothing selected can be deleted",
+      "op_failed": "Operation failed",
+      "open_file_first": "Please open a file first",
+      "open_file_first_continue": "Please open a file before using AI continue",
+      "paste_failed_kbd": "Paste failed — try {{kbd}}",
+      "rename_failed": "Rename failed",
+      "renamed": "Renamed",
+      "reorder_failed": "Reorder failed",
+      "reordered": "Reordered",
+      "save_failed": "Save failed",
+      "saved": "Saved",
+      "script_create_failed": "Failed to create script",
+      "script_deleted": "Script deleted",
+      "scripts_load_failed": "Failed to load scripts"
+    },
+    "toolbar": {
+      "copy": "Copy ⌘C",
+      "cut": "Cut ⌘X",
+      "paste": "Paste ⌘V",
+      "redo": "Redo ⌘⇧Z",
+      "undo": "Undo ⌘Z"
+    },
+    "tree": {
+      "collapse_all": "Collapse all",
+      "empty": "(empty)",
+      "entry_fallback": "(entry {{id}})",
+      "group": {
+        "anchor": "Timeline",
+        "canon": "Canon Entities",
+        "card": "Character Cards",
+        "chapter": "Chapters",
+        "worldbook": "Worldbook"
+      },
+      "load_failed": "Failed to load: {{error}}",
+      "new": "New",
+      "new_item": "New {{label}}",
+      "new_name_placeholder": "New {{label}} name",
+      "search_placeholder": "Search all assets…"
+    },
+    "ws": {
+      "label": "Workspace",
+      "loading": "Loading scripts…",
+      "no_scripts": "(no editable scripts)",
+      "none_selected": "None selected",
+      "script_fallback": "Script {{id}}",
+      "select_first": "Select a script first",
+      "switch_title": "Switch workspace (script)"
+    }
+  },
+  "tavern_page": {
+    "select": {
+      "heading": "Who do you want to chat with?",
+      "new_card_btn": "New Character Card",
+      "import_card_btn": "Import Character Card",
+      "empty_hint": "No character cards yet. Click \"New Character Card\" to create one, or \"Import Character Card\" to drag in a SillyTavern card (.png / .json / .webp).",
+      "card_title": "Chat with {{name}}",
+      "unnamed_card": "Unnamed character"
+    },
+    "char_fallback": "Character",
+    "persona_fallback": "You",
+    "tool_fallback": "Tool",
+    "new_chat_title": "New Chat",
+    "chat_id_fallback": "Chat #{{id}}",
+    "attachment_only_msg": "(Attachments only — please continue based on the current context.)",
+    "config_gen_prompt": "Generate with {{model}}",
+    "config_continue_prompt": "Continue",
+    "meta": {
+      "cached": "cached "
+    },
+    "attach": {
+      "worldbook": "Worldbook",
+      "file_fallback": "Attachment"
+    },
+    "sidebar": {
+      "new_chat": "New Chat",
+      "select_char": "Select Character",
+      "char_cards": "Character Cards (Edit)",
+      "model_params": "Model Parameters",
+      "history_label": "Chat History",
+      "no_chats": "No chats yet",
+      "no_chats_hint": "Click \"New Chat\" or drag in a character card",
+      "archived_label": "Archived ({{count}})"
+    },
+    "hero": {
+      "heading": "Who do you want to chat with?",
+      "sub": "Start a new chat or pick a character card.",
+      "drop_hint": "Or drag a character card (.png / .json / .webp) here"
+    },
+    "header": {
+      "char_persona_tip": "Character / Persona",
+      "elapsed_tip": "Time elapsed",
+      "export_tip": "Export JSONL"
+    },
+    "creds_card": {
+      "tag": "API KEY REQUIRED",
+      "body": "No API key configured for the chat model. Add one to continue.",
+      "retry_btn": "Retry",
+      "settings_btn": "Settings",
+      "dismiss_tip": "Dismiss"
+    },
+    "params_drawer": {
+      "title": "Model Parameters"
+    },
+    "delete_modal": {
+      "title": "Delete this chat?",
+      "body_prefix": "This will permanently delete \"",
+      "body_suffix": "\" and all its messages. This cannot be undone."
+    },
+    "export_modal": {
+      "title": "Export chat history?",
+      "body_prefix": "Export the full conversation for \"",
+      "body_suffix": "\" (including the opening message) as a SillyTavern JSONL file for re-import.",
+      "confirm_btn": "Export"
+    },
+    "toast": {
+      "open_chat_failed": "Failed to open chat",
+      "import_failed": "Import failed",
+      "imported_card": "Imported \"{{name}}\"",
+      "imported_chat": "Chat history imported ({{count}} messages)",
+      "unsupported_file": "Only .png, .json, or .webp character cards are supported",
+      "file_too_large": "File too large (12 MB limit)",
+      "needs_key_title": "API key required",
+      "needs_key_detail": "Add an API key for your chat model, then try again.",
+      "gen_failed": "Generation failed",
+      "retry_hint": "Please try again",
+      "no_retry_input": "Nothing to retry",
+      "renamed": "Renamed",
+      "rename_failed": "Rename failed",
+      "archived": "Archived",
+      "unarchived": "Unarchived",
+      "archive_failed": "Archive operation failed",
+      "deleted": "Deleted",
+      "delete_failed": "Delete failed",
+      "persona_saved": "Persona saved",
+      "save_failed": "Save failed",
+      "system_prompt_saved": "System prompt saved",
+      "save_prefs_failed": "Failed to save preferences",
+      "gen_cancelled": "Generation cancelled",
+      "new_chat_failed": "Failed to create new chat",
+      "start_chat_failed": "Failed to start chat"
+    }
+  },
+  "tavern_app": {
+    "confirm_modal": {
+      "eyebrow_danger": "Destructive action",
+      "eyebrow_default": "Please confirm"
+    },
+    "chat_item": {
+      "default_title": "Chat #{{id}}",
+      "dblclick_rename": "Double-click to rename",
+      "fallback_char": "Tavern character",
+      "menu_more": "More",
+      "menu_rename": "Rename",
+      "menu_archive": "Archive",
+      "menu_unarchive": "Unarchive"
+    },
+    "sidebar": {
+      "brand": "Tavern",
+      "new_chat": "New Chat",
+      "empty_title": "No chats yet",
+      "empty_hint": "Click \"New Chat\" or drop a character card here",
+      "archived_label": "Archived ({{count}})",
+      "drag_resize": "Drag to resize"
+    },
+    "header": {
+      "chat_list": "Chat list",
+      "expand_rail": "Expand sidebar",
+      "view_edit_char": "View / edit character · persona",
+      "export_jsonl": "Export JSONL",
+      "char_persona": "Character card / persona"
+    },
+    "tool_block": {
+      "tool_fallback": "Tool",
+      "summary_one": "Called tool · {{name}}",
+      "summary_many": "Called {{count}} tools · {{name}}…"
+    },
+    "thinking": {
+      "in_progress": "Thinking…",
+      "label": "Reasoning"
+    },
+    "chat_area": {
+      "empty": "The conversation hasn't started yet.",
+      "waiting_named": "{{name}} is thinking…",
+      "error_title": "Generation failed",
+      "error_default": "Request interrupted. Your last input has been preserved — you can retry.",
+      "retry": "Retry",
+      "jump_tip": "Jump to latest",
+      "jump_btn": "Back to latest"
+    },
+    "drawer": {
+      "persona_fallback": "Your persona",
+      "tab_character": "AI Character",
+      "tab_persona": "My Persona",
+      "tab_system": "System Prompt",
+      "collapse": "Collapse",
+      "char_not_found": "No character card found for this chat.",
+      "persona_not_set": "No persona card is set for this chat.",
+      "saving": "Saving…",
+      "sysprompt_title": "System Prompt",
+      "sysprompt_empty": "No system prompt set for this chat. Click Edit to customize the AI's behavior, persona, or instructions (affects this chat only).",
+      "sysprompt_placeholder": "Enter a system prompt (persona, behavior rules, jailbreak instructions, etc.)…"
+    },
+    "toast": {
+      "open_failed": "Failed to open chat",
+      "import_failed": "Import failed",
+      "imported_char": "Imported \"{{name}}\"",
+      "char_fallback": "Character",
+      "imported_chat": "Chat log imported ({{count}} messages)",
+      "drop_unsupported": "Only .png, .json, or .webp character cards are supported",
+      "no_retry_input": "No input to retry",
+      "renamed": "Renamed",
+      "rename_failed": "Rename failed",
+      "archived": "Archived",
+      "unarchived": "Unarchived",
+      "archive_failed": "Archive failed",
+      "deleted": "Deleted",
+      "delete_failed": "Delete failed",
+      "persona_saved": "Persona saved",
+      "save_failed": "Save failed"
+    },
+    "persona": {
+      "you": "You"
+    },
+    "composer": {
+      "placeholder": "Write something to {{name}}…"
+    },
+    "hero": {
+      "title": "Who would you like to chat with?",
+      "subtitle": "Drop in a character card to start a conversation right away.",
+      "drop_main": "Drop a character card here",
+      "drop_sub": "Supports .png (with embedded metadata), .json, or .webp — or click to browse"
+    },
+    "delete_dialog": {
+      "title": "Delete chat?",
+      "body_prefix": "This will permanently delete ",
+      "body_suffix": " and all its messages. This cannot be undone."
+    },
+    "rename_modal": {
+      "eyebrow": "Rename chat",
+      "title": "New title",
+      "placeholder": "Chat title"
+    }
+  },
+  "branch_graph": {
+    "empty": "No branch nodes yet. They will be created automatically after your first action.",
+    "node_fallback": "Node #{{id}}",
+    "action": {
+      "continue": "Continue from here",
+      "activate": "Switch to this branch",
+      "delete_subtree": "Delete subtree"
+    }
+  },
+  "feedback_page": {
+    "header_title": "Support & Feedback",
+    "header_description": "Submit issues or suggestions and track their status and official replies. For a quick note, click the Feedback button in the top bar at any time.",
+    "content_limit": {
+      "title": "Content Restrictions",
+      "body": "Feedback must not contain sexual, explicit, or NSFW adult material, regardless of age. Violations will result in a permanent ban. See"
+    },
+    "form": {
+      "container_title": "Submit Feedback",
+      "container_description": "Including runtime diagnostics helps us investigate faster (visible to admins only).",
+      "success_title": "Feedback Received",
+      "success_body": "Thank you! You can track the status in the My Feedback section below.",
+      "text_label": "Issue / Suggestion",
+      "text_description": "Up to {{max}} characters",
+      "text_over_limit": "Exceeds the {{max}}-character limit",
+      "text_placeholder": "Describe the issue or suggestion… (steps to reproduce / expected / actual — the more specific, the better)",
+      "include_runtime": "Attach runtime diagnostics (current page, active script/save, recent errors, last 3 dialog turns — admin-only, strongly recommended)",
+      "include_excerpts": "Include dialog excerpts (up to 5)",
+      "consent_required": "Please check the consent box to enable submission",
+      "submit_btn": "Submit Feedback"
+    },
+    "error": {
+      "submit_title": "Submission Failed",
+      "load_history": "Failed to load feedback history",
+      "submit_failed": "Submission failed, please try again later",
+      "load_title": "Failed to Load"
+    },
+    "runtime": {
+      "page": "Page",
+      "script": "Script",
+      "save": "Save",
+      "errors": "{{count}} error(s)",
+      "api_failures": "{{count}} failed API call(s)"
+    },
+    "excerpt": {
+      "empty": "No dialog excerpts available",
+      "label_player": "Player",
+      "label_gm": "GM"
+    },
+    "consent_text": "I have read AUP §2.J, understand that adult content excerpts are not permitted, and agree (this action records my consent)",
+    "withdraw": {
+      "confirm_title": "Withdraw Feedback",
+      "confirm_message": "Withdraw feedback #{{id}}?",
+      "confirm_btn": "Withdraw",
+      "toast_success": "Withdrawn",
+      "toast_error": "Withdrawal failed",
+      "btn": "Withdraw"
+    },
+    "history": {
+      "title": "My Feedback",
+      "kpi_total": "Total",
+      "kpi_pending": "In Review",
+      "kpi_accepted": "Accepted",
+      "filter_all": "All {{count}}",
+      "filter_pending": "Pending {{count}}",
+      "filter_ok": "Accepted {{count}}",
+      "filter_other": "Other",
+      "loading": "Loading…",
+      "empty": "No feedback submitted yet. Write a few lines above, or click the Feedback button in the top bar to submit quickly.",
+      "filter_empty": "No feedback matches this filter.",
+      "submitted_at": "Submitted {{time}}",
+      "reviewed_at": "Reviewed {{time}}",
+      "no_text": "(no text content)",
+      "admin_reply": "Official Reply"
+    },
+    "community": {
+      "title": "Player Community",
+      "description": "Have questions or want to discuss gameplay? Join our QQ player group ({{group}}).",
+      "qr_alt": "QQ group QR code {{group}}",
+      "join_btn": "Join via QQ"
+    },
+    "tips": {
+      "title": "Tips",
+      "line1": "· Be specific: include steps to reproduce, expected vs. actual behavior, and screenshot links.",
+      "line2": "· For bugs, keep \"Attach runtime diagnostics\" checked — it helps us locate the issue.",
+      "line3": "· Processed feedback will show its status and any official reply.",
+      "line4": "· Quick feedback: click the Feedback button in the top bar from any page — no interruption to your current flow."
+    }
+  },
+  "console_assistant_nav": {
+    "dirty_modal": {
+      "aria_label": "Unsaved Changes",
+      "title": "You have unsaved changes",
+      "body": "Navigating away will discard your unsaved changes. Continue?",
+      "reason_prefix": "Reason:",
+      "cancel": "Stay on page",
+      "confirm": "Discard changes and leave"
+    }
+  },
+  "responsive": {
+    "resize_handle_title": "Drag to resize · Double-click to reset"
+  },
+  "mobile": {
+    "settings": {
+      "title": "Settings",
+      "common": {
+        "collapse": "Collapse",
+        "expand": "Expand"
+      },
+      "section": {
+        "preferences": {
+          "label": "Preferences",
+          "sub": "Language / Font / Black Swan"
+        },
+        "models": {
+          "label": "API Settings",
+          "sub": "Provider Keys (BYOK)"
+        },
+        "modelparams": {
+          "label": "Model Parameters",
+          "sub": "Temperature / Top-p / Sampling"
+        },
+        "modules": {
+          "label": "Module Assignment",
+          "sub": "Model per sub-agent"
+        },
+        "memory": {
+          "label": "Memory",
+          "sub": "Recall Depth / Memory Buckets"
+        },
+        "permissions": {
+          "label": "Permissions",
+          "sub": "GM Write Permissions + Audit"
+        },
+        "account": {
+          "label": "Account",
+          "sub": "Co-Builder / Data Migration / Federation"
+        },
+        "danger": {
+          "label": "Danger Zone",
+          "sub": "Clear Saves / Reset Platform"
+        }
+      },
+      "pref": {
+        "ui_prefs": "Interface",
+        "ui_language": "Display Language",
+        "ui_language_desc": "Takes effect after reload",
+        "serif_font": "Serif Font",
+        "serif_font_desc": "Use a serif typeface for narrative body text",
+        "autosave": "Auto-Save",
+        "autosave_desc": "Save automatically after each GM response",
+        "gm_style": "GM Narrative Style",
+        "gm_style_desktop_only": "The GM style editor is not yet available on mobile — please use the desktop version",
+        "gm_style_custom": "Customize Voice / Perspective / Pacing",
+        "gm_style_custom_desc": "Open in the desktop editor",
+        "black_swan_agent": "Black Swan Agent",
+        "black_swan_enable": "Enable Black Swan",
+        "black_swan_enable_desc": "Occasionally trigger unexpected world events at low probability (falls back to env default if unset)",
+        "extractor": "Narrative Extractor",
+        "extractor_model": "Extractor Model",
+        "extractor_model_desc": "Configure the extractor model in Module Assignment",
+        "extractor_configure": "Configure",
+        "curator_threshold": "Curator Clarification Threshold",
+        "confidence_threshold": "Confidence Threshold",
+        "confidence_threshold_desc": "When confidence falls below this value the GM will ask the player to clarify intent; 0 = never ask, 1 = always ask"
+      },
+      "models": {
+        "provider_byok": "Provider · BYOK",
+        "sync_models": "Sync models",
+        "delete_key": "Delete key",
+        "status": "Status",
+        "connectivity": "Connectivity",
+        "conn_ok": "OK",
+        "conn_syncing": "Syncing…",
+        "conn_untested": "Untested",
+        "model_count": "Models",
+        "model_count_value": "{{enabled}} / {{total}} enabled",
+        "models_heading": "Models · {{count}}",
+        "no_models_hint": "Tap the refresh button to sync models",
+        "provider_count": "{{count}} provider(s) configured",
+        "load_failed": "Failed to load",
+        "retry": "Retry",
+        "no_providers": "No providers configured",
+        "no_providers_hint": "Add API keys in Settings → Models on the desktop app, then manage them here",
+        "status_connected": "Connected",
+        "status_syncing": "Syncing",
+        "enabled_count": "{{enabled}}/{{total}} enabled",
+        "add_provider_hint": "To add a new provider, use Settings → Models on the desktop app",
+        "sync_done": "Sync complete: {{count}} model(s)",
+        "sync_failed": "Sync failed: {{msg}}",
+        "admin_only": "Only admins can change global model toggles",
+        "save_failed": "Save failed: {{msg}}",
+        "delete_key_confirm": "Delete the API key for \"{{name}}\"? You will need to re-add it from the desktop app.",
+        "key_deleted": "Key deleted",
+        "delete_failed": "Delete failed: {{msg}}"
+      },
+      "modelparams": {
+        "preset": "Sampling Preset",
+        "preset_desc": "Apply a ready-made configuration; manually adjusting any value switches to Custom",
+        "preset_balanced": "Balanced",
+        "preset_conservative": "Conservative",
+        "preset_creative": "Creative",
+        "preset_deterministic": "Deterministic",
+        "preset_custom": "Custom",
+        "temperature_desc": "Higher = more random; 0 = fully deterministic; recommended range 0.4–1.0",
+        "reasoning_effort": "Reasoning Effort",
+        "reasoning_effort_desc": "Only applies to models that support extended reasoning (e.g. o3, DeepSeek-R1)",
+        "effort_low": "Low",
+        "effort_medium": "Medium",
+        "effort_high": "High",
+        "top_p_desc": "Cumulative probability cutoff; 0.9–0.95 is typical",
+        "top_k_desc": "Sample only from the top K tokens; 0 = disabled",
+        "rep_penalty": "Repetition Penalty",
+        "rep_penalty_desc": "Suppresses repetition; 1.0 = no effect; 1.15–1.2 works well for long narratives",
+        "freq_penalty_desc": "Penalizes tokens proportional to their frequency (OpenAI style)",
+        "presence_penalty_desc": "Encourages the model to introduce new topics (OpenAI style)",
+        "max_tokens": "Max Output Tokens",
+        "max_tokens_desc": "Maximum number of tokens to generate per response",
+        "context_size": "Context Window",
+        "context_size_desc": "Maximum history length sent to the model per request",
+        "seed": "Seed",
+        "seed_desc": "-1 = random every time",
+        "stop": "Stop Sequences",
+        "stop_desc": "Separate multiple sequences with |",
+        "content_filter": "Content Filter",
+        "nsfw_block": "Block",
+        "nsfw_soft": "Soft",
+        "nsfw_open": "Open",
+        "nsfw_explicit": "Explicit",
+        "nsfw_intensity": "NSFW Intensity",
+        "nsfw_intensity_desc": "Higher = more explicit content; only applies in soft/open/explicit modes",
+        "nsfw_extra_prompt": "NSFW Extra Prompt",
+        "nsfw_extra_prompt_desc": "Appended to the system prompt (e.g. All characters must be 18+)",
+        "mirostat": "Mirostat Advanced Sampling",
+        "mirostat_desc": "Perplexity-based sampling for llama.cpp / Ollama backends",
+        "mirostat_mode": "Mirostat Mode",
+        "mirostat_off": "Off",
+        "mirostat_tau_desc": "Target perplexity; 5 is a common value",
+        "mirostat_eta_desc": "Learning rate",
+        "view_json": "View Parameters JSON"
+      },
+      "modules": {
+        "intro": "Each sub-agent can use a different model — reserve expensive models for the GM narrator and use faster, cheaper ones for retrieval and extraction.",
+        "embedder_no_key": "No embedding key configured — RAG recall may fall back to a degraded mode",
+        "embedder_switch_note": "After switching the embedding model, any scripts already embedded need to be re-embedded to use the new model.",
+        "label": {
+          "gm": "Primary GM Model",
+          "sub_agent": "Context Sub-Agent",
+          "set_parser": "Command Parser",
+          "console": "Console Assistant",
+          "extractor": "Narrative Extractor",
+          "card_gen": "Character Card Generator",
+          "card_import": "AI Card Field Organizer",
+          "critic": "Consistency Critic",
+          "verifier": "Acceptance Condition Verifier",
+          "phase_digest": "Phase Digest (compact)",
+          "black_swan": "Black Swan Agent",
+          "agent": "Generic Sub-Agent Fallback",
+          "embedder": "Embedder (RAG)",
+          "image_gen": "Image Generation Model"
+        },
+        "tip": {
+          "gm": "Primary model for player conversations",
+          "sub_agent": "Organizes intent and retrieves context; follows the GM model",
+          "set_parser": "Natural-language parsing for /set commands",
+          "console": "Side-panel console; follows the GM model",
+          "extractor": "Secondary parsing of GM output (two-step GM pipeline)",
+          "card_gen": "Creative tool for generating and refining Character Cards",
+          "card_import": "Organizes fields when importing Tavern cards; follows the GM model",
+          "critic": "Consistency scoring sub-agent for card generation",
+          "verifier": "Checks whether GM output meets acceptance conditions",
+          "phase_digest": "Condenses long game history into phase-level summaries",
+          "black_swan": "Proactively triggers unexpected world events",
+          "agent": "Fallback for sub-agents without a dedicated model",
+          "embedder": "Embedding model used for RAG recall",
+          "image_gen": "Default provider/model for image generation; requires a BYOK key"
+        }
+      },
+      "memory": {
+        "recall_behavior": "Recall Behavior",
+        "recall_depth_label": "Recall Depth · {{n}}",
+        "recall_depth_desc": "Maximum number of memory fragments recalled per turn (2–20)",
+        "summary_window_label": "Summary Window · {{n}}",
+        "summary_window_desc": "Number of turns covered per summary pass (3–20)",
+        "token_budget_label": "Token Budget · {{n}}",
+        "token_budget_desc": "Maximum tokens injected from memory per turn (200–2000)",
+        "auto_archive_label": "Auto-Archive · every {{n}} turns",
+        "auto_archive_desc": "Triggers a phase archive after this many turns (10–200)",
+        "buckets": "Memory Buckets",
+        "pinned_max": "Pinned Memory Limit",
+        "pinned_max_desc": "Maximum number of pinned memory entries per game",
+        "bucket_pinned": "Pinned Memory Bucket",
+        "bucket_pinned_desc": "Pinned entries injected every turn",
+        "bucket_world": "World Knowledge Bucket",
+        "bucket_world_desc": "World-lore memories: settings, maps, rules, etc.",
+        "bucket_char": "Character Relations Bucket",
+        "bucket_char_desc": "NPC relationships and past events"
+      },
+      "perm": {
+        "gm_write_perm": "GM Write Permissions",
+        "default_mode": "Default Mode",
+        "default_mode_desc": "Controls whether the GM can write world state directly or requires player confirmation",
+        "mode_default": "Default",
+        "mode_review": "Review",
+        "mode_full_access": "Full Access",
+        "mode_review_hint": "High-risk writes require explicit player approval on the confirmation bar",
+        "mode_full_access_hint": "The GM can modify all fields freely without confirmation",
+        "mode_default_hint": "Follows system default rules; medium-risk writes require confirmation",
+        "high_risk_whitelist": "High-Risk Field Allowlist",
+        "high_risk_whitelist_desc": "Selected fields bypass high-risk confirmation",
+        "custom_whitelist": "Custom High-Risk Allowlist",
+        "custom_whitelist_format_prefix": "Format:",
+        "custom_whitelist_format_or": "or",
+        "no_custom_entries": "No custom entries",
+        "custom_err_empty": "Cannot be empty",
+        "custom_err_too_long": "Must be 80 characters or fewer",
+        "custom_err_format": "Only letters, numbers, underscores, dots, and * are allowed",
+        "custom_err_builtin": "Already in the built-in list",
+        "custom_err_exists": "Already exists",
+        "load_failed": "Failed to load",
+        "audit_log": "Audit Log",
+        "refresh_log": "Refresh Log",
+        "no_audit_log": "No audit log entries — an active save is required",
+        "kind_write": "Write",
+        "kind_parse_error": "Parse Error",
+        "kind_rejected": "Rejected",
+        "kind_hard_forbidden": "Hard Forbidden",
+        "kind_extractor_error": "Extractor Error",
+        "kind_set_parser_error": "Command Error",
+        "kind_clarify_yield": "Clarification",
+        "kind_acceptance_unmet": "Condition Unmet",
+        "kind_question_skip": "Question Skipped"
+      },
+      "account": {
+        "api_usage": "API Usage (last 30 days)",
+        "total_tokens": "Total tokens",
+        "total_calls": "Total calls",
+        "cache_hit": "Cache hit rate",
+        "account_settings": "Account",
+        "co_builder_title": "Beta Co-Builder",
+        "co_builder_active": "Enrolled in co-building beta — early access to new features",
+        "co_builder_inactive": "Not enrolled in the Co-Builder program",
+        "co_builder_unavailable": "Not available",
+        "co_builder_saved": "Co-Builder preference saved",
+        "save_failed": "Save failed",
+        "data_migration": "Data Migration (Export / Import)",
+        "data_migration_desc": "Package all your personal data (Scripts, Saves, Character Cards) for migration to a local instance. API keys are excluded for security.",
+        "data_migration_est": "Scripts {{scripts}} · Saves {{saves}} · Cards {{cards}} · Model entries {{model_entries}}",
+        "include_chunks": "Include raw text chunks (larger file, required for local RAG)",
+        "export_preparing": "Preparing download…",
+        "export_btn": "Export Data Package (.zip)",
+        "export_started": "Download started",
+        "export_failed": "Export failed: {{msg}}",
+        "import_label": "Import data package (select an account-*.zip exported from the online service)",
+        "importing": "Importing…",
+        "import_btn": "Import into Current Account",
+        "import_no_job_id": "No job ID returned",
+        "import_failed": "Import failed: {{msg}}",
+        "import_done_toast": "Import complete: {{scripts}} script(s), {{saves}} save(s), {{cards}} card(s)",
+        "stage_scripts": "Importing scripts",
+        "stage_saves": "Importing saves",
+        "stage_cards": "Importing cards",
+        "stage_done": "Done",
+        "stage_processing": "Processing",
+        "import_done": "Import complete",
+        "import_result": "Scripts {{scripts}} · Saves {{saves}} · Cards {{cards}}",
+        "import_more_warnings": "…and {{n}} more",
+        "online_library": "Online Script Library",
+        "connected_to": "Connected: {{url}}",
+        "disconnect": "Disconnect",
+        "online_library_desc": "Connect to the online service to browse the public Script Library, import scripts, or publish your own",
+        "service_url": "Service URL",
+        "pat_label": "Personal Access Token (PAT)",
+        "pat_desc": "Generate a token under Personal Access Tokens in the online service, then paste it here",
+        "pat_empty": "Please paste your access token",
+        "connecting": "Connecting…",
+        "save_and_connect": "Save & Connect",
+        "federation_connected": "Connected to the online Script Library",
+        "federation_disconnected": "Disconnected",
+        "federation_connect_failed": "Connection failed: {{msg}}",
+        "operation_failed": "Operation failed"
+      },
+      "danger": {
+        "irreversible_warning": "The following actions are irreversible. Proceed with caution.",
+        "dangerous_ops": "Dangerous Operations",
+        "clear_saves": "Clear All Saves",
+        "clear_saves_desc": "Permanently delete all {{n}} save(s) on this account (cannot be undone)",
+        "clear_btn": "Clear",
+        "reset_platform": "Reset Platform Data",
+        "reset_platform_desc": "Must be run from the command line; not supported via the UI",
+        "reset_cmd_label": "Reset command (run on the server):",
+        "no_saves": "No saves to clear",
+        "clear_partial": "Cleared {{done}}, {{fail}} failed",
+        "clear_done": "{{done}} save(s) cleared",
+        "confirm_desc_prefix": "This will permanently delete all",
+        "confirm_desc_suffix": "save(s) on this account. This cannot be undone.",
+        "confirm_preview": "All game progress, branch records, and GM context will be lost. Please confirm before proceeding.",
+        "confirm_input_prefix": "Type",
+        "confirm_keyword": "clear",
+        "confirm_input_suffix": "to confirm",
+        "clear_saves_confirm_btn": "Clear Saves",
+        "deleting_progress": "Deleting {{done}} / {{total}}…"
+      }
+    },
+    "me": {
+      "back": "Back",
+      "processing": "Processing…",
+      "op_failed": "Operation failed",
+      "op_failed_msg": "Operation failed: {{msg}}",
+      "time": {
+        "just_now": "Just now",
+        "minutes_ago": "{{n}}m ago",
+        "hours_ago": "{{n}}h ago",
+        "days_ago": "{{n}}d ago"
+      },
+      "stats": {
+        "wan_unit": "w",
+        "play_hours": "Hours played",
+        "per_week": "wk",
+        "total_rounds": "Turns",
+        "branches": "Branches",
+        "max_depth": "{{n}} deep",
+        "streak_days": "Streak",
+        "longest_streak": "Best {{n}}d",
+        "imported_scripts": "Scripts",
+        "imported_words": "Words",
+        "achievements_unlocked": "Achievements",
+        "saves": "Saves"
+      },
+      "overview": {
+        "title": "Profile",
+        "no_bio": "No bio yet",
+        "registered_at": "Joined {{date}}",
+        "achievements": "Achievements",
+        "no_achievements": "No achievements yet.",
+        "more": "More",
+        "recent_activity": "Recent Activity",
+        "filter_rounds": "Turns",
+        "filter_branches": "Branches",
+        "filter_scripts": "Scripts",
+        "no_activity": "No activity yet.",
+        "stats_title": "Stats",
+        "edit_profile": "Edit Profile",
+        "settings": "Settings",
+        "usage": "Usage",
+        "wall": "Achievement Wall",
+        "public_badge": "Public",
+        "private_badge": "Private",
+        "view_wall": "View Achievement Wall",
+        "no_activity_in_filter": "Nothing in this category.",
+        "account_mgmt": "Account",
+        "edit_desc": "Display name, bio, avatar, contact info",
+        "settings_desc": "Security, sessions, persona, data export",
+        "usage_desc": "Token usage, cost, trend charts",
+        "wall_desc": "{{count}} unlocked"
+      },
+      "edit": {
+        "title": "Edit Profile",
+        "username": "Username",
+        "username_placeholder": "3-32 chars: letters, digits, underscore",
+        "display_name": "Display Name",
+        "display_name_placeholder": "Up to 32 characters",
+        "bio": "Bio",
+        "bio_placeholder": "Up to 500 characters",
+        "gender": "Gender",
+        "gender_unspecified": "Prefer not to say",
+        "gender_male": "Male",
+        "gender_female": "Female",
+        "gender_nonbinary": "Non-binary",
+        "birthday": "Birthday",
+        "website": "Website",
+        "website_placeholder": "https://...",
+        "location": "Location",
+        "location_placeholder": "City or region",
+        "save_success": "Profile saved",
+        "save_failed": "Save failed",
+        "save_error": "Save failed: {{msg}}",
+        "avatar_too_large": "File must be under 2MB",
+        "avatar_updated": "Avatar updated",
+        "upload_failed": "Upload failed",
+        "avatar_reset": "Avatar reset to default",
+        "avatar_section": "Avatar",
+        "upload_avatar": "Upload new avatar",
+        "reset_avatar": "Reset to default",
+        "avatar_hint": "PNG/JPG/WEBP · max 2MB",
+        "basic_section": "Basic Info",
+        "field_display_name": "Display name",
+        "field_display_name_hint": "Shown in games and comments",
+        "field_username": "Username",
+        "field_username_hint": "Used to log in, changeable once every 6 months",
+        "field_real_name": "Real name",
+        "field_real_name_hint": "Visible only to you",
+        "field_gender": "Gender",
+        "gender_other": "Other",
+        "field_pronouns": "Pronouns",
+        "pronoun_she": "She/Her",
+        "pronoun_he": "He/Him",
+        "field_birthday": "Birthday",
+        "field_location": "Location",
+        "field_location_placeholder": "e.g. Shanghai",
+        "field_website": "Website",
+        "field_bio": "Bio",
+        "field_bio_placeholder": "Up to 280 characters",
+        "contact_section": "Contact",
+        "field_email": "Email",
+        "field_email_hint": "Used for notifications and password recovery",
+        "field_phone": "Phone",
+        "field_phone_hint": "Optional, visible only to you",
+        "optional": "Optional",
+        "locale_section": "Locale",
+        "field_language": "Language",
+        "field_timezone": "Timezone",
+        "saving": "Saving…",
+        "save_btn": "Save profile"
+      },
+      "settings": {
+        "title": "Settings",
+        "account_section": "Account",
+        "change_password": "Change Password",
+        "current_password": "Current Password",
+        "new_password": "New Password",
+        "confirm_password": "Confirm Password",
+        "password_mismatch": "Passwords do not match",
+        "password_changed": "Password changed",
+        "change_email": "Change Email",
+        "current_email": "Current Email",
+        "new_email": "New Email",
+        "email_changed": "Email changed",
+        "privacy_section": "Privacy",
+        "public_profile": "Public Profile",
+        "public_profile_desc": "Allow others to view your profile via link",
+        "public_wall": "Public Achievement Wall",
+        "public_wall_desc": "Show achievements on public profile",
+        "session_section": "Login Sessions",
+        "sessions_desc": "{{count}} active session(s)",
+        "sessions_desc_with_ts": "{{count}} active session(s), current: {{ts}}",
+        "no_sessions": "No active sessions",
+        "revoke_other_sessions": "Revoke Other Sessions",
+        "revoke_confirm_title": "Revoke Other Sessions",
+        "revoke_confirm_body": "All sessions except the current device will be signed out.",
+        "revoke_confirm_btn": "Revoke All Others",
+        "revoke_success": "Other sessions revoked",
+        "login_history": "Login History",
+        "login_history_desc": "{{ok}} successful login(s) in the last 30 days",
+        "login_history_desc_blocked": "{{ok}} successful, {{blocked}} blocked in the last 30 days",
+        "no_login_history": "No login history",
+        "view_login_history": "View Login History",
+        "login_history_title": "Login History",
+        "login_history_empty": "No records",
+        "login_success": "Success",
+        "login_blocked": "Blocked",
+        "danger_section": "Danger Zone",
+        "delete_account": "Delete Account",
+        "delete_account_desc": "Permanently delete your account and all data",
+        "delete_confirm_title": "Delete Account",
+        "delete_confirm_phrase": "confirm delete",
+        "delete_confirm_body": "This action is irreversible. All your data will be permanently deleted.",
+        "delete_confirm_body2": "Type \"confirm delete\" to proceed:",
+        "delete_confirm_btn": "Permanently Delete",
+        "delete_input_placeholder": "Type the confirmation phrase",
+        "notification_section": "Notifications",
+        "email_notifications": "Email Notifications",
+        "email_notifications_desc": "Receive system email notifications",
+        "language_section": "Language",
+        "language": "Interface Language",
+        "save_success": "Settings saved",
+        "save_failed": "Save failed",
+        "theme_section": "Appearance",
+        "theme": "Theme",
+        "theme_system": "System",
+        "theme_light": "Light",
+        "theme_dark": "Dark",
+        "session_revoked": "Session signed out",
+        "session_revoke_failed": "Failed to sign out session",
+        "all_revoked": "All other sessions signed out",
+        "pw_enter_current": "Please enter your current password",
+        "pw_enter_new": "Please enter a new password",
+        "pw_mismatch": "Passwords do not match",
+        "pw_changed": "Password changed",
+        "pw_change_failed": "Change failed: {{msg}}",
+        "export_requested": "Export requested — you will be notified by email when ready",
+        "export_failed": "Export request failed",
+        "visibility_saved": "Visibility settings saved",
+        "delete_requested": "Deletion request submitted",
+        "deactivated": "Account deactivated",
+        "persona_saved": "Persona saved",
+        "persona_deleted": "Deleted",
+        "delete_failed": "Delete failed",
+        "sessions_title": "Active Sessions",
+        "sessions_count": "{{n}}",
+        "current_session": "Current",
+        "revoke": "Sign out",
+        "revoke_all": "Sign out all other sessions",
+        "history_title": "Login History",
+        "history_count": "{{n}} entries",
+        "login_ok": "Success",
+        "set_password": "Set password",
+        "pw_changing": "Changing…",
+        "pw_current": "Current password",
+        "pw_new": "New password",
+        "pw_new_hint": "At least 12 characters, upper/lower case and digits",
+        "pw_confirm": "Confirm new password",
+        "pw_desc_change": "Recommended to update every 90 days. At least 12 characters with upper/lower case and digits.",
+        "pw_desc_set": "You currently sign in via email link. No password is set.",
+        "personas_title": "Persona",
+        "persona_new": "New persona",
+        "persona_edit": "Edit persona",
+        "persona_name": "Name",
+        "persona_desc": "Description",
+        "persona_prompt": "Prompt",
+        "persona_unnamed": "Unnamed",
+        "no_personas": "No personas yet. Tap the button above to create one.",
+        "export_title": "Export Data",
+        "export_desc": "Export all Scripts, Saves, memory, library assets, and usage logs. A download link (valid 7 days) will be sent by email.",
+        "export_scope": "Scope",
+        "export_scope_all": "All — Scripts, Saves, library, usage",
+        "export_scope_scripts": "Scripts and chapters only",
+        "export_scope_saves": "Saves and branches only",
+        "export_scope_library": "Library assets only",
+        "export_scope_usage": "Usage logs only",
+        "export_format": "Format",
+        "export_format_zip": "ZIP — JSON + attachments",
+        "export_format_json": "JSON — metadata only",
+        "export_email": "Delivery email",
+        "export_email_placeholder": "Email for download link",
+        "export_requesting": "Requesting…",
+        "export_request_btn": "Request export",
+        "visibility_title": "Profile Visibility",
+        "visibility_desc": "Control who can see each field of your profile.",
+        "vis_self": "Only me",
+        "vis_friends": "Friends",
+        "vis_public": "Everyone",
+        "visibility_save_btn": "Save visibility",
+        "policy_title": "Privacy Policy",
+        "policy_1_title": "1. What we collect",
+        "policy_1_body": "Account information (username, email, optional phone), device fingerprint (for sessions), usage telemetry (only when enabled by you).",
+        "policy_2_title": "2. What we do not collect",
+        "policy_2_body": "Script content, player variables, private chats, long-term memory, Worldbook entries — these are encrypted in your workspace and inaccessible to the team.",
+        "policy_3_title": "3. Third parties",
+        "policy_3_body": "Script content is never shared with third parties. Model API calls go directly to your configured provider; we do not proxy or retain them.",
+        "policy_4_title": "4. Data ownership",
+        "policy_4_body": "You may request a full archive at any time; you can deactivate your account (retained 90 days) or permanently delete it (immediate).",
+        "policy_5_title": "5. Compliance",
+        "policy_5_body": "This platform complies with GDPR, China PIPL, and California CCPA.",
+        "policy_read": "I have read this",
+        "searchable": "Discoverable",
+        "searchable_desc": "Allow others to find you by display name or username.",
+        "field_visibility": "Field visibility",
+        "field_visibility_desc": "Control who can see your real name, location, birthday, etc.",
+        "field_visibility_btn": "Configure",
+        "security_section": "Security",
+        "twofa": "Two-factor authentication (2FA)",
+        "twofa_desc": "Verify with an authenticator app or SMS code.",
+        "active_sessions": "Active sessions",
+        "view_sessions": "View sessions",
+        "login_history_label": "Login history",
+        "view_history": "View log",
+        "personas_section": "Persona",
+        "my_persona": "My personas",
+        "my_persona_desc": "Player personas used in games. Create multiple and switch between them.",
+        "manage_persona": "Manage personas",
+        "notifications_section": "Notifications",
+        "email_notif": "Email notifications",
+        "email_notif_desc": "Important security events, subscription changes, inactivity reminders.",
+        "data_sharing_section": "Data Sharing & Compliance",
+        "anon_usage": "Anonymous usage analytics",
+        "anon_usage_desc": "Anonymously report button clicks and time-on-page (no Script content) to improve the product.",
+        "crash_report": "Crash & error reports",
+        "crash_report_desc": "Upload stack traces and recent actions when errors occur. Script content is never included.",
+        "view_policy": "View policy",
+        "data_ownership_section": "Data Ownership",
+        "export_my_data": "Export my data",
+        "export_my_data_desc": "Export all Scripts, Saves, memory, library assets, and usage records.",
+        "deactivate": "Deactivate account",
+        "deactivate_desc": "You cannot sign in while deactivated. Scripts and Saves are kept for 90 days and can be restored anytime.",
+        "delete_account_btn": "Delete account",
+        "deact_confirm_title": "Deactivate account?",
+        "deact_confirm_body": "You can sign back in to restore your account within 90 days. Scripts and Saves are kept but inaccessible during this period.",
+        "delete_confirm_prompt": "Type \"{{phrase}}\" to continue",
+        "delete_permanent_btn": "Delete permanently"
+      },
+      "usage": {
+        "title": "Usage Stats",
+        "range_7d": "Last 7 days",
+        "range_30d": "Last 30 days",
+        "range_90d": "Last 90 days",
+        "total_tokens": "Total Tokens",
+        "input_tokens": "Input",
+        "output_tokens": "Output",
+        "cache_tokens": "Cached",
+        "calls": "Calls",
+        "by_scenario": "By Scenario",
+        "by_model": "By Model",
+        "no_data": "No data",
+        "scenario_chat": "Chat",
+        "scenario_opening": "Opening",
+        "scenario_extract": "Extract",
+        "scenario_embedding": "Embedding",
+        "scenario_assistant": "Assistant",
+        "scenario_tool": "Tool",
+        "daily_trend": "Daily Trend",
+        "load_failed": "Load failed",
+        "range_toggle": "Toggle time range",
+        "load_error": "Failed to load usage data",
+        "requests": "Requests",
+        "daily_avg": "Avg {{n}}/day",
+        "cost": "Cost",
+        "cached_input": "Cached input",
+        "cache_savings": "Cache savings",
+        "daily_cost": "Daily cost",
+        "forecast_30d": "30-day forecast",
+        "trend": "Trend"
+      },
+      "wall": {
+        "title": "Achievement Wall",
+        "loading": "Loading…",
+        "load_failed": "Load failed",
+        "no_achievements": "No achievements unlocked yet. Start playing!",
+        "other_category": "Other",
+        "hidden": "Hidden",
+        "hidden_desc": "Keep exploring to unlock",
+        "unlocked_at": "Unlocked {{date}}",
+        "share": "Share Achievement Wall",
+        "public_link": "Public Link",
+        "copied": "Link copied",
+        "copy_failed": "Copy failed",
+        "not_public": "Achievement wall is private",
+        "enable_in_settings": "Enable \"Public Achievement Wall\" in Settings",
+        "points": "{{n}} pts",
+        "rarity": "{{pct}}% of players",
+        "my_title": "My Achievement Wall",
+        "unlocked_sub": "{{unlocked}} / {{total}} unlocked",
+        "load_error": "Failed to load",
+        "link_copied": "Link copied",
+        "share_link": "Share link",
+        "achieved": "Achieved"
+      },
+      "avatar": {
+        "change": "Change Avatar",
+        "upload": "Upload Image",
+        "uploading": "Uploading…",
+        "upload_failed": "Upload failed",
+        "upload_success": "Avatar updated"
+      }
+    },
+    "scripts": {
+      "unit": {
+        "wan_chars": " wan chars",
+        "chars": " chars",
+        "wan": "w",
+        "chapter": "ch"
+      },
+      "split_rule": {
+        "auto": "Auto-detect (recommended)",
+        "corpus": "Corpus mode",
+        "chapter_cn": "Chinese chapter headings",
+        "chapter_en": "English chapter headings",
+        "number_dot": "Number-dot rule",
+        "paren_num": "Parenthesized number rule",
+        "custom": "Custom regex"
+      },
+      "play_block": {
+        "importing": "Import in progress, please wait",
+        "missing_data": "Missing required data: {{items}}",
+        "no_chapters": "Chapter data missing — complete the import first"
+      },
+      "op_failed": "Operation failed",
+      "no_title": "Untitled",
+      "chapters": {
+        "title": "Chapters",
+        "subtitle": "{{total}} chapters · Ch. {{current}}",
+        "resplit_title": "Re-split chapters",
+        "empty_title": "No chapters yet",
+        "empty_desc": "Chapters will appear here after the script is imported",
+        "rename_prompt": "New title",
+        "renamed": "Renamed",
+        "confirm_merge_next": "Merge chapter {{a}} and chapter {{b}}?",
+        "confirm_merge_prev": "Merge chapter {{a}} into chapter {{b}} (keep current title)?",
+        "merged": "Merged",
+        "resplit_prompt": "Re-split rule (auto/chapter_cn/chapter_en/number_dot)",
+        "resplit_done": "Re-split complete",
+        "load_error": "Failed to load",
+        "rename_btn": "Rename",
+        "merge_prev_btn": "Merge with prev",
+        "merge_next_btn": "Merge with next",
+        "loading_full": "Loading full text…",
+        "truncated": "[Text too long — showing first 8,000 characters]"
+      },
+      "worldbook": {
+        "title": "Worldbook",
+        "empty_title": "No worldbook entries yet",
+        "empty_desc": "Entries will be generated automatically after import and extraction",
+        "entry_n": "Entry #{{n}}",
+        "active": "Active",
+        "dormant": "Dormant"
+      },
+      "npc": {
+        "title": "NPC Character Cards",
+        "empty_title": "No NPC cards yet",
+        "empty_desc": "Cards are generated automatically after import and extraction",
+        "unnamed": "Unnamed",
+        "protagonist": "Protagonist",
+        "disabled": "Disabled",
+        "first_appears": "Appears in ch. {{ch}}"
+      },
+      "timeline": {
+        "title": "Timeline Anchors",
+        "empty_title": "No timeline yet",
+        "empty_desc": "Shown after the anchors module is built",
+        "chapter_range": "Ch. {{min}}–{{max}}"
+      },
+      "versions": {
+        "title": "Version History",
+        "empty_title": "No versions yet",
+        "current": "Current",
+        "load_error": "Failed to load version history",
+        "confirm_rollback": "Roll back to version {{id}}? This cannot be undone.",
+        "rolled_back": "Rolled back successfully",
+        "rollback_error": "Rollback failed",
+        "rolling_back": "Rolling back…",
+        "rollback_btn": "Roll back to this version"
+      },
+      "overrides": {
+        "title": "Script Parameter Overrides",
+        "desc": "script_overrides JSONB — override global parameters for this script to fine-tune GM behavior.",
+        "json_invalid": "Invalid JSON",
+        "json_error": "JSON parse error: {{msg}}",
+        "saved": "Saved",
+        "save_error": "Failed to save",
+        "saving": "Saving…"
+      },
+      "share": {
+        "title": "Publish & Export",
+        "publish_label": "Publish to online library",
+        "publish_on_desc": "Others can browse and subscribe to this script",
+        "publish_off_desc": "Visible only to you",
+        "need_review": "Complete the script review before publishing",
+        "confirm_publish": "Publish \"{{title}}\" to the public library?",
+        "published": "Published to public library",
+        "unpublished": "Unpublished",
+        "export_ok": "Exported: {{filename}}",
+        "export_error": "Export failed",
+        "confirm_fork": "Save \"{{title}}\" as an editable copy?",
+        "copy_suffix": "Copy",
+        "forked": "Saved as a copy",
+        "not_owner_desc": "This script was shared by someone else. You can save a copy to edit it freely.",
+        "fork_btn": "Save editable copy",
+        "import_export_section": "Import / Export",
+        "exporting": "Exporting…",
+        "export_btn": "Export script pack (.zip)",
+        "sharing_mode_section": "Sharing Mode",
+        "current_mode": "Current mode: ",
+        "mode_public": "Public",
+        "mode_pinned": "Pinned snapshot",
+        "mode_floating": "Follow latest"
+      },
+      "detail": {
+        "embed_no_creds": "No embedding model configured — set up a RAG / Embedding model in settings first",
+        "embed_start_error": "Failed to start indexing",
+        "embed_started": "Indexing started",
+        "confirm_delete": "Delete \"{{title}}\"? This cannot be undone, and associated saves will no longer be usable.",
+        "delete_error": "Delete failed",
+        "deleted": "Deleted",
+        "confirm_unsubscribe": "Remove \"{{title}}\" from your library? The original script is unaffected and can be re-imported from the public library.",
+        "unsubscribe_error": "Failed to remove",
+        "unsubscribed": "Removed from your library",
+        "share_title": "Publish / Export",
+        "unsubscribe_title": "Remove from my library",
+        "coming_soon": "Coming Soon",
+        "coming_soon_desc": "This feature is under development and will be available at public launch.",
+        "stat_chapters": "Chapters",
+        "stat_words": "Words",
+        "stat_saves": "Saves",
+        "stat_index": "Vector Index",
+        "import_report": "Import Report",
+        "split_mode": "Split mode",
+        "confidence": "Confidence",
+        "readiness": "Readiness",
+        "not_built": "Not built",
+        "modules_section": "Script Modules",
+        "chapters_desc": "Browse, rename, merge, split",
+        "worldbook_desc": "Knowledge entries · Semantic activation",
+        "npc_desc": "Extracted playable character cards",
+        "timeline_desc": "Story timeline · Arc breakdown",
+        "advanced_section": "Advanced",
+        "versions_desc": "Commit log · Rollback · Pin",
+        "share_published": "Published to online library",
+        "embed_running": "Indexing {{pct}}%",
+        "embed_done": "{{count}} entries indexed",
+        "embed_none": "Not indexed — tap to start",
+        "not_owner_short": "This is a shared script. You can save an editable copy.",
+        "play_blocked": "Cannot start game right now",
+        "continue_game": "Continue ({{count}} save{{count, plural, one {} other {s}}})",
+        "start_game": "Start New Game",
+        "new_save": "New Save"
+      },
+      "import": {
+        "title": "Import Script",
+        "step": "Step {{n}} of 3",
+        "file_type_error": "Only .txt and .md files are supported",
+        "file_too_large": "File too large (max 50 MB)",
+        "no_upload_id": "Failed to get upload ID",
+        "no_file_selected": "Please select a file first",
+        "upload_init": "Initializing upload…",
+        "uploading": "Uploading {{done}}/{{total}}",
+        "upload_done": "Upload complete, analyzing…",
+        "preview_error": "Preview failed",
+        "uploading_file": "Uploading file…",
+        "creating_script": "Creating script…",
+        "create_error": "Creation failed",
+        "starting_pipeline": "Starting extraction pipeline…",
+        "no_llm_key_partial": "No LLM API key configured — set one up in settings. The script was imported and chapters were created.",
+        "pipeline_error": "Pipeline failed to start",
+        "dispatched": "Import job dispatched to background",
+        "no_llm_key": "No LLM API key — configure one in settings first",
+        "import_error": "Import failed",
+        "pick_file_label": "Tap to select a file",
+        "pick_file_hint": "Supports .txt / .md · Max 50 MB",
+        "intro_note": "After import, character cards, worldbook entries, and the timeline are extracted automatically, and a vector index (RAG) is built. Once everything is ready, you can start playing.",
+        "script_title_label": "Script title",
+        "script_title_placeholder": "Auto-filled from filename",
+        "split_mode_label": "Chapter split mode",
+        "custom_regex_label": "Custom regex",
+        "custom_regex_placeholder": "e.g. ^Chapter \\d+",
+        "pipeline_section": "Pipeline options",
+        "enable_cards_label": "Extract NPC Character Cards",
+        "enable_cards_desc": "LLM auto-identifies major characters",
+        "enable_worldbook_label": "Generate Worldbook",
+        "enable_worldbook_desc": "Auto-extracts character, location, and item entries",
+        "pipeline_warn": "Disabling some options will reduce RAG retrieval accuracy in-game",
+        "uploading_label": "Uploading…",
+        "preview_btn": "Preview chapters",
+        "analysis_done": "Analysis complete",
+        "detected_chapters": "Detected {{n}} chapters",
+        "confidence": "Confidence {{pct}}%",
+        "yes": "Yes",
+        "no": "No",
+        "preview_section": "Chapter preview (first {{n}})",
+        "has_issue": "Issues",
+        "more_chapters": "{{n}} more chapters…",
+        "confirm_note": "After confirming, vector indexing and LLM extraction will run in the background (a few minutes). You can browse the list in the meantime — search improves once indexing is done.",
+        "confirm_btn": "Confirm import (run in background)",
+        "back_btn": "Back to edit",
+        "job_running_title": "Processing in background",
+        "job_needs_key_title": "API Key required",
+        "job_running_desc": "\"{{title}}\" is being indexed in the background. Check the script list for progress.",
+        "job_needs_key_desc": "The script was created, but LLM extraction requires an API key. Go to settings to complete setup.",
+        "go_to_list": "Go to script list",
+        "import_another": "Import another"
+      },
+      "library": {
+        "title": "Online Script Library",
+        "subtitle": "Community · Import and play",
+        "unknown_author": "Unknown author",
+        "mine": "My script",
+        "imported": "Imported",
+        "in_library": "In library",
+        "clone_count": "Clones",
+        "already_mine": "Already in your library",
+        "cloning": "Importing…",
+        "clone_btn": "Add to my library",
+        "back_btn": "Back",
+        "load_error": "Failed to load",
+        "clone_error": "Import failed",
+        "cloned": "\"{{title}}\" added to your library",
+        "search_placeholder": "Search public scripts…",
+        "search_btn": "Search",
+        "no_results": "No matching scripts found",
+        "empty_title": "No public scripts yet",
+        "try_other_keyword": "Try a different keyword",
+        "empty_desc": "No one has shared a script yet"
+      },
+      "filter": {
+        "ready": "Ready",
+        "importing": "Importing",
+        "public": "Public"
+      },
+      "list": {
+        "title": "Scripts",
+        "search_placeholder": "Search scripts…",
+        "no_results": "No matching scripts found",
+        "empty_title": "No scripts yet",
+        "try_other_keyword": "Try a different keyword",
+        "empty_desc": "Import a novel to start your RPG journey",
+        "import_btn": "Import Script",
+        "is_public": "Public",
+        "saves_unit": "saves",
+        "indexing": "Indexing",
+        "ready": "Ready",
+        "not_ready": "Not ready",
+        "total": "{{n}} scripts total",
+        "showing": "showing {{n}}",
+        "fab_title": "Import new script"
+      }
+    },
+    "admin": {
+      "title": "Admin Dashboard",
+      "modules_heading": "Modules",
+      "retry": "Retry",
+      "no_data": "No data",
+      "no_records": "No records",
+      "load_failed": "Failed to load",
+      "search_failed": "Search failed",
+      "processing": "Processing…",
+      "saving": "Saving…",
+      "save_success": "Saved",
+      "save_failed": "Save failed: {{msg}}",
+      "action_success": "Done",
+      "action_failed": "Action failed: {{msg}}",
+      "delete_failed": "Delete failed: {{msg}}",
+      "deleted": "Deleted",
+      "processed": "Handled",
+      "search": "Search",
+      "prev_page": "Previous",
+      "next_page": "Next",
+      "page_n": "Page {{n}}",
+      "yes": "Yes",
+      "no": "No",
+      "section": {
+        "users": "Users",
+        "usage": "Global Usage",
+        "audit": "Audit Log",
+        "health": "System Health",
+        "logs": "System Logs",
+        "registration": "Registration",
+        "security": "Security",
+        "maintenance": "Maintenance",
+        "dmca_takedowns": "DMCA Takedowns",
+        "dmca_strikes": "DMCA Strikes",
+        "csam_reports": "CSAM Reports",
+        "aup_actions": "AUP Actions",
+        "feedback": "User Feedback",
+        "achievements": "Achievements",
+        "deploy": "Deployment Config"
+      },
+      "users": {
+        "total": "{{count}} users",
+        "search_placeholder": "Search username / display name",
+        "role_all": "All roles",
+        "role_admin": "Admin",
+        "role_user": "User",
+        "status_all": "All statuses",
+        "status_active": "Active",
+        "status_deactivated": "Deactivated",
+        "empty": "No users",
+        "me_label": "(me)",
+        "deactivate_title": "Deactivate @{{username}}",
+        "deactivate_body": "This user will not be able to log in.",
+        "deactivate_btn": "Deactivate",
+        "reactivate_title": "Reactivate @{{username}}",
+        "reactivate_body": "Re-activate this account?",
+        "reactivate_btn": "Reactivate",
+        "force_logout_title": "Force sign out @{{username}}",
+        "force_logout_body": "All active sessions will be terminated.",
+        "force_logout_btn": "Sign out",
+        "set_admin_title": "Promote to Admin",
+        "set_admin_body": "Grant @{{username}} admin privileges.",
+        "set_admin_btn": "Make admin",
+        "demote_title": "Remove Admin",
+        "demote_body": "Revoke admin privileges from @{{username}}.",
+        "demote_btn": "Demote"
+      },
+      "usage": {
+        "days": "{{count}}d",
+        "requests": "Requests",
+        "cost": "Cost",
+        "daily_tokens": "Daily Tokens",
+        "top_users": "Top Users by Usage"
+      },
+      "logs": {
+        "lines": "{{count}} lines",
+        "empty": "No logs"
+      },
+      "health": {
+        "database": "Database",
+        "offline": "offline",
+        "memory": "Memory",
+        "disk": "Disk",
+        "disk_used": "{{pct}}% used",
+        "process": "Process"
+      },
+      "registration": {
+        "mode_heading": "Registration Mode",
+        "mode_open": "Open",
+        "mode_invite": "Invite only",
+        "mode_closed": "Closed",
+        "email_verification": "Email verification",
+        "auto_approve": "Auto-approve",
+        "on": "On",
+        "off": "Off",
+        "invite_codes_heading": "Invite Codes ({{count}})",
+        "create_btn": "Create",
+        "no_codes": "No invite codes",
+        "code_used": "Used",
+        "code_unused": "Unused",
+        "expires": "Expires",
+        "create_sheet_title": "Create Invite Codes",
+        "field_count": "Quantity",
+        "field_expires_days": "Valid for (days)",
+        "field_note": "Note (optional)",
+        "invite_created": "Invite codes created",
+        "create_failed": "Create failed: {{msg}}",
+        "delete_code_title": "Delete invite code {{code}}",
+        "delete_code_body": "Confirm delete? This cannot be undone."
+      },
+      "security": {
+        "rate_limit_heading": "Rate Limits",
+        "max_per_ip": "Max requests per IP",
+        "max_per_user": "Max requests per user",
+        "window_minutes": "Window (minutes)",
+        "password_heading": "Password Policy",
+        "min_length": "Min password length",
+        "require_digit": "Require digits",
+        "session_heading": "Session / Lockout",
+        "session_timeout": "Session timeout (days)",
+        "max_attempts": "Max failed attempts",
+        "lockout_minutes": "Lockout duration (min)",
+        "ip_blocklist_heading": "IP Blocklist",
+        "ip_blocklist_placeholder": "One IP or CIDR per line, e.g. 192.168.1.1",
+        "save_btn": "Save security settings"
+      },
+      "maintenance": {
+        "active_notice": "Maintenance mode is active — regular users cannot access the app",
+        "on": "On",
+        "off": "Off",
+        "message_label": "Maintenance message",
+        "message_placeholder": "Down for maintenance, please check back soon…",
+        "started_at": "Started: ",
+        "save_btn": "Save maintenance settings",
+        "restart_heading": "Restart Service",
+        "restart_hint": "The service will restart in 5–30 seconds. Active connections will be dropped.",
+        "restart_btn": "Restart service",
+        "confirm_restart_title": "Confirm restart",
+        "confirm_restart_body": "The service will restart immediately. All active user sessions will be interrupted and should recover within 5–30 seconds.",
+        "confirm_restart_label": "Restart now",
+        "restart_sent": "Restart signal sent",
+        "restart_failed": "Restart failed: {{msg}}"
+      },
+      "dmca": {
+        "status_open": "Open",
+        "status_counter_received": "Counter received",
+        "status_closed": "Closed",
+        "status_restored": "Restored",
+        "status_rejected": "Rejected",
+        "grant_btn": "Grant takedown",
+        "reject_btn": "Reject",
+        "grant_sheet_title": "Approve takedown",
+        "reject_sheet_title": "Reject request",
+        "reason_label": "Reason / notes",
+        "reason_placeholder": "Reason for this decision…"
+      },
+      "strikes": {
+        "title": "DMCA Strike History",
+        "empty": "No strikes on record",
+        "count": "{{count}} strike(s)",
+        "add_btn": "+Strike",
+        "added": "Strike added",
+        "sheet_title": "Add DMCA strike for @{{username}}",
+        "reason_label": "Reason",
+        "reason_placeholder": "Describe the violation…"
+      },
+      "csam": {
+        "review_notice": "CSAM reports require careful review. Please use the full desktop interface for detailed examination. Basic decisions are supported here.",
+        "status_pending": "Pending",
+        "status_decided": "Decided",
+        "empty": "No reports",
+        "reported_user": "Reported: ",
+        "decide_btn": "Make decision",
+        "decide_sheet_title": "Decision for CSAM report #{{id}}",
+        "decision_label": "Decision (founded / escalate / unfounded)",
+        "notes_label": "Notes",
+        "notes_placeholder": "Handling notes…"
+      },
+      "aup": {
+        "notice": "AUP = Acceptable Use Policy. Suspend/terminate are serious actions — terminate permanently bans the account.",
+        "suspend_btn": "Suspend",
+        "unsuspend_btn": "Unsuspend",
+        "terminate_btn": "Terminate account",
+        "suspend_sheet_title": "Suspend @{{username}}",
+        "reason_label": "Reason",
+        "suspend_reason_placeholder": "Describe the violation…",
+        "duration_label": "Duration in days (leave blank = permanent)",
+        "duration_placeholder": "Leave blank for permanent",
+        "unsuspend_sheet_title": "Unsuspend @{{username}}",
+        "unsuspend_body": "Lift this user's suspension?",
+        "terminate_sheet_title": "Terminate account @{{username}}",
+        "terminate_reason_label": "Reason for termination (required)",
+        "terminate_reason_placeholder": "Describe the violation in detail…"
+      },
+      "feedback": {
+        "detail_title": "Feedback #{{id}}",
+        "submitter_label": "Submitted by / time",
+        "content_label": "Feedback content",
+        "no_content": "(no text)",
+        "no_content_short": "(empty)",
+        "reply_label": "Reply to user (shown in their feedback history)",
+        "reply_placeholder": "Reply to send (leave blank and send to withdraw)",
+        "send_reply": "Send reply",
+        "update_reply": "Update reply",
+        "reply_sent": "Reply sent",
+        "reply_withdrawn": "Reply withdrawn",
+        "reply_failed": "Reply failed: {{msg}}",
+        "review_heading": "Review decision",
+        "decision_spam": "Spam",
+        "decision_terminate": "Ban",
+        "mark_ok": "Mark OK",
+        "terminate_notice": "Terminate account (NSFW violation) — please review in full on desktop first",
+        "terminate_prompt": "Reason for termination (required)",
+        "terminate_btn": "Terminate account (nsfw_terminate)",
+        "status_unreviewed": "Unreviewed",
+        "status_reviewed": "Reviewed",
+        "empty": "No feedback"
+      },
+      "achievements": {
+        "hint": "Create or edit achievements on desktop. Mobile supports viewing and disabling only.",
+        "empty": "No achievements defined",
+        "hidden": "hidden",
+        "disable_btn": "Disable",
+        "disabled": "Disabled",
+        "count": "{{count}} items",
+        "disable_title": "Disable achievement \"{{name}}\"",
+        "disable_body": "Users who already earned this achievement are unaffected. It will be removed from the public listing.",
+        "disable_confirm": "Disable"
+      },
+      "deploy": {
+        "simplified_notice": "For complex configuration, use the full desktop interface. This is a simplified view.",
+        "basic_heading": "General",
+        "site_name": "Site name",
+        "site_url": "Site URL",
+        "contact_email": "Contact email",
+        "smtp_heading": "SMTP Mail",
+        "smtp_test_btn": "Send SMTP test email",
+        "smtp_sending": "Sending…",
+        "smtp_test_sent": "SMTP test email sent",
+        "smtp_test_failed": "SMTP test failed: {{msg}}",
+        "save_btn": "Save deployment settings"
+      }
+    },
+    "cards": {
+      "back": "Back",
+      "unnamed": "(Unnamed)",
+      "scope": {
+        "label": "Visibility",
+        "script": "Script-scoped",
+        "private": "Private",
+        "public": "Public"
+      },
+      "form": {
+        "section_basic": "Basic Info",
+        "section_profile": "Character Profile",
+        "section_story": "Story & Dialogue",
+        "section_inject": "Injection Parameters",
+        "name_label": "Name *",
+        "name_placeholder": "e.g. Shen Zhiwei",
+        "full_name_label": "Full Name",
+        "full_name_placeholder": "Optional",
+        "full_name_desc": "Shown when different from name",
+        "identity_label": "Identity / Role",
+        "identity_placeholder": "e.g. Harbour physician",
+        "aliases_label": "Aliases",
+        "aliases_desc": "Separate multiple aliases with commas",
+        "tags_label": "Tags",
+        "tags_desc": "Used for search and semantic activation",
+        "comma_separated": "Comma-separated",
+        "background_label": "Background",
+        "background_placeholder": "Their backstory and circumstances…",
+        "appearance_label": "Appearance",
+        "appearance_placeholder": "Clothing, expression…",
+        "personality_label": "Personality",
+        "personality_placeholder": "Behavioural tendencies…",
+        "speech_style_label": "Speech Style",
+        "speech_style_placeholder": "How they speak…",
+        "current_status_label": "Current Status",
+        "current_status_placeholder": "Current situation in the story…",
+        "current_status_desc": "Injected each turn to reflect real-time state",
+        "secrets_label": "Secrets",
+        "secrets_placeholder": "Settings known only to the GM…",
+        "secrets_desc": "Not directly revealed to other characters",
+        "sample_dialogue_label": "Sample Dialogue",
+        "sample_dialogue_placeholder": "One dialogue line per row",
+        "sample_dialogue_desc": "One line per row",
+        "token_budget_label": "Token Budget",
+        "token_budget_desc": "Max context tokens injected per turn for this card. Higher means richer detail but more usage.",
+        "importance_label": "Importance",
+        "importance_desc": "Affects retrieval priority (0–1000)",
+        "first_revealed_label": "First Revealed Chapter",
+        "first_revealed_desc": "Not injected before this chapter",
+        "priority_label": "Priority",
+        "priority_desc": "Injection order priority",
+        "enabled_label": "Enable this card",
+        "enabled_desc": "Disabled cards are excluded from retrieval"
+      },
+      "detail": {
+        "sub_npc": "NPC Character Card",
+        "sub_user": "Player Character Card",
+        "tab_info": "Character Info",
+        "tab_lore": "Lore",
+        "type": "Type",
+        "type_pc": "Player Card",
+        "type_persona": "Persona",
+        "source": "Source",
+        "source_extracted": "Extracted from Script",
+        "source_user": "User Created",
+        "source_persona": "Persona",
+        "source_platform": "Platform Built-in",
+        "scope": "Visibility",
+        "status": "Status",
+        "status_enabled": "Enabled",
+        "status_disabled": "Disabled",
+        "importance": "Importance",
+        "first_chapter": "First Chapter",
+        "chapter_n": "Chapter {{n}}",
+        "token_budget": "Token Budget",
+        "priority": "Priority",
+        "uses": "Uses",
+        "updated": "Updated",
+        "public_status": "Public Status",
+        "published": "Published to the online card library",
+        "no_lore": "No lore content yet",
+        "btn_edit": "Edit Card",
+        "btn_export_tavern": "Export SillyTavern card (.json)",
+        "btn_export_png": "Export card image (.png)",
+        "btn_duplicate": "Duplicate as new card",
+        "btn_delete": "Delete card"
+      },
+      "editor": {
+        "title_new": "New Character Card",
+        "title_edit": "Edit · {{name}}",
+        "sub_user": "Player Card",
+        "name_required": "Name is required",
+        "target_script_label": "Target Script",
+        "target_script_desc": "New NPC cards will be attached to this script",
+        "saving": "Saving…",
+        "btn_create": "Create Card",
+        "btn_save": "Save Changes"
+      },
+      "import": {
+        "title": "Import Character Card",
+        "subtitle": "Compatible with SillyTavern V2/V3 formats (PNG · JSON · WEBP) and chat logs (JSONL)",
+        "tab_card": "Character Card",
+        "tab_chat": "Chat Log",
+        "mode_file": "Upload File",
+        "mode_paste": "Paste JSON",
+        "drop_hint": "Click to select or drag a file here",
+        "drop_release": "Release to import",
+        "drop_limits": "PNG · JSON · WEBP — up to 8 files, 5 MB each",
+        "pending_parse": "Pending parse",
+        "tag_import": "Imported",
+        "parse_after_submit": "(Parsed on submission)",
+        "no_desc": "No description",
+        "json_parse_fail": "JSON parse error: {{msg}}",
+        "chat_type_error": "Only .jsonl / .json files are supported",
+        "chat_size_error": "File is too large (>20 MB)",
+        "file_parse_fail": "Failed to parse file",
+        "json_label": "JSON text",
+        "btn_parse_json": "Parse JSON",
+        "preview_label": "Preview",
+        "ai_split_label": "AI Field Split",
+        "ai_split_desc": "Automatically split a long description into background, personality, and appearance fields (uses AI credits)",
+        "chat_hint_pre": "Select a",
+        "chat_hint_post": "chat log file — it will be converted into a new save.",
+        "chat_btn_file": "Select chat log file",
+        "chat_preview_label": "Parse Preview",
+        "chat_preview_stats": "{{count}} messages · {{size}} KB · User: {{user}}",
+        "chat_save_title": "[Tavern Import] {{name}}",
+        "btn_import": "Import",
+        "btn_import_n": "Import ({{n}})",
+        "btn_import_chat": "Import Log"
+      },
+      "delete": {
+        "title": "Delete Character Card",
+        "message": "\"{{name}}\" will be permanently deleted and cannot be recovered.",
+        "irreversible": "This action cannot be undone.",
+        "confirm_btn": "Confirm Delete"
+      },
+      "user": {
+        "title": "My Character Cards",
+        "count": "{{count}} cards",
+        "btn_import": "Import",
+        "btn_new": "New",
+        "search_placeholder": "Search name / identity / tags…",
+        "filter_pinned": "Pinned",
+        "filter_public": "Public",
+        "empty_search": "No matching character cards",
+        "empty_filter": "No cards in this category",
+        "empty_all": "No character cards yet — tap + to create one",
+        "badge_pinned": "Pinned",
+        "badge_public": "Public",
+        "origin_generic": "Generic",
+        "uses_count": "{{count}} uses"
+      },
+      "npc": {
+        "title": "NPC Cards",
+        "count": "{{count}} cards",
+        "search_placeholder": "Search name / identity…",
+        "filter_all_scripts": "All Scripts",
+        "script_n": "Script #{{id}}",
+        "load_fail": "Failed to load",
+        "empty_search": "No matching NPCs",
+        "empty_script": "No NPC cards in this script",
+        "empty_all": "No NPC cards yet — tap + to create one",
+        "btn_promote": "Convert to My Character Cards",
+        "promote_tag": "From NPC"
+      },
+      "online": {
+        "title": "Online Card Library",
+        "search_placeholder": "Search name / identity…",
+        "btn_search": "Search",
+        "browse_hint": "Browse character cards shared by other players. Tapping Import creates a full copy in your My Character Cards, ready to edit.",
+        "loading": "Loading online character cards…",
+        "empty": "No public character cards yet. You can make your own cards public in My Character Cards to share them.",
+        "load_fail": "Failed to load",
+        "detail_sub": "Online Library · by {{author}}",
+        "anon": "Anonymous",
+        "no_desc": "No description",
+        "kv_author": "Author",
+        "kv_imports": "Times imported",
+        "kv_tags": "Tags",
+        "kv_identity": "Identity",
+        "importing": "Importing…",
+        "btn_import": "Import to My Cards",
+        "btn_import_short": "Import",
+        "imported": "\"{{name}}\" imported to My Character Cards",
+        "import_fail": "Import failed: {{msg}}"
+      },
+      "toast": {
+        "saved": "Saved",
+        "created": "Created",
+        "save_fail": "Save failed",
+        "save_fail_detail": "Save failed: {{msg}}",
+        "imported": "Imported successfully",
+        "import_fail": "Import failed: {{msg}}",
+        "chat_imported": "Chat log imported as a new save",
+        "duplicated": "Duplicated as new card",
+        "duplicate_suffix": " (Copy)",
+        "duplicate_fail": "Duplicate failed",
+        "deleted": "\"{{name}}\" deleted",
+        "delete_fail": "Delete failed",
+        "published": "Published to online library",
+        "unpublished": "Unpublished",
+        "op_fail": "Operation failed",
+        "npc_script_required": "Please select a script first",
+        "npc_no_script": "Cannot find the parent script",
+        "promoted": "\"{{name}}\" converted to My Character Cards",
+        "promote_fail": "Conversion failed"
+      },
+      "tabs": {
+        "my": "Mine",
+        "online": "Online"
+      }
+    },
+    "tavern": {
+      "card_field": {
+        "name": "Name",
+        "identity": "Identity",
+        "background": "Background",
+        "appearance": "Appearance",
+        "personality": "Personality",
+        "language_style": "Speech Style",
+        "current_status": "Current Status",
+        "secret": "Secret",
+        "sample_dialogue": "Sample Dialogue",
+        "tags_label": "Tags (comma-separated)"
+      },
+      "tool": {
+        "default_name": "Tool",
+        "call_one": "Tool call · {{name}}",
+        "call_many": "{{count}} tool calls · {{name}}…"
+      },
+      "thinking": {
+        "label": "Thinking"
+      },
+      "chat": {
+        "default_title": "Chat #{{id}}",
+        "default_char_name": "Character",
+        "default_character": "Tavern character",
+        "more_aria": "More",
+        "back_aria": "Back to list",
+        "more_actions_aria": "More actions",
+        "fallback_title": "Chat",
+        "empty": "No messages yet.",
+        "long_press_hint": "Long-press to see options",
+        "you": "You",
+        "thinking": "{{name}} is thinking…",
+        "error_title": "Generation failed",
+        "error_default": "Request interrupted. Your last input has been preserved — feel free to retry.",
+        "retry": "Retry",
+        "scroll_to_bottom": "Jump to latest",
+        "composer_placeholder": "Message {{name}}…",
+        "stop_aria": "Stop",
+        "send_aria": "Send",
+        "copied": "Copied"
+      },
+      "menu": {
+        "archived_label": "Archived chat",
+        "actions_label": "Chat actions",
+        "autotitle": "Auto-title",
+        "autotitle_sub": "Generate a title from the conversation",
+        "system_prompt": "System Prompt",
+        "system_prompt_sub": "Edit the system prompt for this chat",
+        "rename_sub": "Rename this chat",
+        "export_jsonl": "Export JSONL",
+        "export_jsonl_sub": "Download chat history in SillyTavern format",
+        "archive": "Archive",
+        "archive_sub": "Archive this chat for later",
+        "unarchive": "Unarchive",
+        "unarchive_sub": "Move back to your chat list",
+        "delete_chat": "Delete chat",
+        "delete_chat_sub": "Permanently delete all messages"
+      },
+      "delete": {
+        "title": "Delete this chat?",
+        "preview": "\"{{title}}\"",
+        "note_prefix": "This will permanently delete the chat and all its messages. ",
+        "note_irreversible": "This cannot be undone",
+        "note_suffix": "."
+      },
+      "rename": {
+        "title": "Rename chat",
+        "placeholder": "Chat title"
+      },
+      "sysprompt": {
+        "title": "System Prompt",
+        "sub": "Affects only this chat's AI behavior and persona",
+        "placeholder": "Enter system prompt (persona, behavior rules, etc.)…",
+        "placeholder_short": "Enter system prompt…",
+        "saving": "Saving…"
+      },
+      "drawer": {
+        "heading": "Character / Persona",
+        "tab_character": "AI Character",
+        "tab_system": "System Prompt",
+        "no_character": "No character card found for this chat.",
+        "your_persona": "Your persona",
+        "no_persona": "No persona card set for this chat.",
+        "no_sysprompt": "No system prompt set. Tap Edit to customize AI behavior."
+      },
+      "import": {
+        "title": "New Chat",
+        "sub": "Pick a Tavern character card to get started — SillyTavern V2/V3 compatible",
+        "card_btn": "Import Character Card",
+        "card_btn_sub": "Supports .png (embedded metadata) / .json / .webp",
+        "jsonl_btn": "Import Chat History",
+        "jsonl_btn_sub": "SillyTavern .jsonl — imports as a new chat"
+      },
+      "list": {
+        "back_to_app": "App",
+        "heading": "Tavern",
+        "sub": "1-on-1 character chat",
+        "hero_title": "Who do you want to talk to?",
+        "hero_sub": "Import a Tavern character card and start chatting right away.",
+        "hero_drop_main": "Select or drop a character card",
+        "hero_drop_sub": ".png (embedded metadata) / .json / .webp",
+        "newchat_sub": "Pick a character card or import a SillyTavern card",
+        "archived_toggle": "Archived ({{count}})"
+      },
+      "msg_sheet": {
+        "assistant_title": "This response",
+        "user_title": "Your message",
+        "copy": "Copy",
+        "copy_sub": "Copy this text to clipboard",
+        "regenerate": "Regenerate",
+        "regenerate_sub": "Get a different response"
+      },
+      "toast": {
+        "open_fail": "Failed to open chat",
+        "card_format_warn": "Only .png / .json / .webp character cards are supported",
+        "import_fail": "Import failed",
+        "card_imported": "Imported {{name}}",
+        "imported_chat_title": "Imported chat",
+        "jsonl_imported": "Chat history imported ({{count}} messages)",
+        "idle_stall": "Generation stalled — no response for 120 seconds",
+        "interrupted": "Generation interrupted. Your input has been restored.",
+        "no_reply": "No reply received. Please try again.",
+        "connection_closed": "Connection closed. Your last input is preserved — feel free to retry.",
+        "no_retry_input": "Nothing to retry",
+        "renamed": "Renamed",
+        "rename_fail": "Rename failed",
+        "archived": "Archived",
+        "unarchived": "Unarchived",
+        "archive_fail": "Archive failed",
+        "deleted": "Deleted",
+        "delete_fail": "Delete failed",
+        "autotitled": "Auto-titled",
+        "autotitle_fail": "Auto-title failed",
+        "sysprompt_saved": "System prompt saved",
+        "save_fail": "Save failed",
+        "persona_saved": "Persona saved"
+      }
+    },
+    "new_game": {
+      "steps": {
+        "script_birth": "Script & Starting Point",
+        "role": "Character Card",
+        "identity": "Origin & Identity",
+        "meta": "Guidance & Spoilers",
+        "confirm": "Confirm & Start"
+      },
+      "script_block": {
+        "importing": "Script is importing, please wait",
+        "missing": "Script is missing: {{keys}}",
+        "no_chapters": "Script chapters are not ready yet",
+        "importing_retry": "Script is still importing, please try again later"
+      },
+      "script": {
+        "label": "Script",
+        "hint": "Choose the script world you want to enter",
+        "empty": "No scripts available. Import one from the Scripts page first.",
+        "chapter_count": "{{count}} ch."
+      },
+      "birthpoint": {
+        "label": "Starting Point",
+        "hint": "Choose where in the story to begin (optional, defaults to the beginning)",
+        "loading": "Loading starting points…",
+        "load_error": "Failed to load starting points — you can skip this step",
+        "empty": "No preset starting points for this script. The story will begin from the start.",
+        "chapter_range": "Ch. {{min}}–{{max}}",
+        "chapter_single": "Ch. {{n}}"
+      },
+      "role": {
+        "source_label": "Character Source",
+        "pick_existing": "Use existing card",
+        "create_new": "Create new",
+        "existing_empty": "No character cards found. Create one on the Character Cards page, or switch to Create new.",
+        "unnamed": "(Unnamed)",
+        "kind_persona": "Persona",
+        "kind_card": "Character Card",
+        "default_badge": "Default",
+        "new_name_label": "Character Name",
+        "new_name_placeholder": "Your name in this world",
+        "new_role_label": "Role",
+        "new_role_placeholder": "e.g. Transmigrator, court strategist, wandering swordsman",
+        "new_bg_label": "Background",
+        "new_bg_placeholder": "Character's backstory, personality, goals… (optional)",
+        "create_failed": "Failed to create character card"
+      },
+      "origin": {
+        "soul": {
+          "label": "Soul Transmigration",
+          "essence": "Independent consciousness · inhabits a native body",
+          "mapping": "Your soul transmigrates into the body of a world native",
+          "hint": "You may attach any local identity"
+        },
+        "body": {
+          "label": "Body Transmigration",
+          "essence": "Body intact · arrives as a complete outsider",
+          "mapping": "You cross into this world with your original appearance and body",
+          "hint": "You are a complete outsider and cannot attach a local identity"
+        },
+        "dual": {
+          "label": "Dual Soul",
+          "essence": "Two souls coexist · sharing one body",
+          "mapping": "Your soul coexists with a native's in the same body",
+          "hint": "You must select a local identity to share your body with"
+        },
+        "native": {
+          "label": "Native",
+          "essence": "World native · never left this world",
+          "mapping": "You are a native character of this world",
+          "hint": "You cannot select another canon character as an amnesia identity"
+        }
+      },
+      "identity": {
+        "origin_hint": "How did you enter this world?",
+        "origin_step": "Step 1: Origin",
+        "src_hint": "Your initial identity in this world (optional)",
+        "src_step": "Step 2: Identity Source",
+        "src_none": "No identity",
+        "src_npc": "Canon character",
+        "src_ai": "AI generated",
+        "src_manual": "Enter manually",
+        "badge_manual": "Manual",
+        "clear": "Clear",
+        "npc_loading": "Loading character cards…",
+        "npc_empty": "No canon character cards for this script",
+        "selected_badge": "Selected",
+        "ai_generating": "Generating…",
+        "ai_regenerate": "Regenerate",
+        "ai_generate_btn": "Generate AI identity suggestions",
+        "ai_empty": "No suggestions returned. Try again or enter manually.",
+        "ai_request_failed": "Request failed ({{status}})",
+        "manual_alias_label": "Alias",
+        "manual_alias_placeholder": "Your name in this world (optional)",
+        "manual_role_label": "Role",
+        "manual_role_placeholder": "e.g. The emperor's confidant, rebel leader",
+        "manual_bg_label": "Background",
+        "manual_bg_placeholder": "The identity's history and circumstances (optional)",
+        "manual_confirm_btn": "Confirm Identity",
+        "known_hint": "Does your character know they hold this identity at the start?",
+        "known_step": "Step 3: Identity Awareness",
+        "known_yes": "Aware",
+        "known_yes_desc": "The character is fully aware of their local identity",
+        "known_no": "Unaware",
+        "known_no_desc": "Starts with amnesia; may be revealed later"
+      },
+      "meta": {
+        "foreknowledge_label": "Foreknowledge",
+        "foreknowledge_hint": "How well do you know the original story as a player?",
+        "foreknowledge_none": "None",
+        "foreknowledge_partial": "Partial",
+        "foreknowledge_omniscient": "Full",
+        "npc_label": "NPC Suspicion",
+        "npc_hint": "How sensitive are NPCs to your unusual behavior?",
+        "npc_oblivious": "Oblivious",
+        "npc_suspicious": "Suspicious",
+        "steering_label": "Story Steering",
+        "steering_hint": "How strongly the GM guides the story direction",
+        "steering_rail": "On-rails",
+        "steering_guided": "Guided",
+        "steering_free": "Freeform",
+        "spoiler_label": "Spoiler Guard",
+        "spoiler_hint": "How strictly the GM protects plot spoilers",
+        "spoiler_strict": "Strict",
+        "spoiler_loose": "Relaxed",
+        "intent_label": "Story Intent",
+        "intent_hint": "Tell the GM your preferences and goals (optional)",
+        "intent_placeholder": "Examples:\n· Avoid combat — find non-violent solutions\n· My transmigrator identity is an absolute secret\n· Prioritize a romance storyline"
+      },
+      "confirm": {
+        "save_name_label": "Save Name",
+        "save_name_placeholder": "Give this journey a name",
+        "row_save_name": "Save Name",
+        "row_script": "Script",
+        "row_birthpoint": "Starting Point",
+        "from_start": "From the beginning",
+        "row_role": "Character",
+        "row_origin": "Origin",
+        "row_identity": "Identity",
+        "identity_set": "(Configured)",
+        "identity_none": "None",
+        "row_foreknowledge": "Foreknowledge",
+        "row_steering": "Steering",
+        "row_spoiler": "Spoiler Guard",
+        "new_role_fallback": "(New Character)",
+        "creating": "Creating save…"
+      },
+      "back_label": "Back",
+      "loading_wizard": "Loading wizard…",
+      "default_save_suffix": "· New Save",
+      "create_failed": "Failed to create save",
+      "nav": {
+        "prev": "Previous",
+        "next": "Next",
+        "creating": "Creating…",
+        "start": "Start Game"
+      }
+    },
+    "saves": {
+      "free_mode": "Free Play",
+      "save_fallback": "Save #{{id}}",
+      "sort": {
+        "played": "Recently Played",
+        "name": "Name",
+        "created": "Date Created"
+      },
+      "export": {
+        "title": "Export Save Bundle",
+        "subtitle": "Choose an export tier to download a .zip file you can import on another device.",
+        "estimating": "Estimating…",
+        "recommended": "Recommended",
+        "tier_standard": "Standard",
+        "tier_standard_desc": "Save data and history, without vector index",
+        "tier_full": "Full Bundle",
+        "tier_full_desc": "Includes all vector embeddings — larger file size",
+        "download_btn": "Download",
+        "started": "Export started"
+      },
+      "settings": {
+        "loading": "Loading settings…",
+        "load_failed": "Failed to load settings",
+        "saved": "Settings saved",
+        "save_failed": "Failed to save settings",
+        "saving": "Saving…",
+        "save_btn": "Save Settings",
+        "partial_locked": "Some fields are locked and could not be updated: {{fields}}"
+      },
+      "branch": {
+        "loading": "Loading branches…",
+        "node_fallback": "Node #{{id}}",
+        "empty_title": "No branch nodes yet",
+        "empty_desc": "Branch history is generated automatically as you play.",
+        "switched": "Switched to this node",
+        "switch_failed": "Switch failed: {{msg}}",
+        "switching": "Switching…",
+        "click_to_switch": "tap to switch"
+      },
+      "detail": {
+        "tab_overview": "Overview",
+        "tab_settings": "Settings",
+        "tab_branches": "Branches",
+        "continue_btn": "Continue",
+        "set_current_btn": "Set as Current",
+        "current_label": "Current",
+        "renamed": "Renamed",
+        "rename_failed": "Rename failed: {{msg}}",
+        "activated": "Set as current save",
+        "activate_failed": "Failed to activate: {{msg}}",
+        "deleted": "Deleted",
+        "delete_failed": "Delete failed: {{msg}}",
+        "kv_script": "Script",
+        "kv_player": "Player",
+        "kv_turn": "Turn",
+        "kv_turn_value": "Turn {{turn}}",
+        "kv_branches": "Branch Nodes",
+        "kv_branches_value": "{{count}}",
+        "kv_world_time": "World Time",
+        "kv_last_played": "Last Played",
+        "kv_created": "Created",
+        "kv_status": "Status",
+        "kv_status_current": "Active",
+        "kv_status_idle": "Idle",
+        "latest_snippet": "Latest Excerpt",
+        "game_settings": "Game Settings",
+        "branches_heading": "Branch Nodes · {{count}}",
+        "del_confirm_title": "Delete Save",
+        "del_confirm_body": "Delete \"{{title}}\"? This cannot be undone."
+      },
+      "branches_page": {
+        "title": "Branch Tree",
+        "node_count": "{{count}} nodes",
+        "no_saves_desc": "Create a save first, then come back here to view its branch history.",
+        "go_saves_btn": "Go to Saves",
+        "load_failed": "Failed to load",
+        "retry_btn": "Retry",
+        "empty_desc": "Commit history is generated automatically as you play.",
+        "switch_failed": "Switch failed",
+        "node_deleted": "Node deleted",
+        "delete_failed": "Delete failed",
+        "continue_from": "Continue from here",
+        "switch_to": "Switch to this",
+        "git_note_prefix": "Branches work like Git. Deleted nodes are kept in ",
+        "git_note_suffix": ", recoverable within 30 days.",
+        "del_node_title": "Delete Node #{{id}}",
+        "del_node_body": "Delete \"{{summary}}\"? This cannot be undone immediately — recoverable from refs/trash within 30 days.",
+        "del_node_btn": "Delete Node",
+        "this_node": "this node",
+        "action_desc": "View branch history for all saves"
+      },
+      "list": {
+        "title": "Saves",
+        "count": "{{count}} saves",
+        "search_placeholder": "Search saves or scripts…",
+        "sort_title": "Sort by",
+        "empty_title": "No saves yet",
+        "empty_desc": "Pick a script to start a new game, or import an existing save.",
+        "browse_scripts_btn": "Browse Scripts",
+        "no_results_title": "No results found",
+        "no_results_desc": "Try a different search term.",
+        "branch_count": "{{count}} branches",
+        "continue_btn": "Resume",
+        "actions_heading": "Actions",
+        "new_game_title": "New Game",
+        "new_game_desc": "Choose a script from the Scripts tab to get started"
+      },
+      "import": {
+        "action_title": "Import Save",
+        "action_desc": "Supports .json and .zip save bundles",
+        "bad_format": "Only .json and .zip files are supported",
+        "too_large": "File is too large (limit: 200 MB)",
+        "importing": "Importing…",
+        "failed": "Import failed",
+        "failed_msg": "Import failed: {{msg}}",
+        "done_with_warnings": "Import complete with {{count}} warning(s)",
+        "success": "Import successful"
+      }
+    },
+    "caps": {
+      "tab": {
+        "plugins": "Plugins",
+        "mcp": "MCP",
+        "skills": "Skills",
+        "apis": "APIs",
+        "feedback": "Feedback"
+      },
+      "header": {
+        "title": "Capabilities & Feedback",
+        "back": "Back"
+      },
+      "error": {
+        "load_failed": "Failed to load",
+        "retry": "Retry"
+      },
+      "plugins": {
+        "builtin_desc": "Built-in platform plugin",
+        "empty_title": "No plugins available",
+        "empty_desc": "Plugins are provided by the platform. None are available at this time.",
+        "count": "{{total}} total · {{enabled}} enabled",
+        "managed_by_platform": "Plugin state is managed by the platform and cannot be toggled manually"
+      },
+      "mcp": {
+        "title": "MCP Servers",
+        "add_btn": "Add",
+        "empty_title": "No MCP servers configured",
+        "empty_desc": "Click Add to connect your first MCP endpoint.",
+        "status": {
+          "connected": "Connected",
+          "disconnected": "Disconnected"
+        },
+        "toast": {
+          "enabled": "Enabled",
+          "disabled": "Disabled",
+          "toggle_failed": "Failed to toggle",
+          "saved": "Saved",
+          "added": "MCP server added — validating",
+          "add_failed": "Failed to add"
+        },
+        "confirm": {
+          "delete": "Delete MCP server \"{{name}}\"?"
+        },
+        "sheet": {
+          "add_title": "Add MCP Server",
+          "edit_title": "Edit MCP Server"
+        },
+        "form": {
+          "name_label": "Name",
+          "name_desc": "Display name for this server",
+          "name_placeholder": "e.g. filesystem · local",
+          "transport_label": "Transport",
+          "transport_stdio": "stdio · local",
+          "transport_http": "http · remote",
+          "command_label": "Command",
+          "command_desc": "uvx my-mcp or a full command string",
+          "env_label": "Environment variables",
+          "env_desc": "Optional — one KEY=VALUE per line",
+          "env_placeholder": "e.g. API_KEY=sk-…",
+          "name_command_required": "Name and command/URL are required",
+          "submitting": "Submitting…",
+          "validate_enable": "Validate & Enable"
+        }
+      },
+      "skills": {
+        "title": "Skill Packages",
+        "import_btn": "Import",
+        "empty_title": "No skill packages imported",
+        "empty_desc": "Click Import to upload a .zip or .tar.gz skill package.",
+        "all_enabled_notice": "All skills are enabled by default — individual disable is not supported",
+        "status": {
+          "deployed": "Deployed"
+        },
+        "select_file_required": "Please select a skill package file",
+        "toast": {
+          "imported": "Skill package imported",
+          "import_failed": "Import failed: {{msg}}"
+        },
+        "sheet": {
+          "title": "Import Skill Package"
+        },
+        "form": {
+          "file_label": "Skill package file",
+          "file_desc": ".zip or .tar.gz format",
+          "select_file": "Choose file…",
+          "importing": "Importing…",
+          "import_deploy": "Import & Deploy"
+        }
+      },
+      "apis": {
+        "title": "API Credentials (BYOK)",
+        "description": "Enter your provider API keys. The platform will use your keys when calling the corresponding models.",
+        "empty_title": "No providers available",
+        "empty_desc": "No API providers are configured.",
+        "key_set": "Set",
+        "key_unset": "Not set",
+        "test_btn": "Test",
+        "replace_btn": "Replace",
+        "set_btn": "Set key",
+        "delete_key_btn": "Remove key",
+        "test": {
+          "ok": "Connected",
+          "failed": "Failed",
+          "request_failed": "Request failed"
+        },
+        "form": {
+          "key_required": "Please enter an API key",
+          "key_desc_existing": "Leave blank to keep the existing key",
+          "key_desc_new": "Enter the API key provided by the vendor",
+          "key_placeholder_existing": "Leave blank to keep unchanged",
+          "saving": "Saving…"
+        },
+        "toast": {
+          "key_saved": "API key saved"
+        },
+        "confirm": {
+          "delete_key": "Remove the API key for \"{{name}}\"?"
+        },
+        "sheet": {
+          "title": "Set API Key — {{name}}"
+        }
+      },
+      "toast": {
+        "deleted": "Deleted",
+        "delete_failed": "Delete failed: {{msg}}",
+        "save_failed": "Save failed"
+      },
+      "feedback": {
+        "tab": {
+          "submit": "Submit Feedback",
+          "history": "My Submissions"
+        },
+        "warning": {
+          "title": "Content Policy",
+          "body": "Feedback must not contain adult or NSFW content. Violations will result in a permanent ban.",
+          "see": "See"
+        },
+        "submit_done": "Your feedback was received! Track its status under My Submissions.",
+        "submit_error": "Submission failed — please try again later",
+        "form": {
+          "label": "Issue / Suggestion",
+          "max_chars": "Up to {{max}} characters",
+          "placeholder": "Describe the issue or suggestion… Steps to reproduce, expected vs. actual behavior — the more detail, the better.",
+          "over_limit": "Exceeds {{max}} character limit",
+          "include_runtime": "Include runtime info (current page, active save, recent errors — admin-only, highly recommended)",
+          "include_excerpts": "Include conversation excerpts (up to 5 turns)",
+          "no_excerpts": "No conversation excerpts available",
+          "submitting": "Submitting…",
+          "submit_btn": "Submit Feedback"
+        },
+        "runtime_preview": {
+          "page": "Page",
+          "save": "Save",
+          "errors": "Errors",
+          "api_failures": "API failures"
+        },
+        "turn_label": {
+          "player": "Player"
+        },
+        "toast": {
+          "submitted": "Feedback received",
+          "withdrawn": "Withdrawn",
+          "withdraw_failed": "Failed to withdraw"
+        },
+        "confirm": {
+          "withdraw": "Withdraw feedback #{{id}}?"
+        },
+        "qq": {
+          "heading": "Community Group",
+          "body": "Join the player QQ group ({{group}}) to get help and connect with other users.",
+          "join_btn": "Join QQ Group"
+        },
+        "kpi": {
+          "total": "Total",
+          "pending": "In Review",
+          "accepted": "Accepted"
+        },
+        "filter": {
+          "pending": "Pending",
+          "accepted": "Accepted",
+          "other": "Other"
+        },
+        "history": {
+          "empty_title": "No feedback submitted yet",
+          "empty_desc": "Switch to Submit Feedback to send your first report.",
+          "filter_empty": "No feedback matches this filter.",
+          "load_error": "Failed to load feedback history",
+          "withdraw_btn": "Withdraw",
+          "reviewed_at": "Reviewed",
+          "no_text": "(no text content)",
+          "official_reply": "Official Reply"
+        }
+      }
+    },
+    "game": {
+      "slash": {
+        "group_query": "Queries",
+        "status": "View status summary",
+        "debug": "View last retrieval",
+        "group_state": "State Updates",
+        "set": "Force-set a parameter (natural language)",
+        "loc": "Update current location",
+        "time": "Advance the timeline",
+        "rel": "Update character relationships",
+        "var": "Set a worldline variable",
+        "group_memory": "Memory",
+        "pin": "Pin to permanent memory",
+        "note": "Player note",
+        "group_system": "System",
+        "save": "Manual save",
+        "retry": "Retry last GM output"
+      },
+      "permission": {
+        "read_only_label": "Read-only",
+        "read_only_desc": "GM narrates only — world state is never modified.",
+        "review_label": "Review",
+        "review_desc": "GM must list proposed changes for your approval before they take effect.",
+        "full_access_label": "Full access",
+        "full_access_desc": "GM can freely modify world state."
+      },
+      "memory": {
+        "normal_label": "Normal",
+        "normal_desc": "Recalls 6 history segments and source text each turn",
+        "deep_label": "Deep",
+        "deep_desc": "Recalls 14 segments — slower but more coherent",
+        "off_label": "Off",
+        "off_desc": "No history recall — current context only",
+        "section_title": "Memory Mode"
+      },
+      "left_drawer": {
+        "title": "Saves & Branches",
+        "back_home": "Back to home",
+        "saves_section": "Saves",
+        "save_default_title": "Save #{{id}}",
+        "branches": "branches",
+        "no_saves": "No saves yet",
+        "manual_save": "Save now",
+        "structured_updates": "This turn's structured updates",
+        "no_updates": "No state writes this turn"
+      },
+      "right_drawer": {
+        "title": "World Panel"
+      },
+      "sheet": {
+        "slash_title": "Commands",
+        "slash_sub": "Use / commands to directly update state, memory, and mode.",
+        "attach_title": "Attach to this turn",
+        "attach_sub": "Reference local files, script resources, or trigger capabilities.",
+        "attach_group_local": "Local",
+        "attach_file": "File / source excerpt",
+        "attach_image": "Image",
+        "attach_group_script": "Script",
+        "attach_chapter": "Chapter",
+        "attach_card": "Character Card @mention",
+        "attach_worldbook": "Worldbook entry",
+        "model_title": "Conversation Model",
+        "model_sub": "Switch the GM's generation model.",
+        "permission_title": "LLM Write Permission",
+        "permission_sub": "Control whether and how the GM can modify world state.",
+        "context_title": "Context Usage",
+        "context_sub_usage": "{{used}} / {{max}} · {{pct}}% used",
+        "context_sub_empty": "No usage data for this turn yet",
+        "ctx_input": "Input",
+        "ctx_cache_hit": "Cache hit",
+        "ctx_output": "Output",
+        "ctx_reasoning": "Reasoning",
+        "ctx_cost": "Turn cost",
+        "ctx_model": "Model",
+        "context_note": "See the Context panel on the right for a full breakdown. Memory mode can be adjusted in the left drawer.",
+        "msg_title_gm": "This GM narration",
+        "msg_title_player": "This player action",
+        "msg_copy": "Copy",
+        "msg_copy_desc": "Copy this text to clipboard",
+        "msg_fork": "Branch from here",
+        "msg_fork_desc": "Keep the original timeline and start a new branch from this point",
+        "msg_regen": "Regenerate this turn",
+        "msg_regen_desc": "Rewrite this section with a different approach",
+        "msg_rollback": "Roll back to before this",
+        "msg_rollback_desc": "Remove this message and everything after it — previous branches are kept automatically",
+        "overflow_title": "More",
+        "overflow_history": "History",
+        "overflow_search": "Search this save",
+        "overflow_settings": "In-game settings",
+        "overflow_sse": "SSE debug (this turn)",
+        "overflow_feedback": "Submit feedback"
+      },
+      "model_sheet": {
+        "toast_switched": "GM model → {{model}}"
+      },
+      "topbar": {
+        "tab_conflict": "This save is open in another window",
+        "tab_conflict_continue": "Continue",
+        "back_app_aria": "Back to app",
+        "back_app_label": "App",
+        "saves_aria": "Saves and branches",
+        "game_fallback": "Game",
+        "free_mode": "Free play",
+        "more_aria": "More",
+        "world_panel_aria": "World panel"
+      },
+      "peek": {
+        "time": "Time",
+        "weather": "Weather",
+        "objective": "Current objective",
+        "on_stage": "On stage",
+        "entity_fallback": "Entity {{n}}",
+        "view_full_status": "View full status panel"
+      },
+      "chat": {
+        "thinking": "Thinking…",
+        "player_tag": "Player",
+        "generating": "Generating",
+        "retry": "Retry"
+      },
+      "toast": {
+        "copied": "Copied",
+        "fork_ok": "Branch created from this point",
+        "fork_fail": "Branch failed",
+        "rollback_confirm": "Roll back to before this message? This message and everything after it — including worldlines and phase summaries — will be removed. Previous branches are kept and can be restored.",
+        "rollback_ok": "Rolled back — previous branch preserved",
+        "rollback_fail": "Rollback failed"
+      },
+      "confirm": {
+        "cliche_tag": "Notice",
+        "cliche_default": "Clichéd phrasing detected",
+        "cliche_rewrite": "Rewrite this turn",
+        "cliche_keep": "Keep",
+        "pending_label": "Pending · {{count}}",
+        "gm_question_tag": "GM question",
+        "dismiss": "Dismiss",
+        "write_tag": "Write",
+        "allow": "Allow",
+        "deny": "Deny"
+      },
+      "composer": {
+        "attach_aria": "Attach",
+        "placeholder": "What do you do…  /command  + attach",
+        "slash_aria": "Commands",
+        "model_fallback": "Model",
+        "context_aria": "Context usage"
+      }
+    },
+    "game_panels": {
+      "tab": {
+        "status": "Status",
+        "rules": "Rules",
+        "memory": "Memory",
+        "worldbook": "Worldbook",
+        "cards": "Characters",
+        "timeline": "Timeline",
+        "context": "Context",
+        "debug": "Debug"
+      },
+      "status": {
+        "section_character": "Character",
+        "kv_name": "Name",
+        "kv_role": "Role",
+        "kv_location": "Location",
+        "empty_character": "No character established yet",
+        "section_world": "World",
+        "kv_time": "Time",
+        "kv_weather": "Weather",
+        "section_worldline_vars": "Worldline Variables"
+      },
+      "rules": {
+        "empty": "Current session is not in rules mode (no 5E-compatible module loaded).",
+        "section_ruleset": "Ruleset",
+        "section_pc": "Character Sheet (PC)",
+        "kv_level": "Level",
+        "section_scene": "Scene",
+        "kv_module": "Module",
+        "kv_location": "Location",
+        "section_encounter": "Encounter",
+        "kv_round": "Round",
+        "section_dice": "Dice Log"
+      },
+      "memory": {
+        "section_mode": "Memory Mode",
+        "kv_objective": "Current Objective",
+        "section_facts": "Pinned Memory / Facts",
+        "empty_facts": "No pinned memories yet",
+        "section_updates": "This Turn's Structured Updates"
+      },
+      "worldbook": {
+        "empty": "No active Worldbook entries in this save (entries are injected on demand during retrieval).",
+        "entry_fallback": "Entry {{index}}"
+      },
+      "cards": {
+        "section_on_stage": "On Stage",
+        "entity_fallback": "Entity {{index}}",
+        "empty_on_stage": "No characters currently on stage",
+        "section_relationships": "Relationships",
+        "empty_relationships": "No relationships recorded yet"
+      },
+      "timeline": {
+        "empty": "No timeline events yet."
+      },
+      "context": {
+        "empty": "No context segments for this turn yet. Tap the Context button at the bottom to view token usage.",
+        "section_segments": "Context Breakdown"
+      },
+      "debug": {
+        "section_raw_state": "Raw State (Debug)"
+      }
+    },
+    "root": {
+      "tab": {
+        "home": "Home",
+        "scripts": "Scripts",
+        "saves": "Play",
+        "cards": "Characters",
+        "me": "Me"
+      },
+      "placeholder": {
+        "scripts": {
+          "title": "Scripts",
+          "desc": "The mobile version of the Script library, details, and import is being rolled out."
+        },
+        "cards": {
+          "title": "Character Cards",
+          "desc": "The mobile version of user cards, NPCs, and the online card library is being rolled out."
+        },
+        "me": {
+          "title": "Me",
+          "desc": "The mobile version of your profile, usage, achievements, and settings is being rolled out."
+        },
+        "tavern": {
+          "title": "Tavern",
+          "desc": "The mobile version of 1-on-1 character chat is being rolled out."
+        },
+        "settings": {
+          "title": "Settings",
+          "desc": "The mobile version of settings and model management is being rolled out."
+        },
+        "generic_desc": "Mobile version coming soon."
+      },
+      "page_title": {
+        "scripts_import": "Import Script",
+        "scripts_library": "Script Library",
+        "modules": "Skill Modules",
+        "saves_branches": "Branches",
+        "cards_online": "Online Card Library",
+        "cards_npc": "NPC Cards",
+        "me_edit": "Edit Profile",
+        "me_settings": "Account Settings",
+        "usage": "Usage",
+        "feedback": "Feedback",
+        "settings_models": "Models",
+        "settings_memory": "Memory",
+        "settings_permissions": "Permissions",
+        "plugins": "Plugins",
+        "mcp": "MCP",
+        "skills": "Skills",
+        "apis": "APIs",
+        "wall": "Achievement Wall"
+      },
+      "page_placeholder": "Page placeholder"
+    },
+    "home": {
+      "wan_suffix": "k words",
+      "greet": {
+        "late_night": "Up late",
+        "morning": "Good morning",
+        "noon": "Good afternoon",
+        "afternoon": "Good afternoon",
+        "evening": "Good evening"
+      },
+      "default_name": "Traveler",
+      "greet_line": "{{greet}}, {{name}}",
+      "toast": {
+        "search_wip": "Search is coming to mobile soon",
+        "no_notifications": "No new notifications"
+      },
+      "aria": {
+        "search": "Search",
+        "notifications": "Notifications",
+        "profile": "Profile"
+      },
+      "continue": {
+        "eyebrow": "Continue",
+        "enter_btn": "Play",
+        "saves_btn": "Saves"
+      },
+      "save_fallback": "Save #{{id}}",
+      "free_mode": "Free Play",
+      "branches": "branches",
+      "empty": {
+        "eyebrow": "Start your story",
+        "title": "No saves yet",
+        "has_scripts": "{{count}} script(s) imported — pick one to start a new game",
+        "no_scripts": "Head to Scripts to import a novel first",
+        "browse_btn": "Browse Scripts"
+      },
+      "stats": {
+        "scripts": "Scripts",
+        "saves": "Saves",
+        "branches": "Branches",
+        "assets": "Assets"
+      },
+      "recent_scripts": {
+        "title": "Recent Scripts"
+      },
+      "chapters": "ch",
+      "recent_saves": {
+        "title": "Recent Saves"
+      },
+      "system": {
+        "title": "System Status",
+        "database": "Database",
+        "profile_link": "My Profile"
+      },
+      "shortcuts": {
+        "title": "Quick Access",
+        "scripts": {
+          "label": "Scripts",
+          "sub": "Import & manage"
+        },
+        "cards": {
+          "label": "Character Cards",
+          "sub": "PC / NPC"
+        },
+        "tavern": {
+          "label": "Tavern",
+          "sub": "1-on-1 character chat"
+        },
+        "profile": {
+          "label": "Profile",
+          "sub": "Settings & usage"
+        }
+      }
+    }
+  },
+  "components": {
+    "agent_model_picker": {
+      "default_header": "Model",
+      "inherit_label": "Follow main GM",
+      "model_disabled_suffix": "(Disabled)",
+      "custom_model_option": "Custom… (enter model name manually)",
+      "custom_model_short": "Custom…",
+      "no_key_alert_header": "No API key configured",
+      "go_config_key": "Set up API key",
+      "no_key_alert_body": "Go to Settings → Model Management to add a key for at least one provider.",
+      "provider_no_key_suffix": "(no key)",
+      "provider_placeholder_no_key": "Configure an API key first",
+      "provider_placeholder": "Select provider",
+      "provider_empty": "No API key configured",
+      "model_field_description": "If your model isn't in the list, choose \"Custom…\" to enter the provider's model name manually.",
+      "model_placeholder": "Select model",
+      "model_name_placeholder": "Enter model name, e.g. gpt-4o-mini",
+      "price_free": "Free",
+      "popover_search_placeholder": "Search models…",
+      "popover_loading": "Loading models…",
+      "popover_no_match": "No models matching \"{{query}}\"",
+      "popover_no_models": "No models available (configure an API key first)"
+    },
+    "feedback_drawer": {
+      "title": "Submit Feedback",
+      "submit_btn": "Submit",
+      "submit_error": "Submission failed. Please try again later.",
+      "aup_warning": {
+        "header": "Content restrictions",
+        "body": "Feedback must not contain sexual, explicit, NSFW, or other adult-only material — regardless of your age. Violations will result in permanent account termination and a ban from registering."
+      },
+      "reviewed_notice": {
+        "header": "{{count}} feedback item(s) reviewed by an admin",
+        "decision_ok": "Accepted",
+        "decision_spam": "Marked as spam",
+        "decision_nsfw": "NSFW violation",
+        "more": "{{count}} more…"
+      },
+      "success": {
+        "header": "Feedback received",
+        "body": "Thank you for your feedback! We will review it and take action as appropriate."
+      },
+      "error": {
+        "header": "Submission failed"
+      },
+      "freetext": {
+        "label": "Issue / Suggestion",
+        "description": "Up to {{max}} characters",
+        "over_limit": "Exceeds the {{max}}-character limit",
+        "placeholder": "Describe the issue or suggestion you'd like to share…"
+      },
+      "contact_email": {
+        "label": "Contact email (optional)",
+        "description": "Self-hosted feedback is forwarded to the official server for review. Providing your email lets us send you a reply; if it matches your login email, the feedback will automatically be linked to your account."
+      },
+      "runtime": {
+        "checkbox_label": "Include runtime environment info (recommended: page URL, active script/save, recent errors, last 3 turns — visible to admins only)",
+        "preview_header": "Runtime snapshot preview",
+        "preview_description": "Visible to admins only — never made public",
+        "page": "Page",
+        "script_save": "Script/Save",
+        "errors": "Error stack",
+        "failed_api": "Failed API calls",
+        "viewport": "Viewport",
+        "locale": "Locale",
+        "tz": "Timezone"
+      },
+      "excerpt": {
+        "checkbox_label": "Include conversation excerpts",
+        "section_header": "Select excerpts to include (up to 5)",
+        "empty": "No conversation excerpts available",
+        "role_player": "Player"
+      },
+      "consent": {
+        "label": "I have read AUP §2.J, understand that adult-themed excerpts are not permitted, and consent (this action records my consent).",
+        "error": "Please check the consent box before submitting"
+      },
+      "qq": {
+        "header": "Player community",
+        "description": "Have a question or want to chat with other players? Join our QQ group (ID: {{group}}).",
+        "qr_alt": "QQ group QR code {{group}}",
+        "join_btn": "Join group via QQ",
+        "search_hint": "Or search for group ID {{group}} in QQ"
+      },
+      "history": {
+        "header": "Feedback history",
+        "error_header": "Failed to load feedback history",
+        "load_error": "Failed to load feedback history",
+        "loading": "Loading feedback history…",
+        "empty": "No feedback history",
+        "submitted_at": "Submitted",
+        "reviewed_at": "Reviewed",
+        "no_text": "(no text content)",
+        "admin_reply": "Official reply"
+      }
+    },
+    "file_library": {
+      "kind": {
+        "ai_image": "AI Image",
+        "card_image": "Character Card Image",
+        "avatar": "Avatar",
+        "cover": "Cover",
+        "script_txt": "Imported Text"
+      },
+      "source": {
+        "image_gen": "AI Generated",
+        "manual_upload": "Uploaded",
+        "script_import": "Imported"
+      },
+      "ref_kind": {
+        "card": "Card",
+        "script": "Script",
+        "user": "User",
+        "persona": "Persona"
+      },
+      "ref_used_by": "Used by: {{kind}} #{{id}}",
+      "ref_separator": ", ",
+      "delete_modal": {
+        "header": "Confirm Deletion",
+        "header_with_refs": "Confirm Deletion (Referenced)",
+        "deleting": "Deleting…",
+        "confirm_delete": "Delete",
+        "refs_warning_header": "Removing this file will break references",
+        "refs_warning_body": "The following locations are using this file and will show broken images or errors after deletion:",
+        "confirm_text": "Are you sure you want to delete \"{{name}}\"? This action cannot be undone.",
+        "asset_fallback": "Asset #{{id}}"
+      },
+      "card": {
+        "download": "Download"
+      },
+      "title": "File Library",
+      "description": "All your file assets — AI images, character card images, avatars, covers, and imported text. Read-only management: direct upload is not supported; files are created by the platform's features.",
+      "load_error": "Failed to load",
+      "toast": {
+        "deleted": "Deleted {{name}}",
+        "delete_failed": "Failed to delete"
+      },
+      "empty": {
+        "all": "No files yet",
+        "filtered": "No {{kind}} files yet",
+        "hint": "Files are created by platform features — AI image generation, avatar uploads, script imports, and similar actions will appear here."
+      }
+    },
+    "model_config_intercept": {
+      "cap": {
+        "image": "Image Generation",
+        "embedding": "Semantic Search",
+        "llm": "Chat"
+      },
+      "provider_label": "Provider",
+      "provider_desc": "Choose a provider to configure an API key for {{cap}}",
+      "toast": {
+        "api_key_saved": "API key saved",
+        "save_failed": "Save failed"
+      },
+      "header": "Model \"{{model}}\" is not configured",
+      "continue_btn": "Continue",
+      "alert": "The {{cap}} model \"{{model}}\" requested for this turn is not available. You can switch to a different configured model, or add an API key for this model's provider, then continue.",
+      "tab_pick": "Switch model",
+      "tab_key": "Add API key",
+      "key_tab_hint": "Enter an API key below (defaults to this model's provider — you can change it). After saving, you'll be taken back to choose the model to use."
+    },
+    "media_studio": {
+      "header": {
+        "title": "Character Image",
+        "change_image": "Change Image"
+      },
+      "tab": {
+        "gen": "AI Generate",
+        "upload": "Upload",
+        "library": "Library"
+      },
+      "gen": {
+        "placeholder_cover": "Describe the cover scene: setting / protagonist / style, e.g. a lone red-robed swordsman on twilight city walls, cinematic, watercolor illustration",
+        "placeholder_avatar": "Describe the image you want to generate — the more specific, the better",
+        "size_label": "Size / Aspect Ratio",
+        "generating": "Generating, please wait…"
+      },
+      "btn": {
+        "generate": "Generate",
+        "processing": "Processing…",
+        "apply": "Apply",
+        "use_this": "Use This"
+      },
+      "upload": {
+        "reselect": "Click to reselect",
+        "preview_alt": "Preview",
+        "uploading": "Uploading…"
+      },
+      "lib": {
+        "loading": "Loading library…",
+        "empty": "No images in the library yet — generate or upload one to get started"
+      },
+      "error": {
+        "quota_exceeded": "Daily image generation limit reached",
+        "operation_failed": "Operation failed",
+        "prompt_required": "Please enter a description to generate",
+        "model_required": "Please select a generation model first",
+        "no_api_key": "No image generation API key configured. ",
+        "go_configure": "Configure now"
+      }
+    },
+    "md_editor_agent": {
+      "title": "Assistant",
+      "hint": "Ask the AI to edit this script — e.g. \"make this character more brooding\", \"polish the prose in this chapter\", \"add a new Worldbook entry: XX\". The AI writes directly to the database (destructive actions require your confirmation).",
+      "error_generic": "Something went wrong",
+      "tool_status": {
+        "running": "Running…",
+        "error": "Failed",
+        "done": "Done"
+      },
+      "confirm_prompt": "The AI wants to run {{tool}} (overwrites saved data)",
+      "confirm_approve": "Run",
+      "continue_btn": "Continue writing (at cursor)",
+      "continue_btn_title": "Use the input box as an instruction (optional) and let the AI continue writing at the current cursor position, or rewrite the selected passage. You can also press ⌘K in the editor.",
+      "continue_hint": "or press ⌘K in the editor",
+      "placeholder_with_script": "Ask the AI to edit this script… (characters, Worldbook, prose)",
+      "placeholder_no_script": "Select a script first"
+    },
+    "generate_image_modal": {
+      "title": "AI Image Generation",
+      "generate_btn": "Generate",
+      "generating": "Generating, please wait…",
+      "configure_key_btn": "Configure API Key",
+      "creds_missing_hint": "Please configure an API Key for this provider in Settings before trying again.",
+      "prompt_label": "Prompt",
+      "prompt_description": "Describe the image you want to generate. The more specific, the better.",
+      "prompt_placeholder": "e.g. A young woman in white hanfu, clear expressive eyes, ink-wash painting style",
+      "model_picker_description": "Choose an image generation model (only models that support image generation are shown)",
+      "size_label": "Size / Aspect Ratio",
+      "size_description": "Default aspect ratio is recommended based on usage type; your selection is saved locally. Vertex (Gemini) does not support custom sizes.",
+      "error": {
+        "no_image_id": "Server did not return a task ID",
+        "generate_failed": "Generation failed",
+        "poll_empty": "Polling returned an empty response",
+        "poll_error": "Polling error",
+        "request_failed": "Request failed",
+        "prompt_required": "Please enter a prompt before generating",
+        "model_required": "Please select a model first",
+        "missing_api_key": "Missing API Key"
+      }
+    },
+    "gm_style_editor": {
+      "title": "Narrative Style (Linear Sliders)",
+      "desc_script": "Showing the effective style for this script (your personal defaults already applied). Only adjust the knobs you want to customize specifically for this script — unchanged knobs continue to inherit your personal or platform defaults.",
+      "desc_user": "Your global default GM style, applied to all scripts that don't have their own override. Script-level or save-level settings take priority.",
+      "loading": "Loading narrative style…",
+      "err_load": "Failed to load",
+      "err_save": "Failed to save",
+      "err_header": "Something went wrong",
+      "ok_saved_script": "Saved. This script's style has been updated — takes effect from the next GM turn.",
+      "ok_saved_user": "Saved. Your default style has been updated — takes effect from the next GM turn.",
+      "revert": "Revert",
+      "readonly_notice": "Only the script author can edit this script's narrative style.",
+      "knobs": {
+        "reply_length": {
+          "label": "Response Length",
+          "lo": "Concise",
+          "hi": "Expansive",
+          "desc": "How long each GM turn is. Lower values produce shorter, tighter prose; higher values yield longer passages with more scene-setting and detail."
+        },
+        "player_action_focus": {
+          "label": "Camera Focus",
+          "lo": "Their reaction",
+          "hi": "Your action in detail",
+          "desc": "Who takes center stage. Lower values focus on the NPC and world reacting to you (your action is briefly acknowledged); higher values describe your action itself in rich detail."
+        },
+        "drama_density": {
+          "label": "Drama Density",
+          "lo": "Mirror your tone",
+          "hi": "Amplify actively",
+          "desc": "Lower values match the energy of your input (quiet in, quiet out); higher values push the GM to introduce conflict, reversals, and tension regardless of your tone."
+        },
+        "interiority": {
+          "label": "Inner Life",
+          "lo": "Exterior only",
+          "hi": "Rich interiority",
+          "desc": "Lower values stick to visible actions, expressions, and dialogue; higher values add NPC inner thoughts, subtext, and unspoken motivations."
+        },
+        "cliffhanger": {
+          "label": "Cliffhanger",
+          "lo": "Smooth close",
+          "hi": "Strong hook",
+          "desc": "Ending tension. Lower values wrap each turn with a sense of closure; higher values leave imminent danger or unresolved threads to pull you into the next turn."
+        },
+        "guidance_force": {
+          "label": "Steering Strength",
+          "lo": "High freedom",
+          "hi": "Strong push",
+          "desc": "Lower values let you freely improvise; higher values have the GM actively drive the plot toward the source material's key story beats."
+        }
+      }
     }
   }
 }

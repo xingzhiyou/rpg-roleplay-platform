@@ -44,10 +44,10 @@ function SchemaField({ field, value, onChange }) {
         {t('auth.terms_agree')}{' '}
         <a href={`${_legalBase}/terms-of-service.${_legalLang}.html`} target="_blank" rel="noopener noreferrer"
            style={{color: 'var(--accent)'}}>{t('auth.terms_of_service')}</a>
-        {'、'}
+        {t('auth.app.legal_sep')}
         <a href={`${_legalBase}/privacy-policy.${_legalLang}.html`} target="_blank" rel="noopener noreferrer"
            style={{color: 'var(--accent)'}}>{t('auth.privacy_policy')}</a>
-        {'、'}
+        {t('auth.app.legal_sep')}
         <a href={`${_legalBase}/acceptable-use-policy.${_legalLang}.html`} target="_blank" rel="noopener noreferrer"
            style={{color: 'var(--accent)'}}>{t('auth.acceptable_use')}</a>
         {' '}{t('auth.terms_and')}{' '}
@@ -234,7 +234,7 @@ function LoginApp() {
         const emailParam = qs.get('email') || '';
         if (!magicToken || !emailParam) return;
         setBusy(true);
-        setNotice('正在验证邀请链接…');
+        setNotice(t('auth.app.magic_verifying'));
         const base = window.__API_BASE || '';
         const r = await fetch(`${base}/api/auth/magic-consume`, {
           method: 'POST',
@@ -247,7 +247,7 @@ function LoginApp() {
         if (j.ok && (j.session_token || j.user_id)) {
           // task: magic link 直接登录(不再发 OTP — magic_token 本身就是认证)。
           // 后端已 set-cookie + 返 needs_profile → 跳 Platform(如需补昵称 Welcome modal 会触发)
-          setNotice('登录成功,正在进入控制台…');
+          setNotice(t('auth.app.magic_login_ok'));
           setErr('');
           // 清掉 magic 参数防回退按钮重放
           try { history.replaceState(null, '', location.pathname); } catch (_) {}
@@ -257,14 +257,14 @@ function LoginApp() {
           setMagicEmail(j.email || emailParam);
           setMagicCode('');
           setErr('');
-          setNotice(`验证码已发送至 ${j.email || emailParam},请查收邮件`);
+          setNotice(t('auth.app.magic_otp_sent', { email: j.email || emailParam }));
           setMode('magic-otp');
         } else {
-          setErr(j.error || '邀请链接无效,请检查邮件中的链接');
+          setErr(j.error || t('auth.app.magic_link_invalid'));
           setNotice('');
         }
       } catch (e) {
-        if (!cancelled) setErr(e?.message || '邀请链接验证失败');
+        if (!cancelled) setErr(e?.message || t('auth.app.magic_link_fail'));
       } finally {
         if (!cancelled) setBusy(false);
       }
@@ -469,16 +469,16 @@ function LoginApp() {
         body: JSON.stringify({email: magicEmail, code}),
       });
       const j = await r.json();
-      if (!j.ok) throw new Error(j.error || '验证失败');
+      if (!j.ok) throw new Error(j.error || t('auth.app.magic_otp_verify_fail'));
       if (j.needs_profile) {
         setMode('needs-profile');
-        setNotice('欢迎！请设置你的用户名以完成注册。');
+        setNotice(t('auth.app.magic_otp_needs_profile'));
       } else {
-        setNotice('登录成功，跳转中…');
+        setNotice(t('auth.app.login_redirect'));
         setTimeout(() => location.replace(__resolveNextOrDefault()), 300);
       }
     } catch (e) {
-      setErr(e?.message || '验证失败，请重试');
+      setErr(e?.message || t('auth.app.magic_otp_verify_fail_retry'));
     } finally {
       setBusy(false);
     }
@@ -490,7 +490,7 @@ function LoginApp() {
     const uname = profileUsername.trim();
     const dname = profileDisplayName.trim();
     if (!uname && !dname) {
-      setErr('请填写用户名或昵称');
+      setErr(t('auth.app.profile_required'));
       return;
     }
     setBusy(true);
@@ -507,11 +507,11 @@ function LoginApp() {
         }),
       });
       const j = await r.json();
-      if (!j.ok) throw new Error(j.error || '保存失败');
-      setNotice('设置成功，跳转中…');
+      if (!j.ok) throw new Error(j.error || t('auth.app.profile_save_fail'));
+      setNotice(t('auth.app.profile_save_ok'));
       setTimeout(() => location.replace(__resolveNextOrDefault()), 300);
     } catch (e) {
-      setErr(e?.message || '保存失败，请重试');
+      setErr(e?.message || t('auth.app.profile_save_fail_retry'));
     } finally {
       setBusy(false);
     }
@@ -763,17 +763,17 @@ function LoginApp() {
         {mode === 'magic-otp' && (
           <form className="pl-auth-form" onSubmit={handleMagicOtpVerify}>
             <div style={{fontSize: 13, color: 'var(--muted)', marginBottom: 8}}>
-              验证码已发送至 <strong>{magicEmail}</strong>，10分钟内有效。
+              {t('auth.app.magic_otp_sent_to', { email: magicEmail })}
             </div>
             <div className="pl-field">
-              <label htmlFor="magic_otp_code">验证码</label>
+              <label htmlFor="magic_otp_code">{t('auth.app.otp_code_label')}</label>
               <OtpInput
                 value={magicCode}
                 onChange={setMagicCode}
                 onComplete={(code) => handleMagicOtpVerify(null, code)}
                 disabled={busy}
                 autoFocus
-                label="验证码"
+                label={t('auth.app.otp_code_label')}
               />
             </div>
             {err && (
@@ -787,7 +787,7 @@ function LoginApp() {
             )}
             <button type="submit" className="btn primary" disabled={busy || magicCode.length !== 6}
                     style={{justifyContent: 'center', height: 34, opacity: busy ? 0.7 : 1}}>
-              {busy ? '验证中…' : '验证并登录'}
+              {busy ? t('auth.app.magic_otp_verifying') : t('auth.app.magic_otp_submit')}
             </button>
           </form>
         )}
@@ -796,10 +796,10 @@ function LoginApp() {
         {mode === 'needs-profile' && (
           <form className="pl-auth-form" onSubmit={handleProfileSubmit}>
             <div style={{fontSize: 13, color: 'var(--muted)', marginBottom: 8}}>
-              欢迎加入！请设置用户名以完成注册。
+              {t('auth.app.needs_profile_desc')}
             </div>
             <div className="pl-field">
-              <label htmlFor="profile_username">用户名 <span className="pl-field-req">*</span></label>
+              <label htmlFor="profile_username">{t('auth.app.username_label')} <span className="pl-field-req">*</span></label>
               <input
                 id="profile_username"
                 type="text"
@@ -811,7 +811,7 @@ function LoginApp() {
               />
             </div>
             <div className="pl-field">
-              <label htmlFor="profile_display_name">昵称（可选）</label>
+              <label htmlFor="profile_display_name">{t('auth.app.display_name_label')}</label>
               <input
                 id="profile_display_name"
                 type="text"
@@ -833,7 +833,7 @@ function LoginApp() {
             <button type="submit" className="btn primary"
                     disabled={busy || !profileUsername.trim()}
                     style={{justifyContent: 'center', height: 34, opacity: busy ? 0.7 : 1}}>
-              {busy ? '保存中…' : '完成注册'}
+              {busy ? t('auth.app.profile_saving') : t('auth.app.profile_submit')}
             </button>
           </form>
         )}

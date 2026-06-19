@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import CSModal from '@cloudscape-design/components/modal';
 import CSBox from '@cloudscape-design/components/box';
 import CSSpaceBetween from '@cloudscape-design/components/space-between';
@@ -22,9 +23,9 @@ import { moduleByPrefix } from '../agent-modules.js';
 // 子集投影:image→image_gen 模块 · embedding→embed 模块 · llm→gm 模块。
 const _capModule = (prefix) => moduleByPrefix[prefix] || {};
 export const CAP_CONFIG = {
-  image:     { prefPrefix: 'image_gen', capabilityFilter: _capModule('image_gen').capabilityFilter || null, label: '生图',     defaultProvider: 'dashscope' },
-  embedding: { prefPrefix: 'embed',     capabilityFilter: _capModule('embed').capabilityFilter || null,     label: '向量检索', defaultProvider: 'openai' },
-  llm:       { prefPrefix: 'gm',        capabilityFilter: _capModule('gm').capabilityFilter || null,         label: '对话',     defaultProvider: 'deepseek' },
+  image:     { prefPrefix: 'image_gen', capabilityFilter: _capModule('image_gen').capabilityFilter || null, defaultProvider: 'dashscope' },
+  embedding: { prefPrefix: 'embed',     capabilityFilter: _capModule('embed').capabilityFilter || null,     defaultProvider: 'openai' },
+  llm:       { prefPrefix: 'gm',        capabilityFilter: _capModule('gm').capabilityFilter || null,         defaultProvider: 'deepseek' },
 };
 
 export function capConfig(capability) {
@@ -42,6 +43,7 @@ export function capConfig(capability) {
      onSaved?      : (providerId) => void  保存成功后回调(父组件据此点亮「继续」) */
 export function InlineProviderConfig({ capability = 'llm', defaultApiId = '', onSaved = null }) {
   const { useState, useEffect, useMemo } = React;
+  const { t } = useTranslation();
   const cap = capConfig(capability);
   // 可选 provider:沿用设置页同一份 PROVIDERS_CONFIG。
   // 排除 agent_platform(走 SA JSON 上传,不是单 key 输入,内联不便)与编辑弹窗隐藏项;
@@ -101,10 +103,10 @@ export function InlineProviderConfig({ capability = 'llm', defaultApiId = '', on
         ...s,
         [pid]: { ...s[pid], has_key: !!(apiKey?.trim() || s[pid]?.has_key), base_url: baseUrl ?? s[pid]?.base_url },
       }));
-      window.__apiToast?.('已保存 API Key', { kind: 'ok', duration: 1800 });
+      window.__apiToast?.(t('components.model_config_intercept.toast.api_key_saved'), { kind: 'ok', duration: 1800 });
       onSaved && onSaved(pid);
     } catch (e) {
-      window.__apiToast?.('保存失败', { kind: 'danger', detail: e?.message });
+      window.__apiToast?.(t('components.model_config_intercept.toast.save_failed'), { kind: 'danger', detail: e?.message });
     } finally {
       setSaving(false);
     }
@@ -116,7 +118,7 @@ export function InlineProviderConfig({ capability = 'llm', defaultApiId = '', on
 
   return (
     <CSSpaceBetween size="s">
-      <CSFormField label="服务商" description={`选择给「${cap.label}」配置 API Key 的服务商`}>
+      <CSFormField label={t('components.model_config_intercept.provider_label')} description={t('components.model_config_intercept.provider_desc', { cap: t(`components.model_config_intercept.cap.${capability}`) })}>
         <CSSelect
           selectedOption={providerOptions.find((o) => o.value === providerId) || null}
           options={providerOptions}
@@ -159,6 +161,7 @@ export function InlineProviderConfig({ capability = 'llm', defaultApiId = '', on
      onCancel    : () => void                       取消(父组件负责 clearQuestions + toast) */
 export default function ModelConfigInterceptModal({ open, item, onResolve, onCancel }) {
   const { useState, useEffect } = React;
+  const { t } = useTranslation();
   const capability = (item && item.capability) || 'llm';
   const cap = capConfig(capability);
   // 用户在本能力下当前选定的模型(AgentModelPicker onChange 回填);默认沿用后端要求的 model。
@@ -196,9 +199,9 @@ export default function ModelConfigInterceptModal({ open, item, onResolve, onCan
       // credentials.set 内部已广播 rpg-credentials-updated → AgentModelPicker 会重拉。
       setEditKeyOpen(false);
       setTab('pick');   // 配好 key 后切回「选模型」,让用户确认要用的模型
-      window.__apiToast?.('已保存 API Key', { kind: 'ok', duration: 1800 });
+      window.__apiToast?.(t('components.model_config_intercept.toast.api_key_saved'), { kind: 'ok', duration: 1800 });
     } catch (e) {
-      setKeyError(String(e?.message || e || '保存失败'));
+      setKeyError(String(e?.message || e || t('components.model_config_intercept.toast.save_failed')));
     } finally {
       setSaving(false);
     }
@@ -210,17 +213,17 @@ export default function ModelConfigInterceptModal({ open, item, onResolve, onCan
     <CSModal
       visible
       onDismiss={() => onCancel && onCancel()}
-      header={`模型「${requestedModel || '?'}」尚未配置`}
+      header={t('components.model_config_intercept.header', { model: requestedModel || '?' })}
       footer={
         <CSBox float="right">
           <CSSpaceBetween direction="horizontal" size="xs">
-            <CSButton variant="link" onClick={() => onCancel && onCancel()}>取消</CSButton>
+            <CSButton variant="link" onClick={() => onCancel && onCancel()}>{t('common.cancel')}</CSButton>
             <CSButton
               variant="primary"
               disabled={!canContinue}
               onClick={() => onResolve && onResolve(chosen.model || requestedModel)}
             >
-              继续生成
+              {t('components.model_config_intercept.continue_btn')}
             </CSButton>
           </CSSpaceBetween>
         </CSBox>
@@ -228,16 +231,15 @@ export default function ModelConfigInterceptModal({ open, item, onResolve, onCan
     >
       <CSSpaceBetween size="m">
         <CSAlert type="info">
-          本轮{cap.label}请求的模型「{requestedModel || '?'}」当前不可用。你可以给{cap.label}换一个已配好的模型，
-          或为该模型所属服务商补一把 API Key，然后继续。
+          {t('components.model_config_intercept.alert', { cap: t(`components.model_config_intercept.cap.${capability}`), model: requestedModel || '?' })}
         </CSAlert>
 
         <CSSegmentedControl
           selectedId={tab}
           onChange={({ detail }) => setTab(detail.selectedId)}
           options={[
-            { id: 'pick', text: '换一个模型' },
-            { id: 'key', text: '补 API Key' },
+            { id: 'pick', text: t('components.model_config_intercept.tab_pick') },
+            { id: 'key', text: t('components.model_config_intercept.tab_key') },
           ]}
         />
 
@@ -256,7 +258,7 @@ export default function ModelConfigInterceptModal({ open, item, onResolve, onCan
         {tab === 'key' && (
           <CSSpaceBetween size="s">
             <CSBox color="text-body-secondary" fontSize="body-s">
-              就地填写 API Key（默认选中该模型所属服务商,可改）。保存后回到「换一个模型」选要用的模型。
+              {t('components.model_config_intercept.key_tab_hint')}
             </CSBox>
             {/* 就地内联凭据表单(复用设置页 ProviderCard);保存后切回「选模型」 */}
             <InlineProviderConfig

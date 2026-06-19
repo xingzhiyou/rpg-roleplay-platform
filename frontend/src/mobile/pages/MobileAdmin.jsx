@@ -2,6 +2,7 @@
    nav.page = admin-xxx 决定 section。
    铁律:零 Cloudscape/CS* 组件;数据全走 window.api.admin.*;样式只用 mobile.css 已有 class + inline。 */
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Icon } from '../icons.jsx';
 
 /* ── 工具 ─────────────────────────────────────────────── */
@@ -17,19 +18,22 @@ function fmtDate(iso) {
 }
 
 function LoadingRow() {
-  return <div className="pl-row" style={{ justifyContent: 'center', color: 'var(--muted)', fontSize: 13 }}>加载中…</div>;
+  const { t } = useTranslation();
+  return <div className="pl-row" style={{ justifyContent: 'center', color: 'var(--muted)', fontSize: 13 }}>{t('common.loading')}</div>;
 }
 function ErrRow({ msg, onRetry }) {
+  const { t } = useTranslation();
   return (
     <div className="pl-row" style={{ flexDirection: 'column', gap: 8, alignItems: 'flex-start' }}>
       <span className="pl-row-ic warn"><Icon name="warn" size={17} /></span>
       <span style={{ fontSize: 13, color: 'var(--danger)' }}>{msg}</span>
-      {onRetry && <button className="pl-btn-ghost" style={{ fontSize: 12 }} onClick={onRetry}>重试</button>}
+      {onRetry && <button className="pl-btn-ghost" style={{ fontSize: 12 }} onClick={onRetry}>{t('mobile.admin.retry')}</button>}
     </div>
   );
 }
-function EmptyRow({ text = '暂无数据' }) {
-  return <div className="pl-empty" style={{ padding: '24px 0', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>{text}</div>;
+function EmptyRow({ text }) {
+  const { t } = useTranslation();
+  return <div className="pl-empty" style={{ padding: '24px 0', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>{text ?? t('mobile.admin.no_data')}</div>;
 }
 
 /* 底部操作确认 sheet
@@ -38,7 +42,9 @@ function EmptyRow({ text = '暂无数据' }) {
    ② scrim 点关由 busy 守护(处理中禁止关闭)③ sheet-actions marginTop:14(统一版 8)
    ④ 与本文件 InputSheet 共用 position:fixed 内联模式 + busy/onCancel 契约(非 open/loading)。
    1:1 复刻不了 → 按铁律保留原样。 */
-function ConfirmSheet({ title, body, confirmLabel = '确认', danger = false, busy, onConfirm, onCancel }) {
+function ConfirmSheet({ title, body, confirmLabel, danger = false, busy, onConfirm, onCancel }) {
+  const { t } = useTranslation();
+  const label = confirmLabel ?? t('common.confirm');
   return (
     <div className="sheet-wrap show" style={{ position: 'fixed', inset: 0, zIndex: 60, pointerEvents: 'auto' }}>
       <div className="sheet-scrim" onClick={!busy ? onCancel : undefined} />
@@ -47,9 +53,9 @@ function ConfirmSheet({ title, body, confirmLabel = '确认', danger = false, bu
         <div className="sheet-title">{title}</div>
         {body && <div className="sheet-sub">{body}</div>}
         <div className="sheet-actions" style={{ marginTop: 14 }}>
-          <button className="sheet-btn" onClick={onCancel} disabled={busy}>取消</button>
+          <button className="sheet-btn" onClick={onCancel} disabled={busy}>{t('common.cancel')}</button>
           <button className={`sheet-btn ${danger ? 'danger' : 'primary'}`} onClick={onConfirm} disabled={busy}>
-            {busy ? '处理中…' : confirmLabel}
+            {busy ? t('mobile.admin.processing') : label}
           </button>
         </div>
       </div>
@@ -59,6 +65,7 @@ function ConfirmSheet({ title, body, confirmLabel = '确认', danger = false, bu
 
 /* 输入 sheet */
 function InputSheet({ title, fields, busy, onConfirm, onCancel }) {
+  const { t } = useTranslation();
   const [vals, setVals] = React.useState(() => {
     const v = {};
     fields.forEach((f) => { v[f.key] = f.default || ''; });
@@ -95,8 +102,8 @@ function InputSheet({ title, fields, busy, onConfirm, onCancel }) {
           ))}
         </div>
         <div className="sheet-actions">
-          <button className="sheet-btn" onClick={onCancel} disabled={busy}>取消</button>
-          <button className="sheet-btn primary" onClick={() => onConfirm(vals)} disabled={busy}>{busy ? '处理中…' : '确认'}</button>
+          <button className="sheet-btn" onClick={onCancel} disabled={busy}>{t('common.cancel')}</button>
+          <button className="sheet-btn primary" onClick={() => onConfirm(vals)} disabled={busy}>{busy ? t('mobile.admin.processing') : t('common.confirm')}</button>
         </div>
       </div>
     </div>
@@ -104,36 +111,40 @@ function InputSheet({ title, fields, busy, onConfirm, onCancel }) {
 }
 
 /* ── section nav 菜单(admin-xxx 列表) ─────────────────── */
-const SECTIONS = [
-  { key: 'admin-users', icon: 'user', label: '用户管理' },
-  { key: 'admin-usage', icon: 'usage', label: '全局用量' },
-  { key: 'admin-audit', icon: 'history', label: '审计日志' },
-  { key: 'admin-health', icon: 'cpu', label: '系统健康' },
-  { key: 'admin-logs', icon: 'list', label: '系统日志' },
-  { key: 'admin-registration', icon: 'key', label: '注册开关' },
-  { key: 'admin-security', icon: 'shield', label: '安全设置' },
-  { key: 'admin-maintenance', icon: 'settings', label: '维护模式' },
-  { key: 'admin-dmca-takedowns', icon: 'flag', label: 'DMCA 下架' },
-  { key: 'admin-dmca-strikes', icon: 'warn', label: 'DMCA 警告' },
-  { key: 'admin-csam-reports', icon: 'lock', label: 'CSAM 举报' },
-  { key: 'admin-aup-actions', icon: 'slash', label: 'AUP 封禁' },
-  { key: 'admin-feedback', icon: 'feedback', label: '用户反馈' },
-  { key: 'admin-achievements', icon: 'trophy', label: '成就目录' },
-  { key: 'admin-deploy', icon: 'cloud', label: '部署配置' },
-];
+function getSections(t) {
+  return [
+    { key: 'admin-users', icon: 'user', label: t('mobile.admin.section.users') },
+    { key: 'admin-usage', icon: 'usage', label: t('mobile.admin.section.usage') },
+    { key: 'admin-audit', icon: 'history', label: t('mobile.admin.section.audit') },
+    { key: 'admin-health', icon: 'cpu', label: t('mobile.admin.section.health') },
+    { key: 'admin-logs', icon: 'list', label: t('mobile.admin.section.logs') },
+    { key: 'admin-registration', icon: 'key', label: t('mobile.admin.section.registration') },
+    { key: 'admin-security', icon: 'shield', label: t('mobile.admin.section.security') },
+    { key: 'admin-maintenance', icon: 'settings', label: t('mobile.admin.section.maintenance') },
+    { key: 'admin-dmca-takedowns', icon: 'flag', label: t('mobile.admin.section.dmca_takedowns') },
+    { key: 'admin-dmca-strikes', icon: 'warn', label: t('mobile.admin.section.dmca_strikes') },
+    { key: 'admin-csam-reports', icon: 'lock', label: t('mobile.admin.section.csam_reports') },
+    { key: 'admin-aup-actions', icon: 'slash', label: t('mobile.admin.section.aup_actions') },
+    { key: 'admin-feedback', icon: 'feedback', label: t('mobile.admin.section.feedback') },
+    { key: 'admin-achievements', icon: 'trophy', label: t('mobile.admin.section.achievements') },
+    { key: 'admin-deploy', icon: 'cloud', label: t('mobile.admin.section.deploy') },
+  ];
+}
 
 function AdminMenu({ nav }) {
+  const { t } = useTranslation();
+  const sections = getSections(t);
   return (
     <>
       <div className="pl-head">
         <button className="pl-headbtn" onClick={() => nav.pop?.() || nav.switchTab?.('me')}><Icon name="chevron_left" size={20} /></button>
-        <div className="pl-head-title"><strong style={{ fontSize: 15 }}>管理后台</strong></div>
+        <div className="pl-head-title"><strong style={{ fontSize: 15 }}>{t('mobile.admin.title')}</strong></div>
       </div>
       <div className="pl-body tabbed">
         <div className="pl-pad">
           <div className="pl-sec">
-            <div className="pl-sec-head"><h2>管理模块</h2></div>
-            {SECTIONS.map((s) => (
+            <div className="pl-sec-head"><h2>{t('mobile.admin.modules_heading')}</h2></div>
+            {sections.map((s) => (
               <button key={s.key} className="pl-row" onClick={() => nav.go(s.key)}>
                 <span className="pl-row-ic"><Icon name={s.icon} size={17} /></span>
                 <span className="pl-row-tx"><strong style={{ fontSize: 13.5 }}>{s.label}</strong></span>
@@ -151,6 +162,7 @@ function AdminMenu({ nav }) {
    Section: admin-users
 ══════════════════════════════════════════ */
 function SectionUsers({ nav }) {
+  const { t } = useTranslation();
   const [users, setUsers] = React.useState([]);
   const [total, setTotal] = React.useState(0);
   const [loading, setLoading] = React.useState(true);
@@ -175,7 +187,7 @@ function SectionUsers({ nav }) {
       setUsers(res.users || res.items || res || []);
       setTotal(res.total || (res.users || res.items || res || []).length);
       setPage(p);
-    } catch (e) { setErr(e?.message || '加载失败'); }
+    } catch (e) { setErr(e?.message || t('mobile.admin.load_failed')); }
     finally { setLoading(false); }
   }, [search, roleFilter, statusFilter]);
 
@@ -191,10 +203,10 @@ function SectionUsers({ nav }) {
       else if (action === 'force-logout') await window.api.admin.forceLogout(user.id);
       else if (action === 'set-admin') await window.api.admin.updateUser(user.id, { role: 'admin' });
       else if (action === 'set-user') await window.api.admin.updateUser(user.id, { role: 'user' });
-      nav.toast('操作成功', 'ok');
+      nav.toast(t('mobile.admin.action_success'), 'ok');
       setConfirm(null);
       load(page);
-    } catch (e) { nav.toast('操作失败: ' + (e?.message || ''), 'danger'); }
+    } catch (e) { nav.toast(t('mobile.admin.action_failed', { msg: e?.message || '' }), 'danger'); }
     finally { setBusy(false); }
   }
 
@@ -202,7 +214,7 @@ function SectionUsers({ nav }) {
     <>
       <div className="pl-head">
         <button className="pl-headbtn" onClick={() => nav.go('admin')}><Icon name="chevron_left" size={20} /></button>
-        <div className="pl-head-title"><strong style={{ fontSize: 15 }}>用户管理</strong><span className="sub">{total > 0 ? `共 ${total} 人` : ''}</span></div>
+        <div className="pl-head-title"><strong style={{ fontSize: 15 }}>{t('mobile.admin.section.users')}</strong><span className="sub">{total > 0 ? t('mobile.admin.users.total', { count: total }) : ''}</span></div>
         <button className="pl-headbtn" onClick={() => load(page)} disabled={loading}><Icon name="refresh" size={18} /></button>
       </div>
       <div className="pl-body tabbed">
@@ -211,23 +223,23 @@ function SectionUsers({ nav }) {
           <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
             <input
               type="search"
-              placeholder="搜索用户名 / 昵称"
+              placeholder={t('mobile.admin.users.search_placeholder')}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') load(1); }}
               style={{ flex: 1, background: 'var(--panel-2)', border: '1px solid var(--line)', borderRadius: 10, padding: '8px 10px', color: 'var(--text)', fontSize: 14, fontFamily: 'inherit' }}
             />
-            <button className="pl-btn-primary" style={{ padding: '0 14px', height: 38 }} onClick={() => load(1)}>搜索</button>
+            <button className="pl-btn-primary" style={{ padding: '0 14px', height: 38 }} onClick={() => load(1)}>{t('mobile.admin.search')}</button>
           </div>
           {/* 过滤 */}
           <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
-            {[['', '全部角色'], ['admin', '管理员'], ['user', '普通']].map(([v, l]) => (
+            {[['', t('mobile.admin.users.role_all')], ['admin', t('mobile.admin.users.role_admin')], ['user', t('mobile.admin.users.role_user')]].map(([v, l]) => (
               <button key={v} onClick={() => setRoleFilter(v)}
                 style={{ padding: '4px 12px', borderRadius: 999, fontSize: 12, border: '1px solid', borderColor: roleFilter === v ? 'var(--accent-edge)' : 'var(--line)', background: roleFilter === v ? 'var(--accent-soft)' : 'var(--panel-2)', color: roleFilter === v ? 'var(--accent)' : 'var(--muted)' }}>
                 {l}
               </button>
             ))}
-            {[['', '全部状态'], ['active', '活跃'], ['deactivated', '已停用']].map(([v, l]) => (
+            {[['', t('mobile.admin.users.status_all')], ['active', t('mobile.admin.users.status_active')], ['deactivated', t('mobile.admin.users.status_deactivated')]].map(([v, l]) => (
               <button key={v} onClick={() => setStatusFilter(v)}
                 style={{ padding: '4px 12px', borderRadius: 999, fontSize: 12, border: '1px solid', borderColor: statusFilter === v ? 'var(--accent-edge)' : 'var(--line)', background: statusFilter === v ? 'var(--accent-soft)' : 'var(--panel-2)', color: statusFilter === v ? 'var(--accent)' : 'var(--muted)' }}>
                 {l}
@@ -235,7 +247,7 @@ function SectionUsers({ nav }) {
             ))}
           </div>
 
-          {loading ? <LoadingRow /> : err ? <ErrRow msg={err} onRetry={() => load(page)} /> : users.length === 0 ? <EmptyRow text="暂无用户" /> : (
+          {loading ? <LoadingRow /> : err ? <ErrRow msg={err} onRetry={() => load(page)} /> : users.length === 0 ? <EmptyRow text={t('mobile.admin.users.empty')} /> : (
             <div className="pl-sec">
               {users.map((u) => {
                 const isSelf = me && (me.id === u.id || me.username === u.username);
@@ -247,12 +259,12 @@ function SectionUsers({ nav }) {
                       <span className={`pl-row-ic ${isAdmin ? 'accent' : ''}`}><Icon name="user" size={17} /></span>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          @{u.username || '—'} {isSelf && <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 400 }}>（我）</span>}
+                          @{u.username || '—'} {isSelf && <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 400 }}>{t('mobile.admin.users.me_label')}</span>}
                         </div>
                         <div style={{ fontSize: 11.5, color: 'var(--muted-2)', display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 2 }}>
                           <span style={{ color: isAdmin ? 'var(--accent)' : 'var(--muted)' }}>{isAdmin ? 'admin' : 'user'}</span>
                           <span>·</span>
-                          <span style={{ color: isDeact ? 'var(--danger)' : 'var(--ok)' }}>{isDeact ? '已停用' : '活跃'}</span>
+                          <span style={{ color: isDeact ? 'var(--danger)' : 'var(--ok)' }}>{isDeact ? t('mobile.admin.users.status_deactivated') : t('mobile.admin.users.status_active')}</span>
                           {u.last_login_at && <><span>·</span><span>{fmtDate(u.last_login_at)}</span></>}
                         </div>
                       </div>
@@ -261,28 +273,28 @@ function SectionUsers({ nav }) {
                       <div style={{ display: 'flex', gap: 0, borderTop: '1px solid var(--line-soft)' }}>
                         {!isDeact ? (
                           <button style={{ flex: 1, padding: '9px 4px', fontSize: 12, color: 'var(--danger)', borderRight: '1px solid var(--line-soft)' }}
-                            onClick={() => setConfirm({ action: 'deactivate', user: u, title: `停用 @${u.username}`, body: '停用后该用户无法登录。' })}>
-                            停用
+                            onClick={() => setConfirm({ action: 'deactivate', user: u, title: t('mobile.admin.users.deactivate_title', { username: u.username }), body: t('mobile.admin.users.deactivate_body') })}>
+                            {t('mobile.admin.users.deactivate_btn')}
                           </button>
                         ) : (
                           <button style={{ flex: 1, padding: '9px 4px', fontSize: 12, color: 'var(--ok)', borderRight: '1px solid var(--line-soft)' }}
-                            onClick={() => setConfirm({ action: 'reactivate', user: u, title: `恢复 @${u.username}`, body: '确认重新激活该账户？' })}>
-                            恢复
+                            onClick={() => setConfirm({ action: 'reactivate', user: u, title: t('mobile.admin.users.reactivate_title', { username: u.username }), body: t('mobile.admin.users.reactivate_body') })}>
+                            {t('mobile.admin.users.reactivate_btn')}
                           </button>
                         )}
                         <button style={{ flex: 1, padding: '9px 4px', fontSize: 12, color: 'var(--warn)', borderRight: '1px solid var(--line-soft)' }}
-                          onClick={() => setConfirm({ action: 'force-logout', user: u, title: `强制下线 @${u.username}`, body: '将终止该用户所有会话。' })}>
-                          踢下线
+                          onClick={() => setConfirm({ action: 'force-logout', user: u, title: t('mobile.admin.users.force_logout_title', { username: u.username }), body: t('mobile.admin.users.force_logout_body') })}>
+                          {t('mobile.admin.users.force_logout_btn')}
                         </button>
                         {!isAdmin ? (
                           <button style={{ flex: 1, padding: '9px 4px', fontSize: 12, color: 'var(--accent)' }}
-                            onClick={() => setConfirm({ action: 'set-admin', user: u, title: `提升为管理员`, body: `将 @${u.username} 提升为 admin 角色。` })}>
-                            设管理员
+                            onClick={() => setConfirm({ action: 'set-admin', user: u, title: t('mobile.admin.users.set_admin_title'), body: t('mobile.admin.users.set_admin_body', { username: u.username }) })}>
+                            {t('mobile.admin.users.set_admin_btn')}
                           </button>
                         ) : (
                           <button style={{ flex: 1, padding: '9px 4px', fontSize: 12, color: 'var(--muted)' }}
-                            onClick={() => setConfirm({ action: 'set-user', user: u, title: `降级为普通用户`, body: `撤销 @${u.username} 的管理员权限。` })}>
-                            降级
+                            onClick={() => setConfirm({ action: 'set-user', user: u, title: t('mobile.admin.users.demote_title'), body: t('mobile.admin.users.demote_body', { username: u.username }) })}>
+                            {t('mobile.admin.users.demote_btn')}
                           </button>
                         )}
                       </div>
@@ -296,9 +308,9 @@ function SectionUsers({ nav }) {
           {/* 分页 */}
           {!loading && !err && users.length > 0 && (
             <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 12 }}>
-              <button className="pl-btn-ghost" disabled={page <= 1} onClick={() => load(page - 1)} style={{ padding: '6px 16px', fontSize: 13 }}>上一页</button>
-              <span style={{ fontSize: 13, color: 'var(--muted)', lineHeight: '34px' }}>第 {page} 页</span>
-              <button className="pl-btn-ghost" disabled={users.length < LIMIT} onClick={() => load(page + 1)} style={{ padding: '6px 16px', fontSize: 13 }}>下一页</button>
+              <button className="pl-btn-ghost" disabled={page <= 1} onClick={() => load(page - 1)} style={{ padding: '6px 16px', fontSize: 13 }}>{t('mobile.admin.prev_page')}</button>
+              <span style={{ fontSize: 13, color: 'var(--muted)', lineHeight: '34px' }}>{t('mobile.admin.page_n', { n: page })}</span>
+              <button className="pl-btn-ghost" disabled={users.length < LIMIT} onClick={() => load(page + 1)} style={{ padding: '6px 16px', fontSize: 13 }}>{t('mobile.admin.next_page')}</button>
             </div>
           )}
         </div>
@@ -319,6 +331,7 @@ function SectionUsers({ nav }) {
    Section: admin-usage
 ══════════════════════════════════════════ */
 function SectionUsage({ nav }) {
+  const { t } = useTranslation();
   const [data, setData] = React.useState(null);
   const [loading, setLoading] = React.useState(true);
   const [err, setErr] = React.useState(null);
@@ -327,7 +340,7 @@ function SectionUsage({ nav }) {
   const load = React.useCallback(async () => {
     setLoading(true); setErr(null);
     try { const r = await window.api.admin.globalUsage({ days }); setData(r); }
-    catch (e) { setErr(e?.message || '加载失败'); }
+    catch (e) { setErr(e?.message || t('mobile.admin.load_failed')); }
     finally { setLoading(false); }
   }, [days]);
 
@@ -342,7 +355,7 @@ function SectionUsage({ nav }) {
     <>
       <div className="pl-head">
         <button className="pl-headbtn" onClick={() => nav.go('admin')}><Icon name="chevron_left" size={20} /></button>
-        <div className="pl-head-title"><strong style={{ fontSize: 15 }}>全局用量</strong></div>
+        <div className="pl-head-title"><strong style={{ fontSize: 15 }}>{t('mobile.admin.section.usage')}</strong></div>
         <button className="pl-headbtn" onClick={load} disabled={loading}><Icon name="refresh" size={18} /></button>
       </div>
       <div className="pl-body tabbed">
@@ -352,7 +365,7 @@ function SectionUsage({ nav }) {
             {[7, 14, 30, 90].map((d) => (
               <button key={d} onClick={() => setDays(d)}
                 style={{ padding: '4px 14px', borderRadius: 999, fontSize: 12, border: '1px solid', borderColor: days === d ? 'var(--accent-edge)' : 'var(--line)', background: days === d ? 'var(--accent-soft)' : 'var(--panel-2)', color: days === d ? 'var(--accent)' : 'var(--muted)' }}>
-                {d}天
+                {t('mobile.admin.usage.days', { count: d })}
               </button>
             ))}
           </div>
@@ -362,9 +375,9 @@ function SectionUsage({ nav }) {
               {/* 汇总卡片 */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 14 }}>
                 {[
-                  ['请求', (summary.total_requests || 0).toLocaleString()],
+                  [t('mobile.admin.usage.requests'), (summary.total_requests || 0).toLocaleString()],
                   ['Tokens', (summary.total_tokens || 0).toLocaleString()],
-                  ['费用', typeof summary.total_cost === 'number' ? `$${summary.total_cost.toFixed(3)}` : '—'],
+                  [t('mobile.admin.usage.cost'), typeof summary.total_cost === 'number' ? `$${summary.total_cost.toFixed(3)}` : '—'],
                 ].map(([k, v]) => (
                   <div key={k} style={{ border: '1px solid var(--line-soft)', borderRadius: 10, background: 'var(--panel)', padding: '10px 8px', textAlign: 'center' }}>
                     <div style={{ fontSize: 16, fontWeight: 600, fontFamily: 'var(--font-serif)' }}>{v}</div>
@@ -376,7 +389,7 @@ function SectionUsage({ nav }) {
               {/* 每日柱状 */}
               {byDay.length > 0 && (
                 <div className="pl-sec">
-                  <div className="pl-sec-head"><h2>每日 Tokens</h2></div>
+                  <div className="pl-sec-head"><h2>{t('mobile.admin.usage.daily_tokens')}</h2></div>
                   <div style={{ display: 'grid', gap: 4 }}>
                     {byDay.slice(-14).map((d) => {
                       const pct = Math.max(2, Math.round((d.tokens || 0) / maxDay * 100));
@@ -397,7 +410,7 @@ function SectionUsage({ nav }) {
               {/* 按用户 */}
               {byUser.length > 0 && (
                 <div className="pl-sec">
-                  <div className="pl-sec-head"><h2>用量 TOP 用户</h2></div>
+                  <div className="pl-sec-head"><h2>{t('mobile.admin.usage.top_users')}</h2></div>
                   {byUser.slice(0, 10).map((u, i) => (
                     <div key={u.user_id || i} className="pl-row" style={{ cursor: 'default' }}>
                       <span className="pl-row-ic info" style={{ width: 24, height: 24, fontSize: 11, fontFamily: 'var(--font-mono)', display: 'grid', placeItems: 'center' }}>{i + 1}</span>
@@ -421,6 +434,7 @@ function SectionUsage({ nav }) {
    Section: admin-audit
 ══════════════════════════════════════════ */
 function SectionAudit({ nav }) {
+  const { t } = useTranslation();
   const [items, setItems] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
   const [err, setErr] = React.useState(null);
@@ -436,7 +450,7 @@ function SectionAudit({ nav }) {
       const res = await window.api.admin.auditLog(params);
       setItems(res.items || res.logs || res || []);
       setPage(p);
-    } catch (e) { setErr(e?.message || '加载失败'); }
+    } catch (e) { setErr(e?.message || t('mobile.admin.load_failed')); }
     finally { setLoading(false); }
   }, [actionFilter]);
 
@@ -446,13 +460,13 @@ function SectionAudit({ nav }) {
     <>
       <div className="pl-head">
         <button className="pl-headbtn" onClick={() => nav.go('admin')}><Icon name="chevron_left" size={20} /></button>
-        <div className="pl-head-title"><strong style={{ fontSize: 15 }}>审计日志</strong></div>
+        <div className="pl-head-title"><strong style={{ fontSize: 15 }}>{t('mobile.admin.section.audit')}</strong></div>
         <button className="pl-headbtn" onClick={() => load(page)} disabled={loading}><Icon name="refresh" size={18} /></button>
       </div>
       <div className="pl-body tabbed">
         <div className="pl-pad">
           <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
-            {[['', '全部'], ['user', 'user.*'], ['config', 'config.*'], ['maintenance', 'maintenance.*'], ['invite', 'invite.*']].map(([v, l]) => (
+            {[['', t('common.all')], ['user', 'user.*'], ['config', 'config.*'], ['maintenance', 'maintenance.*'], ['invite', 'invite.*']].map(([v, l]) => (
               <button key={v} onClick={() => setActionFilter(v)}
                 style={{ padding: '4px 12px', borderRadius: 999, fontSize: 12, border: '1px solid', borderColor: actionFilter === v ? 'var(--accent-edge)' : 'var(--line)', background: actionFilter === v ? 'var(--accent-soft)' : 'var(--panel-2)', color: actionFilter === v ? 'var(--accent)' : 'var(--muted)' }}>
                 {l}
@@ -479,9 +493,9 @@ function SectionAudit({ nav }) {
 
           {!loading && !err && items.length > 0 && (
             <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 12 }}>
-              <button className="pl-btn-ghost" disabled={page <= 1} onClick={() => load(page - 1)} style={{ padding: '6px 16px', fontSize: 13 }}>上一页</button>
-              <span style={{ fontSize: 13, color: 'var(--muted)', lineHeight: '34px' }}>第 {page} 页</span>
-              <button className="pl-btn-ghost" disabled={items.length < LIMIT} onClick={() => load(page + 1)} style={{ padding: '6px 16px', fontSize: 13 }}>下一页</button>
+              <button className="pl-btn-ghost" disabled={page <= 1} onClick={() => load(page - 1)} style={{ padding: '6px 16px', fontSize: 13 }}>{t('mobile.admin.prev_page')}</button>
+              <span style={{ fontSize: 13, color: 'var(--muted)', lineHeight: '34px' }}>{t('mobile.admin.page_n', { n: page })}</span>
+              <button className="pl-btn-ghost" disabled={items.length < LIMIT} onClick={() => load(page + 1)} style={{ padding: '6px 16px', fontSize: 13 }}>{t('mobile.admin.next_page')}</button>
             </div>
           )}
         </div>
@@ -494,6 +508,7 @@ function SectionAudit({ nav }) {
    Section: admin-health
 ══════════════════════════════════════════ */
 function SectionHealth({ nav }) {
+  const { t } = useTranslation();
   const [data, setData] = React.useState(null);
   const [loading, setLoading] = React.useState(true);
   const [err, setErr] = React.useState(null);
@@ -501,7 +516,7 @@ function SectionHealth({ nav }) {
   const load = React.useCallback(async () => {
     setLoading(true); setErr(null);
     try { const r = await window.api.admin.health(); setData(r); }
-    catch (e) { setErr(e?.message || '加载失败'); }
+    catch (e) { setErr(e?.message || t('mobile.admin.load_failed')); }
     finally { setLoading(false); }
   }, []);
 
@@ -517,17 +532,17 @@ function SectionHealth({ nav }) {
   const proc = data?.process || data?.proc || {};
 
   const rows = data ? [
-    { key: '数据库', ok: db.ok !== false, val: db.ok !== false ? `online${typeof db.latency_ms === 'number' ? ` · ${db.latency_ms}ms` : ''}` : '离线', icon: 'cpu' },
-    { key: '内存', ok: typeof mem.rss_mb === 'number', val: typeof mem.rss_mb === 'number' ? `RSS ${mem.rss_mb} MB` : '—', icon: 'layers' },
-    { key: '磁盘', ok: (disk.used_percent || 0) < 90, val: disk.used_percent != null ? `已用 ${disk.used_percent}%` : '—', icon: 'folder' },
-    { key: '进程', ok: !!proc.pid, val: proc.pid ? `PID ${proc.pid}${proc.uptime_s ? ` · ${Math.round(proc.uptime_s / 60)}min` : ''}` : '—', icon: 'plug' },
+    { key: t('mobile.admin.health.database'), ok: db.ok !== false, val: db.ok !== false ? `online${typeof db.latency_ms === 'number' ? ` · ${db.latency_ms}ms` : ''}` : t('mobile.admin.health.offline'), icon: 'cpu' },
+    { key: t('mobile.admin.health.memory'), ok: typeof mem.rss_mb === 'number', val: typeof mem.rss_mb === 'number' ? `RSS ${mem.rss_mb} MB` : '—', icon: 'layers' },
+    { key: t('mobile.admin.health.disk'), ok: (disk.used_percent || 0) < 90, val: disk.used_percent != null ? t('mobile.admin.health.disk_used', { pct: disk.used_percent }) : '—', icon: 'folder' },
+    { key: t('mobile.admin.health.process'), ok: !!proc.pid, val: proc.pid ? `PID ${proc.pid}${proc.uptime_s ? ` · ${Math.round(proc.uptime_s / 60)}min` : ''}` : '—', icon: 'plug' },
   ] : [];
 
   return (
     <>
       <div className="pl-head">
         <button className="pl-headbtn" onClick={() => nav.go('admin')}><Icon name="chevron_left" size={20} /></button>
-        <div className="pl-head-title"><strong style={{ fontSize: 15 }}>系统健康</strong></div>
+        <div className="pl-head-title"><strong style={{ fontSize: 15 }}>{t('mobile.admin.section.health')}</strong></div>
         <button className="pl-headbtn" onClick={load} disabled={loading}><Icon name="refresh" size={18} /></button>
       </div>
       <div className="pl-body tabbed">
@@ -556,6 +571,7 @@ function SectionHealth({ nav }) {
    Section: admin-logs
 ══════════════════════════════════════════ */
 function SectionLogs({ nav }) {
+  const { t } = useTranslation();
   const [lines, setLines] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
   const [err, setErr] = React.useState(null);
@@ -565,7 +581,7 @@ function SectionLogs({ nav }) {
   const load = React.useCallback(async () => {
     setLoading(true); setErr(null);
     try { const r = await window.api.admin.logs({ lines: lineCount }); setLines(r.lines || r || []); }
-    catch (e) { setErr(e?.message || '加载失败'); }
+    catch (e) { setErr(e?.message || t('mobile.admin.load_failed')); }
     finally { setLoading(false); }
   }, [lineCount]);
 
@@ -584,7 +600,7 @@ function SectionLogs({ nav }) {
     <>
       <div className="pl-head">
         <button className="pl-headbtn" onClick={() => nav.go('admin')}><Icon name="chevron_left" size={20} /></button>
-        <div className="pl-head-title"><strong style={{ fontSize: 15 }}>系统日志</strong></div>
+        <div className="pl-head-title"><strong style={{ fontSize: 15 }}>{t('mobile.admin.section.logs')}</strong></div>
         <button className="pl-headbtn" onClick={load} disabled={loading}><Icon name="refresh" size={18} /></button>
       </div>
       <div className="pl-body tabbed">
@@ -593,10 +609,10 @@ function SectionLogs({ nav }) {
             {[50, 100, 200].map((n) => (
               <button key={n} onClick={() => setLineCount(n)}
                 style={{ padding: '4px 12px', borderRadius: 999, fontSize: 12, border: '1px solid', borderColor: lineCount === n ? 'var(--accent-edge)' : 'var(--line)', background: lineCount === n ? 'var(--accent-soft)' : 'var(--panel-2)', color: lineCount === n ? 'var(--accent)' : 'var(--muted)' }}>
-                {n}行
+                {t('mobile.admin.logs.lines', { count: n })}
               </button>
             ))}
-            {[['', '全部'], ['ERROR', 'ERROR'], ['WARN', 'WARN']].map(([v, l]) => (
+            {[['', t('common.all')], ['ERROR', 'ERROR'], ['WARN', 'WARN']].map(([v, l]) => (
               <button key={v} onClick={() => setLevelFilter(v)}
                 style={{ padding: '4px 12px', borderRadius: 999, fontSize: 12, border: '1px solid', borderColor: levelFilter === v ? 'var(--accent-edge)' : 'var(--line)', background: levelFilter === v ? 'var(--accent-soft)' : 'var(--panel-2)', color: levelFilter === v ? 'var(--accent)' : 'var(--muted)' }}>
                 {l}
@@ -604,7 +620,7 @@ function SectionLogs({ nav }) {
             ))}
           </div>
 
-          {loading ? <LoadingRow /> : err ? <ErrRow msg={err} onRetry={load} /> : filtered.length === 0 ? <EmptyRow text="暂无日志" /> : (
+          {loading ? <LoadingRow /> : err ? <ErrRow msg={err} onRetry={load} /> : filtered.length === 0 ? <EmptyRow text={t('mobile.admin.logs.empty')} /> : (
             <div style={{ background: 'var(--bg-deep)', borderRadius: 10, border: '1px solid var(--line-soft)', padding: '10px 12px', maxHeight: '60vh', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
               {filtered.map((line, i) => (
                 <div key={i} style={{ fontFamily: 'var(--font-mono)', fontSize: 11, lineHeight: 1.7, color: lineColor(line), wordBreak: 'break-all' }}>{String(line)}</div>
@@ -621,6 +637,7 @@ function SectionLogs({ nav }) {
    Section: admin-registration
 ══════════════════════════════════════════ */
 function SectionRegistration({ nav }) {
+  const { t } = useTranslation();
   const [regConfig, setRegConfig] = React.useState(null);
   const [inviteCodes, setInviteCodes] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
@@ -637,7 +654,7 @@ function SectionRegistration({ nav }) {
       const [reg, codes] = await Promise.all([window.api.admin.registration(), window.api.admin.inviteCodes()]);
       setRegConfig(reg);
       setInviteCodes(codes.items || codes.codes || codes || []);
-    } catch (e) { setErr(e?.message || '加载失败'); }
+    } catch (e) { setErr(e?.message || t('mobile.admin.load_failed')); }
     finally { setLoading(false); }
   }, []);
 
@@ -649,8 +666,8 @@ function SectionRegistration({ nav }) {
       const next = { ...regConfig, ...patch };
       await window.api.admin.saveRegistration(next);
       setRegConfig(next);
-      nav.toast('保存成功', 'ok');
-    } catch (e) { nav.toast('保存失败: ' + (e?.message || ''), 'danger'); }
+      nav.toast(t('mobile.admin.save_success'), 'ok');
+    } catch (e) { nav.toast(t('mobile.admin.save_failed', { msg: e?.message || '' }), 'danger'); }
     finally { setSaving(false); }
   }
 
@@ -658,11 +675,11 @@ function SectionRegistration({ nav }) {
     setCreating(true);
     try {
       await window.api.admin.createInviteCodes({ count: Number(vals.count) || 1, expires_days: Number(vals.expires_days) || 30, note: vals.note || undefined });
-      nav.toast('邀请码创建成功', 'ok');
+      nav.toast(t('mobile.admin.registration.invite_created'), 'ok');
       setShowCreate(false);
       const codes = await window.api.admin.inviteCodes();
       setInviteCodes(codes.items || codes.codes || codes || []);
-    } catch (e) { nav.toast('创建失败: ' + (e?.message || ''), 'danger'); }
+    } catch (e) { nav.toast(t('mobile.admin.registration.create_failed', { msg: e?.message || '' }), 'danger'); }
     finally { setCreating(false); }
   }
 
@@ -671,11 +688,11 @@ function SectionRegistration({ nav }) {
     setDeleting(true);
     try {
       await window.api.admin.deleteInviteCode(deleteTarget);
-      nav.toast('已删除', 'ok');
+      nav.toast(t('mobile.admin.deleted'), 'ok');
       setDeleteTarget(null);
       const codes = await window.api.admin.inviteCodes();
       setInviteCodes(codes.items || codes.codes || codes || []);
-    } catch (e) { nav.toast('删除失败: ' + (e?.message || ''), 'danger'); }
+    } catch (e) { nav.toast(t('mobile.admin.delete_failed', { msg: e?.message || '' }), 'danger'); }
     finally { setDeleting(false); }
   }
 
@@ -683,7 +700,7 @@ function SectionRegistration({ nav }) {
     <>
       <div className="pl-head">
         <button className="pl-headbtn" onClick={() => nav.go('admin')}><Icon name="chevron_left" size={20} /></button>
-        <div className="pl-head-title"><strong style={{ fontSize: 15 }}>注册开关</strong></div>
+        <div className="pl-head-title"><strong style={{ fontSize: 15 }}>{t('mobile.admin.section.registration')}</strong></div>
         <button className="pl-headbtn" onClick={load} disabled={loading}><Icon name="refresh" size={18} /></button>
       </div>
       <div className="pl-body tabbed">
@@ -691,9 +708,9 @@ function SectionRegistration({ nav }) {
           {loading ? <LoadingRow /> : err ? <ErrRow msg={err} onRetry={load} /> : !regConfig ? <EmptyRow /> : (
             <>
               <div className="pl-sec">
-                <div className="pl-sec-head"><h2>注册模式</h2></div>
+                <div className="pl-sec-head"><h2>{t('mobile.admin.registration.mode_heading')}</h2></div>
                 <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-                  {[['open', '开放'], ['invite', '邀请制'], ['closed', '关闭']].map(([v, l]) => (
+                  {[['open', t('mobile.admin.registration.mode_open')], ['invite', t('mobile.admin.registration.mode_invite')], ['closed', t('mobile.admin.registration.mode_closed')]].map(([v, l]) => (
                     <button key={v}
                       onClick={() => saveReg({ mode: v })}
                       style={{ flex: 1, padding: '10px 4px', borderRadius: 10, fontSize: 13, fontWeight: regConfig.mode === v ? 600 : 400, border: '1px solid', borderColor: regConfig.mode === v ? 'var(--accent-edge)' : 'var(--line)', background: regConfig.mode === v ? 'var(--accent-soft)' : 'var(--panel-2)', color: regConfig.mode === v ? 'var(--accent)' : 'var(--muted)' }}>
@@ -703,29 +720,29 @@ function SectionRegistration({ nav }) {
                 </div>
 
                 {[
-                  { key: 'email_verification', label: '邮箱验证' },
-                  { key: 'auto_approve', label: '自动审批' },
+                  { key: 'email_verification', label: t('mobile.admin.registration.email_verification') },
+                  { key: 'auto_approve', label: t('mobile.admin.registration.auto_approve') },
                 ].map(({ key, label }) => (
                   <div key={key} className="pl-row" style={{ cursor: 'pointer' }} onClick={() => saveReg({ [key]: !regConfig[key] })}>
                     <span className={`pl-row-ic ${regConfig[key] ? 'ok' : ''}`}><Icon name={regConfig[key] ? 'check' : 'close'} size={17} /></span>
                     <span className="pl-row-tx"><strong style={{ fontSize: 13.5 }}>{label}</strong></span>
-                    <span style={{ fontSize: 12, color: regConfig[key] ? 'var(--ok)' : 'var(--muted)' }}>{regConfig[key] ? '开启' : '关闭'}</span>
+                    <span style={{ fontSize: 12, color: regConfig[key] ? 'var(--ok)' : 'var(--muted)' }}>{regConfig[key] ? t('mobile.admin.registration.on') : t('mobile.admin.registration.off')}</span>
                   </div>
                 ))}
               </div>
 
               <div className="pl-sec">
-                <div className="pl-sec-head"><h2>邀请码 ({inviteCodes.length})</h2>
-                  <button className="act" onClick={() => setShowCreate(true)}><Icon name="plus" size={13} /> 创建</button>
+                <div className="pl-sec-head"><h2>{t('mobile.admin.registration.invite_codes_heading', { count: inviteCodes.length })}</h2>
+                  <button className="act" onClick={() => setShowCreate(true)}><Icon name="plus" size={13} /> {t('mobile.admin.registration.create_btn')}</button>
                 </div>
-                {inviteCodes.length === 0 ? <EmptyRow text="暂无邀请码" /> : inviteCodes.map((c) => (
+                {inviteCodes.length === 0 ? <EmptyRow text={t('mobile.admin.registration.no_codes')} /> : inviteCodes.map((c) => (
                   <div key={c.code} className="pl-row" style={{ cursor: 'default' }}>
                     <span className="pl-row-ic info"><Icon name="key" size={17} /></span>
                     <span className="pl-row-tx">
                       <strong className="mono" style={{ fontSize: 13 }}>{c.code}</strong>
-                      <span>{c.used ? '已使用' : '未使用'}{c.expires_at ? ` · 到期 ${fmtDate(c.expires_at)}` : ''}{c.note ? ` · ${c.note}` : ''}</span>
+                      <span>{c.used ? t('mobile.admin.registration.code_used') : t('mobile.admin.registration.code_unused')}{c.expires_at ? ` · ${t('mobile.admin.registration.expires')} ${fmtDate(c.expires_at)}` : ''}{c.note ? ` · ${c.note}` : ''}</span>
                     </span>
-                    {!c.used && <button style={{ fontSize: 12, color: 'var(--danger)', padding: '4px 8px' }} onClick={() => setDeleteTarget(c.code)}>删除</button>}
+                    {!c.used && <button style={{ fontSize: 12, color: 'var(--danger)', padding: '4px 8px' }} onClick={() => setDeleteTarget(c.code)}>{t('common.delete')}</button>}
                   </div>
                 ))}
               </div>
@@ -736,11 +753,11 @@ function SectionRegistration({ nav }) {
 
       {showCreate && (
         <InputSheet
-          title="创建邀请码"
+          title={t('mobile.admin.registration.create_sheet_title')}
           fields={[
-            { key: 'count', label: '数量', default: '1', type: 'number' },
-            { key: 'expires_days', label: '有效天数', default: '30', type: 'number' },
-            { key: 'note', label: '备注(可选)', default: '' },
+            { key: 'count', label: t('mobile.admin.registration.field_count'), default: '1', type: 'number' },
+            { key: 'expires_days', label: t('mobile.admin.registration.field_expires_days'), default: '30', type: 'number' },
+            { key: 'note', label: t('mobile.admin.registration.field_note'), default: '' },
           ]}
           busy={creating}
           onConfirm={handleCreate}
@@ -749,7 +766,7 @@ function SectionRegistration({ nav }) {
       )}
       {deleteTarget && (
         <ConfirmSheet
-          title={`删除邀请码 ${deleteTarget}`} body="确认删除？操作不可撤销。"
+          title={t('mobile.admin.registration.delete_code_title', { code: deleteTarget })} body={t('mobile.admin.registration.delete_code_body')}
           danger busy={deleting} onConfirm={handleDelete} onCancel={() => setDeleteTarget(null)}
         />
       )}
@@ -761,6 +778,7 @@ function SectionRegistration({ nav }) {
    Section: admin-security
 ══════════════════════════════════════════ */
 function SectionSecurity({ nav }) {
+  const { t } = useTranslation();
   const [draft, setDraft] = React.useState(null);
   const [loading, setLoading] = React.useState(true);
   const [err, setErr] = React.useState(null);
@@ -771,7 +789,7 @@ function SectionSecurity({ nav }) {
     (async () => {
       setLoading(true); setErr(null);
       try { const r = await window.api.admin.securityConfig(); if (!cancelled) setDraft(JSON.parse(JSON.stringify(r))); }
-      catch (e) { if (!cancelled) setErr(e?.message || '加载失败'); }
+      catch (e) { if (!cancelled) setErr(e?.message || t('mobile.admin.load_failed')); }
       finally { if (!cancelled) setLoading(false); }
     })();
     return () => { cancelled = true; };
@@ -791,8 +809,8 @@ function SectionSecurity({ nav }) {
   async function save() {
     if (!draft) return;
     setSaving(true);
-    try { await window.api.admin.saveSecurityConfig(draft); nav.toast('保存成功', 'ok'); }
-    catch (e) { nav.toast('保存失败: ' + (e?.message || ''), 'danger'); }
+    try { await window.api.admin.saveSecurityConfig(draft); nav.toast(t('mobile.admin.save_success'), 'ok'); }
+    catch (e) { nav.toast(t('mobile.admin.save_failed', { msg: e?.message || '' }), 'danger'); }
     finally { setSaving(false); }
   }
 
@@ -813,55 +831,55 @@ function SectionSecurity({ nav }) {
     <>
       <div className="pl-head">
         <button className="pl-headbtn" onClick={() => nav.go('admin')}><Icon name="chevron_left" size={20} /></button>
-        <div className="pl-head-title"><strong style={{ fontSize: 15 }}>安全设置</strong></div>
+        <div className="pl-head-title"><strong style={{ fontSize: 15 }}>{t('mobile.admin.section.security')}</strong></div>
       </div>
       <div className="pl-body tabbed">
         <div className="pl-pad">
           {loading ? <LoadingRow /> : err ? <ErrRow msg={err} /> : !draft ? <EmptyRow /> : (
             <>
               <div className="pl-sec">
-                <div className="pl-sec-head"><h2>速率限制</h2></div>
+                <div className="pl-sec-head"><h2>{t('mobile.admin.security.rate_limit_heading')}</h2></div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                  {numField('每 IP 最大请求', 'rate_limit.max_per_ip', '100')}
-                  {numField('每用户最大请求', 'rate_limit.max_per_user', '50')}
-                  {numField('窗口（分钟）', 'rate_limit.window_minutes', '60')}
+                  {numField(t('mobile.admin.security.max_per_ip'), 'rate_limit.max_per_ip', '100')}
+                  {numField(t('mobile.admin.security.max_per_user'), 'rate_limit.max_per_user', '50')}
+                  {numField(t('mobile.admin.security.window_minutes'), 'rate_limit.window_minutes', '60')}
                 </div>
               </div>
 
               <div className="pl-sec">
-                <div className="pl-sec-head"><h2>密码策略</h2></div>
+                <div className="pl-sec-head"><h2>{t('mobile.admin.security.password_heading')}</h2></div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                  {numField('最短密码长度', 'password.min_length', '8')}
+                  {numField(t('mobile.admin.security.min_length'), 'password.min_length', '8')}
                 </div>
                 <div className="pl-row" style={{ cursor: 'pointer', marginTop: 8 }} onClick={() => upd('password.require_digit', !d.password?.require_digit)}>
                   <span className={`pl-row-ic ${d.password?.require_digit ? 'ok' : ''}`}><Icon name={d.password?.require_digit ? 'check' : 'close'} size={17} /></span>
-                  <span className="pl-row-tx"><strong style={{ fontSize: 13.5 }}>要求包含数字</strong></span>
-                  <span style={{ fontSize: 12, color: d.password?.require_digit ? 'var(--ok)' : 'var(--muted)' }}>{d.password?.require_digit ? '是' : '否'}</span>
+                  <span className="pl-row-tx"><strong style={{ fontSize: 13.5 }}>{t('mobile.admin.security.require_digit')}</strong></span>
+                  <span style={{ fontSize: 12, color: d.password?.require_digit ? 'var(--ok)' : 'var(--muted)' }}>{d.password?.require_digit ? t('mobile.admin.yes') : t('mobile.admin.no')}</span>
                 </div>
               </div>
 
               <div className="pl-sec">
-                <div className="pl-sec-head"><h2>会话 / 锁定</h2></div>
+                <div className="pl-sec-head"><h2>{t('mobile.admin.security.session_heading')}</h2></div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                  {numField('会话超时（天）', 'session.timeout_days', '30')}
-                  {numField('最多失败次数', 'lockout.max_attempts', '5')}
-                  {numField('锁定时长（分钟）', 'lockout.lockout_minutes', '15')}
+                  {numField(t('mobile.admin.security.session_timeout'), 'session.timeout_days', '30')}
+                  {numField(t('mobile.admin.security.max_attempts'), 'lockout.max_attempts', '5')}
+                  {numField(t('mobile.admin.security.lockout_minutes'), 'lockout.lockout_minutes', '15')}
                 </div>
               </div>
 
               <div className="pl-sec">
-                <div className="pl-sec-head"><h2>IP 黑名单</h2></div>
+                <div className="pl-sec-head"><h2>{t('mobile.admin.security.ip_blocklist_heading')}</h2></div>
                 <textarea
                   value={Array.isArray(d.ip_blocklist) ? d.ip_blocklist.join('\n') : (d.ip_blocklist || '')}
                   onChange={(e) => upd('ip_blocklist', e.target.value.split('\n').map((s) => s.trim()).filter(Boolean))}
                   rows={4}
-                  placeholder="每行一个 IP 或 CIDR，如 192.168.1.1"
+                  placeholder={t('mobile.admin.security.ip_blocklist_placeholder')}
                   style={{ width: '100%', background: 'var(--panel-2)', border: '1px solid var(--line)', borderRadius: 10, padding: '8px 10px', color: 'var(--text)', fontSize: 13, fontFamily: 'var(--font-mono)', resize: 'vertical', boxSizing: 'border-box' }}
                 />
               </div>
 
               <button className="pl-btn-primary" style={{ width: '100%', marginTop: 8 }} onClick={save} disabled={saving}>
-                {saving ? '保存中…' : '保存安全配置'}
+                {saving ? t('mobile.admin.saving') : t('mobile.admin.security.save_btn')}
               </button>
             </>
           )}
@@ -875,6 +893,7 @@ function SectionSecurity({ nav }) {
    Section: admin-maintenance
 ══════════════════════════════════════════ */
 function SectionMaintenance({ nav }) {
+  const { t } = useTranslation();
   const [draft, setDraft] = React.useState(null);
   const [loading, setLoading] = React.useState(true);
   const [err, setErr] = React.useState(null);
@@ -887,7 +906,7 @@ function SectionMaintenance({ nav }) {
     (async () => {
       setLoading(true); setErr(null);
       try { const r = await window.api.admin.maintenance(); if (!cancelled) setDraft(JSON.parse(JSON.stringify(r))); }
-      catch (e) { if (!cancelled) setErr(e?.message || '加载失败'); }
+      catch (e) { if (!cancelled) setErr(e?.message || t('mobile.admin.load_failed')); }
       finally { if (!cancelled) setLoading(false); }
     })();
     return () => { cancelled = true; };
@@ -896,15 +915,15 @@ function SectionMaintenance({ nav }) {
   async function save() {
     if (!draft) return;
     setSaving(true);
-    try { await window.api.admin.saveMaintenance(draft); nav.toast('保存成功', 'ok'); }
-    catch (e) { nav.toast('保存失败: ' + (e?.message || ''), 'danger'); }
+    try { await window.api.admin.saveMaintenance(draft); nav.toast(t('mobile.admin.save_success'), 'ok'); }
+    catch (e) { nav.toast(t('mobile.admin.save_failed', { msg: e?.message || '' }), 'danger'); }
     finally { setSaving(false); }
   }
 
   async function doRestart() {
     setRestarting(true);
-    try { await window.api.admin.restart(); nav.toast('重启指令已发送', 'ok'); setRestartConfirm(false); }
-    catch (e) { nav.toast('重启失败: ' + (e?.message || ''), 'danger'); }
+    try { await window.api.admin.restart(); nav.toast(t('mobile.admin.maintenance.restart_sent'), 'ok'); setRestartConfirm(false); }
+    catch (e) { nav.toast(t('mobile.admin.maintenance.restart_failed', { msg: e?.message || '' }), 'danger'); }
     finally { setRestarting(false); }
   }
 
@@ -914,7 +933,7 @@ function SectionMaintenance({ nav }) {
     <>
       <div className="pl-head">
         <button className="pl-headbtn" onClick={() => nav.go('admin')}><Icon name="chevron_left" size={20} /></button>
-        <div className="pl-head-title"><strong style={{ fontSize: 15 }}>维护模式</strong></div>
+        <div className="pl-head-title"><strong style={{ fontSize: 15 }}>{t('mobile.admin.section.maintenance')}</strong></div>
       </div>
       <div className="pl-body tabbed">
         <div className="pl-pad">
@@ -922,38 +941,38 @@ function SectionMaintenance({ nav }) {
             <>
               {d.enabled && (
                 <div style={{ padding: '10px 13px', borderRadius: 10, background: 'var(--warn-soft)', border: '1px solid rgba(212,179,102,0.4)', fontSize: 13, color: 'var(--warn)', marginBottom: 12 }}>
-                  维护模式当前已开启，普通用户无法访问
+                  {t('mobile.admin.maintenance.active_notice')}
                 </div>
               )}
               <div className="pl-row" style={{ cursor: 'pointer' }} onClick={() => setDraft((prev) => ({ ...prev, enabled: !prev.enabled }))}>
                 <span className={`pl-row-ic ${d.enabled ? 'warn' : ''}`}><Icon name={d.enabled ? 'lock' : 'unlock'} size={17} /></span>
-                <span className="pl-row-tx"><strong style={{ fontSize: 13.5 }}>维护模式</strong></span>
-                <span style={{ fontSize: 12, color: d.enabled ? 'var(--warn)' : 'var(--muted)' }}>{d.enabled ? '已开启' : '关闭'}</span>
+                <span className="pl-row-tx"><strong style={{ fontSize: 13.5 }}>{t('mobile.admin.section.maintenance')}</strong></span>
+                <span style={{ fontSize: 12, color: d.enabled ? 'var(--warn)' : 'var(--muted)' }}>{d.enabled ? t('mobile.admin.maintenance.on') : t('mobile.admin.maintenance.off')}</span>
               </div>
 
               <div style={{ marginTop: 10 }}>
-                <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 4 }}>维护提示消息</div>
+                <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 4 }}>{t('mobile.admin.maintenance.message_label')}</div>
                 <textarea
                   value={d.message || ''}
                   onChange={(e) => setDraft((prev) => ({ ...prev, message: e.target.value }))}
                   rows={3}
-                  placeholder="正在维护中，请稍后再试…"
+                  placeholder={t('mobile.admin.maintenance.message_placeholder')}
                   style={{ width: '100%', background: 'var(--panel-2)', border: '1px solid var(--line)', borderRadius: 10, padding: '8px 10px', color: 'var(--text)', fontSize: 14, fontFamily: 'inherit', resize: 'vertical', boxSizing: 'border-box' }}
                 />
               </div>
 
-              {d.started_at && <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 6 }}>开始时间：{fmtTime(d.started_at)}</div>}
+              {d.started_at && <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 6 }}>{t('mobile.admin.maintenance.started_at')}{fmtTime(d.started_at)}</div>}
 
               <button className="pl-btn-primary" style={{ width: '100%', marginTop: 14 }} onClick={save} disabled={saving}>
-                {saving ? '保存中…' : '保存维护配置'}
+                {saving ? t('mobile.admin.saving') : t('mobile.admin.maintenance.save_btn')}
               </button>
 
               <div className="pl-sec" style={{ marginTop: 20 }}>
-                <div className="pl-sec-head"><h2>服务重启</h2></div>
-                <div style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 10 }}>重启后约 5–30 秒服务恢复，当前连接将断开。</div>
+                <div className="pl-sec-head"><h2>{t('mobile.admin.maintenance.restart_heading')}</h2></div>
+                <div style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 10 }}>{t('mobile.admin.maintenance.restart_hint')}</div>
                 <button style={{ width: '100%', padding: '11px', borderRadius: 12, background: 'var(--danger-soft)', border: '1px solid rgba(200,103,93,0.4)', color: 'var(--danger)', fontSize: 14, fontWeight: 500 }}
                   onClick={() => setRestartConfirm(true)}>
-                  重启服务
+                  {t('mobile.admin.maintenance.restart_btn')}
                 </button>
               </div>
             </>
@@ -963,8 +982,8 @@ function SectionMaintenance({ nav }) {
 
       {restartConfirm && (
         <ConfirmSheet
-          title="确认重启服务" body="服务将立即重启，所有在线用户会话中断，约 5–30 秒恢复。"
-          confirmLabel="确认重启" danger busy={restarting}
+          title={t('mobile.admin.maintenance.confirm_restart_title')} body={t('mobile.admin.maintenance.confirm_restart_body')}
+          confirmLabel={t('mobile.admin.maintenance.confirm_restart_label')} danger busy={restarting}
           onConfirm={doRestart} onCancel={() => setRestartConfirm(false)}
         />
       )}
@@ -976,6 +995,7 @@ function SectionMaintenance({ nav }) {
    Section: admin-dmca-takedowns
 ══════════════════════════════════════════ */
 function SectionDmcaTakedowns({ nav }) {
+  const { t } = useTranslation();
   const [items, setItems] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
   const [err, setErr] = React.useState(null);
@@ -986,7 +1006,7 @@ function SectionDmcaTakedowns({ nav }) {
   const load = React.useCallback(async () => {
     setLoading(true); setErr(null);
     try { const r = await window.api.admin.dmcaTakedowns.list({ status: statusFilter }); setItems(r.takedowns || r || []); }
-    catch (e) { setErr(e?.message || '加载失败'); }
+    catch (e) { setErr(e?.message || t('mobile.admin.load_failed')); }
     finally { setLoading(false); }
   }, [statusFilter]);
 
@@ -997,27 +1017,33 @@ function SectionDmcaTakedowns({ nav }) {
     setActionBusy(true);
     try {
       await window.api.admin.dmcaTakedowns.action(actionSheet.item.id, { action: actionSheet.action, reason: vals?.reason || '' });
-      nav.toast('操作成功', 'ok');
+      nav.toast(t('mobile.admin.action_success'), 'ok');
       setActionSheet(null);
       load();
-    } catch (e) { nav.toast('操作失败: ' + (e?.message || ''), 'danger'); }
+    } catch (e) { nav.toast(t('mobile.admin.action_failed', { msg: e?.message || '' }), 'danger'); }
     finally { setActionBusy(false); }
   }
 
   const statusColor = { open: 'var(--danger)', counter_received: 'var(--info)', closed: 'var(--muted)', restored: 'var(--ok)', rejected: 'var(--muted)' };
-  const statusLabel = { open: '待处理', counter_received: '已反驳', closed: '已关闭', restored: '已恢复', rejected: '已拒绝' };
+  const statusLabel = {
+    open: t('mobile.admin.dmca.status_open'),
+    counter_received: t('mobile.admin.dmca.status_counter_received'),
+    closed: t('mobile.admin.dmca.status_closed'),
+    restored: t('mobile.admin.dmca.status_restored'),
+    rejected: t('mobile.admin.dmca.status_rejected'),
+  };
 
   return (
     <>
       <div className="pl-head">
         <button className="pl-headbtn" onClick={() => nav.go('admin')}><Icon name="chevron_left" size={20} /></button>
-        <div className="pl-head-title"><strong style={{ fontSize: 15 }}>DMCA 下架</strong></div>
+        <div className="pl-head-title"><strong style={{ fontSize: 15 }}>{t('mobile.admin.section.dmca_takedowns')}</strong></div>
         <button className="pl-headbtn" onClick={load} disabled={loading}><Icon name="refresh" size={18} /></button>
       </div>
       <div className="pl-body tabbed">
         <div className="pl-pad">
           <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
-            {Object.entries(statusLabel).concat([['all', '全部']]).map(([v, l]) => (
+            {Object.entries(statusLabel).concat([['all', t('common.all')]]).map(([v, l]) => (
               <button key={v} onClick={() => setStatusFilter(v)}
                 style={{ padding: '4px 11px', borderRadius: 999, fontSize: 12, border: '1px solid', borderColor: statusFilter === v ? 'var(--accent-edge)' : 'var(--line)', background: statusFilter === v ? 'var(--accent-soft)' : 'var(--panel-2)', color: statusFilter === v ? 'var(--accent)' : 'var(--muted)' }}>
                 {l}
@@ -1025,7 +1051,7 @@ function SectionDmcaTakedowns({ nav }) {
             ))}
           </div>
 
-          {loading ? <LoadingRow /> : err ? <ErrRow msg={err} onRetry={load} /> : items.length === 0 ? <EmptyRow text="暂无记录" /> : (
+          {loading ? <LoadingRow /> : err ? <ErrRow msg={err} onRetry={load} /> : items.length === 0 ? <EmptyRow text={t('mobile.admin.no_records')} /> : (
             <div className="pl-sec">
               {items.map((item) => (
                 <div key={item.id} style={{ border: '1px solid var(--line-soft)', borderRadius: 12, background: 'var(--panel)', marginBottom: 8, overflow: 'hidden' }}>
@@ -1043,7 +1069,7 @@ function SectionDmcaTakedowns({ nav }) {
                         <button key={action}
                           style={{ flex: 1, padding: '9px 4px', fontSize: 12, color: action === 'grant' ? 'var(--ok)' : 'var(--danger)', borderRight: i === 0 ? '1px solid var(--line-soft)' : 'none' }}
                           onClick={() => setActionSheet({ item, action })}>
-                          {action === 'grant' ? '批准下架' : '拒绝'}
+                          {action === 'grant' ? t('mobile.admin.dmca.grant_btn') : t('mobile.admin.dmca.reject_btn')}
                         </button>
                       ))}
                     </div>
@@ -1057,8 +1083,8 @@ function SectionDmcaTakedowns({ nav }) {
 
       {actionSheet && (
         <InputSheet
-          title={actionSheet.action === 'grant' ? '批准下架' : '拒绝申请'}
-          fields={[{ key: 'reason', label: '原因/备注', multiline: true, placeholder: '处理原因…' }]}
+          title={actionSheet.action === 'grant' ? t('mobile.admin.dmca.grant_sheet_title') : t('mobile.admin.dmca.reject_sheet_title')}
+          fields={[{ key: 'reason', label: t('mobile.admin.dmca.reason_label'), multiline: true, placeholder: t('mobile.admin.dmca.reason_placeholder') }]}
           busy={actionBusy}
           onConfirm={doAction}
           onCancel={() => setActionSheet(null)}
@@ -1072,6 +1098,7 @@ function SectionDmcaTakedowns({ nav }) {
    Section: admin-dmca-strikes
 ══════════════════════════════════════════ */
 function SectionDmcaStrikes({ nav }) {
+  const { t } = useTranslation();
   const [items, setItems] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
   const [err, setErr] = React.useState(null);
@@ -1081,7 +1108,7 @@ function SectionDmcaStrikes({ nav }) {
   const load = React.useCallback(async () => {
     setLoading(true); setErr(null);
     try { const r = await window.api.admin.dmcaStrikes.list(); setItems(r.strikes || r || []); }
-    catch (e) { setErr(e?.message || '加载失败'); }
+    catch (e) { setErr(e?.message || t('mobile.admin.load_failed')); }
     finally { setLoading(false); }
   }, []);
 
@@ -1092,10 +1119,10 @@ function SectionDmcaStrikes({ nav }) {
     setBusy(true);
     try {
       await window.api.admin.dmcaStrikes.increment(incTarget.user_id, { reason: vals?.reason || '' });
-      nav.toast('已添加警告', 'ok');
+      nav.toast(t('mobile.admin.strikes.added'), 'ok');
       setIncTarget(null);
       load();
-    } catch (e) { nav.toast('操作失败: ' + (e?.message || ''), 'danger'); }
+    } catch (e) { nav.toast(t('mobile.admin.action_failed', { msg: e?.message || '' }), 'danger'); }
     finally { setBusy(false); }
   }
 
@@ -1103,21 +1130,21 @@ function SectionDmcaStrikes({ nav }) {
     <>
       <div className="pl-head">
         <button className="pl-headbtn" onClick={() => nav.go('admin')}><Icon name="chevron_left" size={20} /></button>
-        <div className="pl-head-title"><strong style={{ fontSize: 15 }}>DMCA 警告记录</strong></div>
+        <div className="pl-head-title"><strong style={{ fontSize: 15 }}>{t('mobile.admin.strikes.title')}</strong></div>
         <button className="pl-headbtn" onClick={load} disabled={loading}><Icon name="refresh" size={18} /></button>
       </div>
       <div className="pl-body tabbed">
         <div className="pl-pad">
-          {loading ? <LoadingRow /> : err ? <ErrRow msg={err} onRetry={load} /> : items.length === 0 ? <EmptyRow text="暂无警告记录" /> : (
+          {loading ? <LoadingRow /> : err ? <ErrRow msg={err} onRetry={load} /> : items.length === 0 ? <EmptyRow text={t('mobile.admin.strikes.empty')} /> : (
             <div className="pl-sec">
               {items.map((s) => (
                 <div key={s.user_id} className="pl-row">
                   <span className="pl-row-ic warn"><Icon name="warn" size={17} /></span>
                   <span className="pl-row-tx">
                     <strong style={{ fontSize: 13 }}>{s.username || s.user_id}</strong>
-                    <span className="mono">警告 {s.strike_count || 0} 次</span>
+                    <span className="mono">{t('mobile.admin.strikes.count', { count: s.strike_count || 0 })}</span>
                   </span>
-                  <button style={{ fontSize: 12, color: 'var(--warn)', padding: '4px 8px' }} onClick={() => setIncTarget(s)}>+警告</button>
+                  <button style={{ fontSize: 12, color: 'var(--warn)', padding: '4px 8px' }} onClick={() => setIncTarget(s)}>{t('mobile.admin.strikes.add_btn')}</button>
                 </div>
               ))}
             </div>
@@ -1127,8 +1154,8 @@ function SectionDmcaStrikes({ nav }) {
 
       {incTarget && (
         <InputSheet
-          title={`给 @${incTarget.username || incTarget.user_id} 添加 DMCA 警告`}
-          fields={[{ key: 'reason', label: '原因', multiline: true, placeholder: '违规内容描述…' }]}
+          title={t('mobile.admin.strikes.sheet_title', { username: incTarget.username || incTarget.user_id })}
+          fields={[{ key: 'reason', label: t('mobile.admin.strikes.reason_label'), multiline: true, placeholder: t('mobile.admin.strikes.reason_placeholder') }]}
           busy={busy} onConfirm={doIncrement} onCancel={() => setIncTarget(null)}
         />
       )}
@@ -1140,6 +1167,7 @@ function SectionDmcaStrikes({ nav }) {
    Section: admin-csam-reports
 ══════════════════════════════════════════ */
 function SectionCsamReports({ nav }) {
+  const { t } = useTranslation();
   const [reports, setReports] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
   const [err, setErr] = React.useState(null);
@@ -1150,7 +1178,7 @@ function SectionCsamReports({ nav }) {
   const load = React.useCallback(async () => {
     setLoading(true); setErr(null);
     try { const r = await window.api.admin.csamReports.list({ status: statusFilter }); setReports(r.reports || r || []); }
-    catch (e) { setErr(e?.message || '加载失败'); }
+    catch (e) { setErr(e?.message || t('mobile.admin.load_failed')); }
     finally { setLoading(false); }
   }, [statusFilter]);
 
@@ -1161,10 +1189,10 @@ function SectionCsamReports({ nav }) {
     setBusy(true);
     try {
       await window.api.admin.csamReports.decision(decideTarget.id, { decision: vals.decision, notes: vals.notes || '' });
-      nav.toast('已处理', 'ok');
+      nav.toast(t('mobile.admin.processed'), 'ok');
       setDecideTarget(null);
       load();
-    } catch (e) { nav.toast('操作失败: ' + (e?.message || ''), 'danger'); }
+    } catch (e) { nav.toast(t('mobile.admin.action_failed', { msg: e?.message || '' }), 'danger'); }
     finally { setBusy(false); }
   }
 
@@ -1174,16 +1202,16 @@ function SectionCsamReports({ nav }) {
     <>
       <div className="pl-head">
         <button className="pl-headbtn" onClick={() => nav.go('admin')}><Icon name="chevron_left" size={20} /></button>
-        <div className="pl-head-title"><strong style={{ fontSize: 15 }}>CSAM 举报</strong></div>
+        <div className="pl-head-title"><strong style={{ fontSize: 15 }}>{t('mobile.admin.section.csam_reports')}</strong></div>
         <button className="pl-headbtn" onClick={load} disabled={loading}><Icon name="refresh" size={18} /></button>
       </div>
       <div className="pl-body tabbed">
         <div className="pl-pad">
           <div style={{ padding: '10px 13px', borderRadius: 10, background: 'var(--warn-soft)', border: '1px solid rgba(212,179,102,0.4)', fontSize: 12.5, color: 'var(--warn)', marginBottom: 12 }}>
-            CSAM 举报需严肃处理，请在电脑端完整审查详情。此处仅支持基础决定操作。
+            {t('mobile.admin.csam.review_notice')}
           </div>
           <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-            {[['pending', '待处理'], ['decided', '已决定'], ['all', '全部']].map(([v, l]) => (
+            {[['pending', t('mobile.admin.csam.status_pending')], ['decided', t('mobile.admin.csam.status_decided')], ['all', t('common.all')]].map(([v, l]) => (
               <button key={v} onClick={() => setStatusFilter(v)}
                 style={{ flex: 1, padding: '7px 4px', borderRadius: 999, fontSize: 12, border: '1px solid', borderColor: statusFilter === v ? 'var(--accent-edge)' : 'var(--line)', background: statusFilter === v ? 'var(--accent-soft)' : 'var(--panel-2)', color: statusFilter === v ? 'var(--accent)' : 'var(--muted)' }}>
                 {l}
@@ -1191,23 +1219,23 @@ function SectionCsamReports({ nav }) {
             ))}
           </div>
 
-          {loading ? <LoadingRow /> : err ? <ErrRow msg={err} onRetry={load} /> : reports.length === 0 ? <EmptyRow text="暂无举报" /> : (
+          {loading ? <LoadingRow /> : err ? <ErrRow msg={err} onRetry={load} /> : reports.length === 0 ? <EmptyRow text={t('mobile.admin.csam.empty')} /> : (
             <div className="pl-sec">
               {reports.map((r) => (
                 <div key={r.id} style={{ border: '1px solid var(--line-soft)', borderRadius: 12, background: 'var(--panel)', marginBottom: 8, overflow: 'hidden' }}>
                   <div style={{ padding: '11px 13px' }}>
                     <div style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
-                      <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: r.status === 'pending' ? 'var(--danger)' : 'var(--muted)' }}>{r.status === 'pending' ? '待处理' : '已决定'}</span>
+                      <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: r.status === 'pending' ? 'var(--danger)' : 'var(--muted)' }}>{r.status === 'pending' ? t('mobile.admin.csam.status_pending') : t('mobile.admin.csam.status_decided')}</span>
                       {r.decision && <span style={{ fontSize: 11, color: decisionColor[r.decision] || 'var(--muted)' }}>{r.decision}</span>}
                       <span style={{ fontSize: 10.5, color: 'var(--muted-3)', marginLeft: 'auto' }}>#{r.id}</span>
                     </div>
-                    <div style={{ fontSize: 13, color: 'var(--text-quiet)' }}>被举报：{r.reported_username || `uid:${r.reported_user_id}`}</div>
+                    <div style={{ fontSize: 13, color: 'var(--text-quiet)' }}>{t('mobile.admin.csam.reported_user')}{r.reported_username || `uid:${r.reported_user_id}`}</div>
                     {r.cybertip_report_id && <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 3 }}>CyberTip: {r.cybertip_report_id}</div>}
                   </div>
                   {r.status === 'pending' && (
                     <button style={{ width: '100%', padding: '9px', fontSize: 12.5, color: 'var(--info)', borderTop: '1px solid var(--line-soft)' }}
                       onClick={() => setDecideTarget(r)}>
-                      作出决定
+                      {t('mobile.admin.csam.decide_btn')}
                     </button>
                   )}
                 </div>
@@ -1219,10 +1247,10 @@ function SectionCsamReports({ nav }) {
 
       {decideTarget && (
         <InputSheet
-          title={`CSAM 举报 #${decideTarget.id} 决定`}
+          title={t('mobile.admin.csam.decide_sheet_title', { id: decideTarget.id })}
           fields={[
-            { key: 'decision', label: '决定 (founded / escalate / unfounded)', placeholder: 'founded' },
-            { key: 'notes', label: '备注', multiline: true, placeholder: '处理说明…' },
+            { key: 'decision', label: t('mobile.admin.csam.decision_label'), placeholder: 'founded' },
+            { key: 'notes', label: t('mobile.admin.csam.notes_label'), multiline: true, placeholder: t('mobile.admin.csam.notes_placeholder') },
           ]}
           busy={busy} onConfirm={doDecide} onCancel={() => setDecideTarget(null)}
         />
@@ -1235,6 +1263,7 @@ function SectionCsamReports({ nav }) {
    Section: admin-aup-actions
 ══════════════════════════════════════════ */
 function SectionAupActions({ nav }) {
+  const { t } = useTranslation();
   const [search, setSearch] = React.useState('');
   const [users, setUsers] = React.useState([]);
   const [loading, setLoading] = React.useState(false);
@@ -1246,7 +1275,7 @@ function SectionAupActions({ nav }) {
     if (!search.trim()) return;
     setLoading(true); setErr(null);
     try { const r = await window.api.admin.users({ search, limit: 20 }); setUsers(r.users || []); }
-    catch (e) { setErr(e?.message || '搜索失败'); }
+    catch (e) { setErr(e?.message || t('mobile.admin.search_failed')); }
     finally { setLoading(false); }
   }
 
@@ -1258,10 +1287,10 @@ function SectionAupActions({ nav }) {
       if (action === 'suspend') await window.api.admin.suspendUser(user.id, { reason: vals?.reason || '', duration_days: vals?.duration_days ? Number(vals.duration_days) : undefined });
       else if (action === 'unsuspend') await window.api.admin.unsuspendUser(user.id);
       else if (action === 'terminate') await window.api.admin.terminateUser(user.id, { reason: vals?.reason || '' });
-      nav.toast('操作成功', 'ok');
+      nav.toast(t('mobile.admin.action_success'), 'ok');
       setSheet(null);
       doSearch();
-    } catch (e) { nav.toast('操作失败: ' + (e?.message || ''), 'danger'); }
+    } catch (e) { nav.toast(t('mobile.admin.action_failed', { msg: e?.message || '' }), 'danger'); }
     finally { setBusy(false); }
   }
 
@@ -1269,21 +1298,21 @@ function SectionAupActions({ nav }) {
     <>
       <div className="pl-head">
         <button className="pl-headbtn" onClick={() => nav.go('admin')}><Icon name="chevron_left" size={20} /></button>
-        <div className="pl-head-title"><strong style={{ fontSize: 15 }}>AUP 封禁操作</strong></div>
+        <div className="pl-head-title"><strong style={{ fontSize: 15 }}>{t('mobile.admin.section.aup_actions')}</strong></div>
       </div>
       <div className="pl-body tabbed">
         <div className="pl-pad">
           <div style={{ padding: '10px 13px', borderRadius: 10, background: 'var(--info-soft)', border: '1px solid rgba(122,166,194,0.3)', fontSize: 12.5, color: 'var(--info)', marginBottom: 12 }}>
-            AUP = 可接受使用政策。暂停/终止为严肃操作，terminate 会封号，请谨慎。
+            {t('mobile.admin.aup.notice')}
           </div>
           <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
             <input
-              type="search" placeholder="搜索用户名" value={search}
+              type="search" placeholder={t('mobile.admin.users.search_placeholder')} value={search}
               onChange={(e) => setSearch(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') doSearch(); }}
               style={{ flex: 1, background: 'var(--panel-2)', border: '1px solid var(--line)', borderRadius: 10, padding: '8px 10px', color: 'var(--text)', fontSize: 14, fontFamily: 'inherit' }}
             />
-            <button className="pl-btn-primary" style={{ padding: '0 14px', height: 38 }} onClick={doSearch} disabled={loading}>搜索</button>
+            <button className="pl-btn-primary" style={{ padding: '0 14px', height: 38 }} onClick={doSearch} disabled={loading}>{t('mobile.admin.search')}</button>
           </div>
 
           {loading ? <LoadingRow /> : err ? <ErrRow msg={err} /> : users.length === 0 ? null : (
@@ -1293,20 +1322,20 @@ function SectionAupActions({ nav }) {
                   <div style={{ padding: '11px 13px' }}>
                     <div style={{ fontSize: 13.5, fontWeight: 600 }}>@{u.username}</div>
                     <div style={{ fontSize: 11.5, color: 'var(--muted-2)', marginTop: 2 }}>
-                      {u.deactivated_at ? <span style={{ color: 'var(--danger)' }}>已停用</span> : <span style={{ color: 'var(--ok)' }}>活跃</span>}
+                      {u.deactivated_at ? <span style={{ color: 'var(--danger)' }}>{t('mobile.admin.users.status_deactivated')}</span> : <span style={{ color: 'var(--ok)' }}>{t('mobile.admin.users.status_active')}</span>}
                       {u.ban_reason && <span> · {u.ban_reason}</span>}
                     </div>
                   </div>
                   <div style={{ display: 'flex', borderTop: '1px solid var(--line-soft)' }}>
                     {!u.deactivated_at ? (
                       <button style={{ flex: 1, padding: '9px 4px', fontSize: 12, color: 'var(--warn)', borderRight: '1px solid var(--line-soft)' }}
-                        onClick={() => setSheet({ action: 'suspend', user: u })}>暂停</button>
+                        onClick={() => setSheet({ action: 'suspend', user: u })}>{t('mobile.admin.aup.suspend_btn')}</button>
                     ) : (
                       <button style={{ flex: 1, padding: '9px 4px', fontSize: 12, color: 'var(--ok)', borderRight: '1px solid var(--line-soft)' }}
-                        onClick={() => setSheet({ action: 'unsuspend', user: u })}>解封</button>
+                        onClick={() => setSheet({ action: 'unsuspend', user: u })}>{t('mobile.admin.aup.unsuspend_btn')}</button>
                     )}
                     <button style={{ flex: 1, padding: '9px 4px', fontSize: 12, color: 'var(--danger)' }}
-                      onClick={() => setSheet({ action: 'terminate', user: u })}>终止账户</button>
+                      onClick={() => setSheet({ action: 'terminate', user: u })}>{t('mobile.admin.aup.terminate_btn')}</button>
                   </div>
                 </div>
               ))}
@@ -1317,24 +1346,24 @@ function SectionAupActions({ nav }) {
 
       {sheet?.action === 'suspend' && (
         <InputSheet
-          title={`暂停 @${sheet.user.username}`}
+          title={t('mobile.admin.aup.suspend_sheet_title', { username: sheet.user.username })}
           fields={[
-            { key: 'reason', label: '原因', multiline: true, placeholder: '违规说明…' },
-            { key: 'duration_days', label: '暂停天数（空 = 永久）', type: 'number', placeholder: '留空永久' },
+            { key: 'reason', label: t('mobile.admin.aup.reason_label'), multiline: true, placeholder: t('mobile.admin.aup.suspend_reason_placeholder') },
+            { key: 'duration_days', label: t('mobile.admin.aup.duration_label'), type: 'number', placeholder: t('mobile.admin.aup.duration_placeholder') },
           ]}
           busy={busy} onConfirm={doAction} onCancel={() => setSheet(null)}
         />
       )}
       {sheet?.action === 'unsuspend' && (
         <ConfirmSheet
-          title={`解封 @${sheet.user.username}`} body="确认解除暂停？"
+          title={t('mobile.admin.aup.unsuspend_sheet_title', { username: sheet.user.username })} body={t('mobile.admin.aup.unsuspend_body')}
           busy={busy} onConfirm={() => doAction({})} onCancel={() => setSheet(null)}
         />
       )}
       {sheet?.action === 'terminate' && (
         <InputSheet
-          title={`终止账户 @${sheet.user.username}`}
-          fields={[{ key: 'reason', label: '终止原因（必填）', multiline: true, placeholder: '违规详情…' }]}
+          title={t('mobile.admin.aup.terminate_sheet_title', { username: sheet.user.username })}
+          fields={[{ key: 'reason', label: t('mobile.admin.aup.terminate_reason_label'), multiline: true, placeholder: t('mobile.admin.aup.terminate_reason_placeholder') }]}
           busy={busy} onConfirm={doAction} onCancel={() => setSheet(null)}
         />
       )}
@@ -1346,6 +1375,7 @@ function SectionAupActions({ nav }) {
    Section: admin-feedback
 ══════════════════════════════════════════ */
 function SectionFeedback({ nav }) {
+  const { t } = useTranslation();
   const [items, setItems] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
   const [err, setErr] = React.useState(null);
@@ -1361,7 +1391,7 @@ function SectionFeedback({ nav }) {
       const data = await r.json();
       if (!r.ok || !data.ok) throw new Error(data.detail || data.error || `HTTP ${r.status}`);
       setItems(data.items || []);
-    } catch (e) { setErr(e?.message || '加载失败'); }
+    } catch (e) { setErr(e?.message || t('mobile.admin.load_failed')); }
     finally { setLoading(false); }
   }, [statusFilter]);
 
@@ -1373,10 +1403,10 @@ function SectionFeedback({ nav }) {
       const r = await fetch(`/api/admin/feedback/${id}/decision`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ decision, notes }) });
       const data = await r.json();
       if (!r.ok || !data.ok) throw new Error(data.detail || data.error || `HTTP ${r.status}`);
-      nav.toast('已处理', 'ok');
+      nav.toast(t('mobile.admin.processed'), 'ok');
       setDetail(null);
       load();
-    } catch (e) { nav.toast('操作失败: ' + (e?.message || ''), 'danger'); }
+    } catch (e) { nav.toast(t('mobile.admin.action_failed', { msg: e?.message || '' }), 'danger'); }
     finally { setActionBusy(false); }
   }
 
@@ -1386,20 +1416,20 @@ function SectionFeedback({ nav }) {
       const r = await fetch(`/api/admin/feedback/${id}/reply`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ reply }) });
       const data = await r.json();
       if (!r.ok || !data.ok) throw new Error(data.detail || data.error || `HTTP ${r.status}`);
-      nav.toast(reply ? '回复已发送' : '回复已撤回', 'ok');
+      nav.toast(reply ? t('mobile.admin.feedback.reply_sent') : t('mobile.admin.feedback.reply_withdrawn'), 'ok');
       setDetail((d) => d ? { ...d, admin_reply: reply || null } : d);
-    } catch (e) { nav.toast('回复失败: ' + (e?.message || ''), 'danger'); }
+    } catch (e) { nav.toast(t('mobile.admin.feedback.reply_failed', { msg: e?.message || '' }), 'danger'); }
     finally { setActionBusy(false); }
   }
 
   const decisionColor = { ok: 'var(--ok)', nsfw_terminate: 'var(--danger)', spam: 'var(--warn)' };
-  const decisionLabel = { ok: 'OK', nsfw_terminate: '封号', spam: '垃圾' };
+  const decisionLabel = { ok: 'OK', nsfw_terminate: t('mobile.admin.feedback.decision_terminate'), spam: t('mobile.admin.feedback.decision_spam') };
 
   return (
     <>
       <div className="pl-head">
         <button className="pl-headbtn" onClick={detail ? () => setDetail(null) : () => nav.go('admin')}><Icon name="chevron_left" size={20} /></button>
-        <div className="pl-head-title"><strong style={{ fontSize: 15 }}>{detail ? `反馈 #${detail.id}` : '用户反馈'}</strong></div>
+        <div className="pl-head-title"><strong style={{ fontSize: 15 }}>{detail ? t('mobile.admin.feedback.detail_title', { id: detail.id }) : t('mobile.admin.section.feedback')}</strong></div>
         {!detail && <button className="pl-headbtn" onClick={load} disabled={loading}><Icon name="refresh" size={18} /></button>}
       </div>
 
@@ -1408,7 +1438,7 @@ function SectionFeedback({ nav }) {
         <div className="pl-body tabbed">
           <div className="pl-pad">
             <div style={{ marginBottom: 14 }}>
-              <div style={{ fontSize: 11.5, color: 'var(--muted)', marginBottom: 4 }}>提交者 / 时间</div>
+              <div style={{ fontSize: 11.5, color: 'var(--muted)', marginBottom: 4 }}>{t('mobile.admin.feedback.submitter_label')}</div>
               <div style={{ fontSize: 13.5, color: 'var(--text)' }}>@{detail.username || '—'} · {fmtTime(detail.created_at)}</div>
               {detail.review_decision && (
                 <span style={{ display: 'inline-block', marginTop: 6, fontSize: 11, padding: '2px 8px', borderRadius: 6, background: 'var(--panel-3)', color: decisionColor[detail.review_decision] || 'var(--muted)' }}>
@@ -1418,39 +1448,39 @@ function SectionFeedback({ nav }) {
             </div>
 
             <div style={{ marginBottom: 14 }}>
-              <div style={{ fontSize: 11.5, color: 'var(--muted)', marginBottom: 6 }}>反馈内容</div>
+              <div style={{ fontSize: 11.5, color: 'var(--muted)', marginBottom: 6 }}>{t('mobile.admin.feedback.content_label')}</div>
               <div style={{ background: 'var(--panel-2)', borderRadius: 10, padding: '10px 12px', fontSize: 13.5, lineHeight: 1.7, color: 'var(--text-quiet)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                {detail.free_text || '（无文字内容）'}
+                {detail.free_text || t('mobile.admin.feedback.no_content')}
               </div>
             </div>
 
             {/* 回复 */}
             <div style={{ marginBottom: 14 }}>
-              <div style={{ fontSize: 11.5, color: 'var(--muted)', marginBottom: 6 }}>回复用户（显示在 ta 的反馈历史）</div>
+              <div style={{ fontSize: 11.5, color: 'var(--muted)', marginBottom: 6 }}>{t('mobile.admin.feedback.reply_label')}</div>
               <textarea
                 value={replyText}
                 onChange={(e) => setReplyText(e.target.value)}
                 rows={3}
-                placeholder="给用户的回复（留空并发送 = 撤回）"
+                placeholder={t('mobile.admin.feedback.reply_placeholder')}
                 style={{ width: '100%', background: 'var(--panel-2)', border: '1px solid var(--line)', borderRadius: 10, padding: '8px 10px', color: 'var(--text)', fontSize: 14, fontFamily: 'inherit', resize: 'vertical', boxSizing: 'border-box' }}
               />
               <button className="pl-btn-ghost" style={{ marginTop: 8, fontSize: 13 }} onClick={() => doReply(detail.id, replyText.trim())} disabled={actionBusy}>
-                {detail.admin_reply ? '更新回复' : '发送回复'}
+                {detail.admin_reply ? t('mobile.admin.feedback.update_reply') : t('mobile.admin.feedback.send_reply')}
               </button>
             </div>
 
             {/* 审核操作 */}
             {!detail.review_decision && (
               <div>
-                <div style={{ fontSize: 11.5, color: 'var(--muted)', marginBottom: 8 }}>审核决定</div>
+                <div style={{ fontSize: 11.5, color: 'var(--muted)', marginBottom: 8 }}>{t('mobile.admin.feedback.review_heading')}</div>
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <button className="pl-btn-ghost" style={{ flex: 1, fontSize: 13 }} onClick={() => doDecision(detail.id, 'spam')} disabled={actionBusy}>垃圾</button>
-                  <button className="pl-btn-primary" style={{ flex: 1, fontSize: 13 }} onClick={() => doDecision(detail.id, 'ok')} disabled={actionBusy}>标记 OK</button>
+                  <button className="pl-btn-ghost" style={{ flex: 1, fontSize: 13 }} onClick={() => doDecision(detail.id, 'spam')} disabled={actionBusy}>{t('mobile.admin.feedback.decision_spam')}</button>
+                  <button className="pl-btn-primary" style={{ flex: 1, fontSize: 13 }} onClick={() => doDecision(detail.id, 'ok')} disabled={actionBusy}>{t('mobile.admin.feedback.mark_ok')}</button>
                 </div>
-                <div style={{ fontSize: 11.5, color: 'var(--muted)', margin: '12px 0 6px' }}>终止账户（NSFW 违规）— 请先在电脑端审查确认</div>
+                <div style={{ fontSize: 11.5, color: 'var(--muted)', margin: '12px 0 6px' }}>{t('mobile.admin.feedback.terminate_notice')}</div>
                 <button style={{ width: '100%', padding: '10px', borderRadius: 12, background: 'var(--danger-soft)', border: '1px solid rgba(200,103,93,0.4)', color: 'var(--danger)', fontSize: 13 }}
-                  onClick={() => { const reason = window.prompt('终止原因（必填）'); if (reason) doDecision(detail.id, 'nsfw_terminate', reason); }}>
-                  终止账户 (nsfw_terminate)
+                  onClick={() => { const reason = window.prompt(t('mobile.admin.feedback.terminate_prompt')); if (reason) doDecision(detail.id, 'nsfw_terminate', reason); }}>
+                  {t('mobile.admin.feedback.terminate_btn')}
                 </button>
               </div>
             )}
@@ -1461,7 +1491,7 @@ function SectionFeedback({ nav }) {
         <div className="pl-body tabbed">
           <div className="pl-pad">
             <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-              {[['unreviewed', '待审'], ['reviewed', '已审'], ['all', '全部']].map(([v, l]) => (
+              {[['unreviewed', t('mobile.admin.feedback.status_unreviewed')], ['reviewed', t('mobile.admin.feedback.status_reviewed')], ['all', t('common.all')]].map(([v, l]) => (
                 <button key={v} onClick={() => setStatusFilter(v)}
                   style={{ flex: 1, padding: '7px 4px', borderRadius: 999, fontSize: 12, border: '1px solid', borderColor: statusFilter === v ? 'var(--accent-edge)' : 'var(--line)', background: statusFilter === v ? 'var(--accent-soft)' : 'var(--panel-2)', color: statusFilter === v ? 'var(--accent)' : 'var(--muted)' }}>
                   {l}
@@ -1469,14 +1499,14 @@ function SectionFeedback({ nav }) {
               ))}
             </div>
 
-            {loading ? <LoadingRow /> : err ? <ErrRow msg={err} onRetry={load} /> : items.length === 0 ? <EmptyRow text="暂无反馈" /> : (
+            {loading ? <LoadingRow /> : err ? <ErrRow msg={err} onRetry={load} /> : items.length === 0 ? <EmptyRow text={t('mobile.admin.feedback.empty')} /> : (
               <div className="pl-sec">
                 {items.map((f) => (
                   <button key={f.id} className="pl-row" onClick={() => { setDetail(f); setReplyText(f.admin_reply || ''); }}>
                     <span className={`pl-row-ic ${!f.review_decision ? 'warn' : 'ok'}`}><Icon name="feedback" size={17} /></span>
                     <span className="pl-row-tx">
                       <strong style={{ fontSize: 13 }}>@{f.username || '—'} <span className="mono" style={{ fontWeight: 400, fontSize: 11.5, color: 'var(--muted-2)' }}>#{f.id}</span></strong>
-                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{(f.free_text || '').slice(0, 60) || '（无内容）'}</span>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{(f.free_text || '').slice(0, 60) || t('mobile.admin.feedback.no_content_short')}</span>
                     </span>
                     <span className="pl-row-chev"><Icon name="chevron_right" size={17} /></span>
                   </button>
@@ -1494,6 +1524,7 @@ function SectionFeedback({ nav }) {
    Section: admin-achievements
 ══════════════════════════════════════════ */
 function SectionAchievements({ nav }) {
+  const { t } = useTranslation();
   const [items, setItems] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
   const [err, setErr] = React.useState(null);
@@ -1503,7 +1534,7 @@ function SectionAchievements({ nav }) {
   const load = React.useCallback(async () => {
     setLoading(true); setErr(null);
     try { const r = await window.api.admin.achievements.list(); setItems(r.items || r || []); }
-    catch (e) { setErr(e?.message || '加载失败'); }
+    catch (e) { setErr(e?.message || t('mobile.admin.load_failed')); }
     finally { setLoading(false); }
   }, []);
 
@@ -1514,10 +1545,10 @@ function SectionAchievements({ nav }) {
     setBusy(true);
     try {
       await window.api.admin.achievements.remove(disableTarget.id);
-      nav.toast('已停用', 'ok');
+      nav.toast(t('mobile.admin.achievements.disabled'), 'ok');
       setDisableTarget(null);
       load();
-    } catch (e) { nav.toast('操作失败: ' + (e?.message || ''), 'danger'); }
+    } catch (e) { nav.toast(t('mobile.admin.action_failed', { msg: e?.message || '' }), 'danger'); }
     finally { setBusy(false); }
   }
 
@@ -1527,14 +1558,14 @@ function SectionAchievements({ nav }) {
     <>
       <div className="pl-head">
         <button className="pl-headbtn" onClick={() => nav.go('admin')}><Icon name="chevron_left" size={20} /></button>
-        <div className="pl-head-title"><strong style={{ fontSize: 15 }}>成就目录</strong><span className="sub">{items.length > 0 ? `${items.length} 条` : ''}</span></div>
+        <div className="pl-head-title"><strong style={{ fontSize: 15 }}>{t('mobile.admin.section.achievements')}</strong><span className="sub">{items.length > 0 ? t('mobile.admin.achievements.count', { count: items.length }) : ''}</span></div>
         <button className="pl-headbtn" onClick={load} disabled={loading}><Icon name="refresh" size={18} /></button>
       </div>
       <div className="pl-body tabbed">
         <div className="pl-pad">
-          <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 10 }}>新建/编辑成就请在电脑端操作，移动端支持查看和停用。</div>
+          <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 10 }}>{t('mobile.admin.achievements.hint')}</div>
 
-          {loading ? <LoadingRow /> : err ? <ErrRow msg={err} onRetry={load} /> : items.length === 0 ? <EmptyRow text="暂无成就定义" /> : (
+          {loading ? <LoadingRow /> : err ? <ErrRow msg={err} onRetry={load} /> : items.length === 0 ? <EmptyRow text={t('mobile.admin.achievements.empty')} /> : (
             <div className="pl-sec">
               {items.map((a) => (
                 <div key={a.id} className="pl-row" style={{ cursor: 'default' }}>
@@ -1544,10 +1575,10 @@ function SectionAchievements({ nav }) {
                       {a.name}
                       {a.tier && <span style={{ fontSize: 10, marginLeft: 6, color: tierColor[a.tier] || 'var(--muted)' }}>{a.tier}</span>}
                     </strong>
-                    <span className="mono">{a.id} · {a.category}{a.hidden ? ' · 隐藏' : ''} · {a.enabled ? <span style={{ color: 'var(--ok)' }}>启用</span> : <span style={{ color: 'var(--muted)' }}>停用</span>}</span>
+                    <span className="mono">{a.id} · {a.category}{a.hidden ? ` · ${t('mobile.admin.achievements.hidden')}` : ''} · {a.enabled ? <span style={{ color: 'var(--ok)' }}>{t('common.enabled')}</span> : <span style={{ color: 'var(--muted)' }}>{t('common.disabled')}</span>}</span>
                   </span>
                   {a.enabled && (
-                    <button style={{ fontSize: 12, color: 'var(--danger)', padding: '4px 8px', flex: 'none' }} onClick={() => setDisableTarget(a)}>停用</button>
+                    <button style={{ fontSize: 12, color: 'var(--danger)', padding: '4px 8px', flex: 'none' }} onClick={() => setDisableTarget(a)}>{t('mobile.admin.achievements.disable_btn')}</button>
                   )}
                 </div>
               ))}
@@ -1558,9 +1589,9 @@ function SectionAchievements({ nav }) {
 
       {disableTarget && (
         <ConfirmSheet
-          title={`停用成就「${disableTarget.name}」`}
-          body="已解锁的用户不受影响，成就将从前台下架。"
-          confirmLabel="确认停用" danger
+          title={t('mobile.admin.achievements.disable_title', { name: disableTarget.name })}
+          body={t('mobile.admin.achievements.disable_body')}
+          confirmLabel={t('mobile.admin.achievements.disable_confirm')} danger
           busy={busy} onConfirm={doDisable} onCancel={() => setDisableTarget(null)}
         />
       )}
@@ -1572,6 +1603,7 @@ function SectionAchievements({ nav }) {
    Section: admin-deploy
 ══════════════════════════════════════════ */
 function SectionDeploy({ nav }) {
+  const { t } = useTranslation();
   const [config, setConfig] = React.useState(null);
   const [loading, setLoading] = React.useState(true);
   const [err, setErr] = React.useState(null);
@@ -1586,7 +1618,7 @@ function SectionDeploy({ nav }) {
       try {
         const r = await window.api.admin.deploymentConfig();
         if (!cancelled) { setConfig(r); setDraft(JSON.parse(JSON.stringify(r))); }
-      } catch (e) { if (!cancelled) setErr(e?.message || '加载失败'); }
+      } catch (e) { if (!cancelled) setErr(e?.message || t('mobile.admin.load_failed')); }
       finally { if (!cancelled) setLoading(false); }
     })();
     return () => { cancelled = true; };
@@ -1599,15 +1631,15 @@ function SectionDeploy({ nav }) {
   async function save() {
     if (!draft) return;
     setSaving(true);
-    try { await window.api.admin.saveDeploymentConfig(draft); setConfig(draft); nav.toast('保存成功', 'ok'); }
-    catch (e) { nav.toast('保存失败: ' + (e?.message || ''), 'danger'); }
+    try { await window.api.admin.saveDeploymentConfig(draft); setConfig(draft); nav.toast(t('mobile.admin.save_success'), 'ok'); }
+    catch (e) { nav.toast(t('mobile.admin.save_failed', { msg: e?.message || '' }), 'danger'); }
     finally { setSaving(false); }
   }
 
   async function testSmtp() {
     setTestingSmtp(true);
-    try { await window.api.admin.smtpTest(); nav.toast('SMTP 测试邮件已发送', 'ok'); }
-    catch (e) { nav.toast('SMTP 测试失败: ' + (e?.message || ''), 'danger'); }
+    try { await window.api.admin.smtpTest(); nav.toast(t('mobile.admin.deploy.smtp_test_sent'), 'ok'); }
+    catch (e) { nav.toast(t('mobile.admin.deploy.smtp_test_failed', { msg: e?.message || '' }), 'danger'); }
     finally { setTestingSmtp(false); }
   }
 
@@ -1625,27 +1657,27 @@ function SectionDeploy({ nav }) {
     <>
       <div className="pl-head">
         <button className="pl-headbtn" onClick={() => nav.go('admin')}><Icon name="chevron_left" size={20} /></button>
-        <div className="pl-head-title"><strong style={{ fontSize: 15 }}>部署配置</strong></div>
+        <div className="pl-head-title"><strong style={{ fontSize: 15 }}>{t('mobile.admin.section.deploy')}</strong></div>
       </div>
       <div className="pl-body tabbed">
         <div className="pl-pad">
           <div style={{ fontSize: 12, color: 'var(--warn)', background: 'var(--warn-soft)', border: '1px solid rgba(212,179,102,0.4)', borderRadius: 10, padding: '10px 13px', marginBottom: 14 }}>
-            复杂配置建议在电脑端完整编辑，此处为简化视图。
+            {t('mobile.admin.deploy.simplified_notice')}
           </div>
 
           {loading ? <LoadingRow /> : err ? <ErrRow msg={err} /> : !draft ? <EmptyRow /> : (
             <>
               <div className="pl-sec">
-                <div className="pl-sec-head"><h2>基础信息</h2></div>
+                <div className="pl-sec-head"><h2>{t('mobile.admin.deploy.basic_heading')}</h2></div>
                 <div style={{ display: 'grid', gap: 12 }}>
-                  {textField('站点名称', 'site_name', 'RPG Roleplay')}
-                  {textField('站点 URL', 'site_url', 'https://example.com')}
-                  {textField('联系邮箱', 'contact_email', 'admin@example.com', 'email')}
+                  {textField(t('mobile.admin.deploy.site_name'), 'site_name', 'RPG Roleplay')}
+                  {textField(t('mobile.admin.deploy.site_url'), 'site_url', 'https://example.com')}
+                  {textField(t('mobile.admin.deploy.contact_email'), 'contact_email', 'admin@example.com', 'email')}
                 </div>
               </div>
 
               <div className="pl-sec" style={{ marginTop: 16 }}>
-                <div className="pl-sec-head"><h2>SMTP 邮件</h2></div>
+                <div className="pl-sec-head"><h2>{t('mobile.admin.deploy.smtp_heading')}</h2></div>
                 <div style={{ display: 'grid', gap: 12 }}>
                   {textField('SMTP Host', 'smtp_host', 'smtp.example.com')}
                   {textField('SMTP Port', 'smtp_port', '587', 'number')}
@@ -1653,12 +1685,12 @@ function SectionDeploy({ nav }) {
                   {textField('SMTP Password', 'smtp_password', '••••••••', 'password')}
                 </div>
                 <button className="pl-btn-ghost" style={{ marginTop: 10, fontSize: 13 }} onClick={testSmtp} disabled={testingSmtp}>
-                  {testingSmtp ? '发送中…' : '发送 SMTP 测试邮件'}
+                  {testingSmtp ? t('mobile.admin.deploy.smtp_sending') : t('mobile.admin.deploy.smtp_test_btn')}
                 </button>
               </div>
 
               <button className="pl-btn-primary" style={{ width: '100%', marginTop: 18 }} onClick={save} disabled={saving}>
-                {saving ? '保存中…' : '保存部署配置'}
+                {saving ? t('mobile.admin.saving') : t('mobile.admin.deploy.save_btn')}
               </button>
             </>
           )}

@@ -29,6 +29,7 @@
  */
 import React from 'react';
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { lsGet, lsSet } from './lib/storage.js';
 
 
@@ -185,10 +186,11 @@ function useResizable({
 function ResizeHandle({ side = "left", ...rest }) {
   // side='left' → 手柄出现在被拖元素的右边缘
   // side='right' → 手柄出现在被拖元素的左边缘
+  const { t } = useTranslation();
   return (
     <div
       className={`pl-resize-handle pl-resize-handle-${side}`}
-      title="拖动调整宽度 · 双击恢复默认"
+      title={t('responsive.resize_handle_title')}
       {...rest}
     />
   );

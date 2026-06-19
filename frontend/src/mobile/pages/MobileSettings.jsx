@@ -4,6 +4,7 @@
    铁律:零 Cloudscape / 零电脑端 UI 复用;数据层全接 window.api.* 真实接口。
    ──────────────────────────────────────────────────────────────────────── */
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Icon } from '../icons.jsx';
 import { usePlatformData, useReactiveUser } from '../../platform-app.jsx';
 // 模型选择器全站唯一规范组件(用户强制指令:不再自造 <select>)。Cloudscape 已在 platform 入口打包,
@@ -116,6 +117,7 @@ function usePrefSave(namespace) {
 /* SECTION: 偏好 (preferences)                                        */
 /* ────────────────────────────────────────────────────────────────── */
 function PrefSection({ nav }) {
+  const { t } = useTranslation();
   const save = usePrefSave('pref');
   const [lang, setLang] = useState('zh-CN');
   const [serif, setSerif] = useState(true);
@@ -155,11 +157,11 @@ function PrefSection({ nav }) {
   return (
     <>
       {/* 界面偏好 */}
-      <SetGroup title="界面偏好">
+      <SetGroup title={t('mobile.settings.pref.ui_prefs')}>
         <div className="pl-setrow">
           <div className="pl-setrow-tx">
-            <strong>界面语言</strong>
-            <span>重新加载后生效</span>
+            <strong>{t('mobile.settings.pref.ui_language')}</strong>
+            <span>{t('mobile.settings.pref.ui_language_desc')}</span>
           </div>
           <div className="pl-seg2" style={{ marginLeft: 'auto', flexShrink: 0, width: 170 }}>
             {[['zh-CN','简体'],['zh-TW','繁體'],['en','EN']].map(([id, l]) => (
@@ -172,15 +174,15 @@ function PrefSection({ nav }) {
         </div>
         <div className="pl-setrow">
           <div className="pl-setrow-tx">
-            <strong>衬线字体</strong>
-            <span>叙事正文使用衬线(宋体风格)</span>
+            <strong>{t('mobile.settings.pref.serif_font')}</strong>
+            <span>{t('mobile.settings.pref.serif_font_desc')}</span>
           </div>
           <Toggle on={serif} onChange={(v) => { setSerif(v); save('serif', v); }} />
         </div>
         <div className="pl-setrow">
           <div className="pl-setrow-tx">
-            <strong>自动保存</strong>
-            <span>每轮 GM 响应后自动保存存档</span>
+            <strong>{t('mobile.settings.pref.autosave')}</strong>
+            <span>{t('mobile.settings.pref.autosave_desc')}</span>
           </div>
           <Toggle on={auto} onChange={(v) => { setAuto(v); save('autosave', v); }} />
         </div>
@@ -188,48 +190,48 @@ function PrefSection({ nav }) {
 
       {/* GM 叙事风格 */}
       <div className="pl-sec" style={{ marginTop: 18 }}>
-        <div className="pl-sec-head"><h2>GM 叙事风格</h2></div>
-        <button className="pl-row" onClick={() => nav.toast('GM 风格编辑器暂未移植至移动端，请使用电脑版', 'warn', 'sparkle')}>
+        <div className="pl-sec-head"><h2>{t('mobile.settings.pref.gm_style')}</h2></div>
+        <button className="pl-row" onClick={() => nav.toast(t('mobile.settings.pref.gm_style_desktop_only'), 'warn', 'sparkle')}>
           <span className="pl-row-ic accent"><Icon name="sparkle" size={18} /></span>
-          <span className="pl-row-tx"><strong>自定义文风 / 视角 / 节奏</strong><span>点击前往电脑端编辑器</span></span>
+          <span className="pl-row-tx"><strong>{t('mobile.settings.pref.gm_style_custom')}</strong><span>{t('mobile.settings.pref.gm_style_custom_desc')}</span></span>
           <span className="pl-row-chev"><Icon name="chevron_right" size={17} /></span>
         </button>
       </div>
 
       {/* 黑天鹅事件 */}
-      <SetGroup title="黑天鹅事件代理">
+      <SetGroup title={t('mobile.settings.pref.black_swan_agent')}>
         <div className="pl-setrow">
           <div className="pl-setrow-tx">
-            <strong>启用黑天鹅</strong>
-            <span>低概率主动触发意外世界事件(未设置则沿用环境变量默认)</span>
+            <strong>{t('mobile.settings.pref.black_swan_enable')}</strong>
+            <span>{t('mobile.settings.pref.black_swan_enable_desc')}</span>
           </div>
           <Toggle on={blackSwan} onChange={(v) => { setBlackSwan(v); saveBS('enabled', v); }} />
         </div>
       </SetGroup>
 
       {/* 叙事提取器 */}
-      <SetGroup title="叙事提取器(Extractor)">
+      <SetGroup title={t('mobile.settings.pref.extractor')}>
         <div className="pl-setrow">
           <div className="pl-setrow-tx">
-            <strong>提取器模型</strong>
-            <span>在「模块分配」中单独配置叙事提取器模型</span>
+            <strong>{t('mobile.settings.pref.extractor_model')}</strong>
+            <span>{t('mobile.settings.pref.extractor_model_desc')}</span>
           </div>
           <button
             style={{ fontSize: 11.5, color: 'var(--accent)', background: 'none', border: 'none' }}
             onClick={() => nav.go('settings-modules')}
           >
-            去配置 <Icon name="chevron_right" size={13} />
+            {t('mobile.settings.pref.extractor_configure')} <Icon name="chevron_right" size={13} />
           </button>
         </div>
       </SetGroup>
 
       {/* Curator 反问阈值 */}
       <div className="pl-sec" style={{ marginTop: 18 }}>
-        <div className="pl-sec-head"><h2>Curator 反问阈值</h2></div>
+        <div className="pl-sec-head"><h2>{t('mobile.settings.pref.curator_threshold')}</h2></div>
         <div className="pl-card" style={{ border: '1px solid var(--line-soft)', borderRadius: 14, background: 'var(--panel)', padding: 14 }}>
           <MSlider
-            label="置信度阈值"
-            desc="低于此值时 GM 会反问玩家确认意图；0 = 从不反问，1 = 总是反问"
+            label={t('mobile.settings.pref.confidence_threshold')}
+            desc={t('mobile.settings.pref.confidence_threshold_desc')}
             value={threshold}
             min={0} max={1} step={0.05}
             onChange={(v) => setThreshold(v)}
@@ -241,7 +243,7 @@ function PrefSection({ nav }) {
               onTouchEnd={() => commitThreshold(threshold)}
               onClick={() => commitThreshold(threshold)}
             >
-              <Icon name="save" size={14} /> 保存
+              <Icon name="save" size={14} /> {t('common.save')}
             </button>
           </div>
         </div>
@@ -252,6 +254,7 @@ function PrefSection({ nav }) {
 
 /* 供应商详情子视图 */
 function ProviderDetail({ api, onBack, onSync, onToggleModel, onDeleteKey, nav }) {
+  const { t } = useTranslation();
   const [showModels, setShowModels] = useState(true);
   const conn = api.connectivity || {};
   const enabledCount = api.models.filter(m => m.enabled).length;
@@ -262,11 +265,11 @@ function ProviderDetail({ api, onBack, onSync, onToggleModel, onDeleteKey, nav }
         <button className="pl-back" onClick={onBack}><Icon name="chevron_left" size={20} /></button>
         <div className="pl-head-title">
           <strong>{api.name}</strong>
-          <span className="sub">供应商 · BYOK</span>
+          <span className="sub">{t('mobile.settings.models.provider_byok')}</span>
         </div>
         <div className="pl-head-actions">
-          <button className="pl-headbtn" onClick={onSync} title="同步模型"><Icon name="refresh" size={17} /></button>
-          <button className="pl-headbtn" onClick={onDeleteKey} title="删除密钥" style={{ color: 'var(--danger)' }}><Icon name="trash" size={17} /></button>
+          <button className="pl-headbtn" onClick={onSync} title={t('mobile.settings.models.sync_models')}><Icon name="refresh" size={17} /></button>
+          <button className="pl-headbtn" onClick={onDeleteKey} title={t('mobile.settings.models.delete_key')} style={{ color: 'var(--danger)' }}><Icon name="trash" size={17} /></button>
         </div>
       </div>
       <div className="pl-body">
@@ -288,24 +291,24 @@ function ProviderDetail({ api, onBack, onSync, onToggleModel, onDeleteKey, nav }
               </div>
               {api.enabled===false && (
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: 'var(--muted)' }}>状态</span>
-                  <span style={{ color: 'var(--muted-2)', fontSize: 12, fontWeight: 600 }}>已禁用</span>
+                  <span style={{ color: 'var(--muted)' }}>{t('mobile.settings.models.status')}</span>
+                  <span style={{ color: 'var(--muted-2)', fontSize: 12, fontWeight: 600 }}>{t('common.disabled')}</span>
                 </div>
               )}
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--muted)' }}>连通性</span>
+                <span style={{ color: 'var(--muted)' }}>{t('mobile.settings.models.connectivity')}</span>
                 <span style={{
                   color: conn.status==='ok' ? 'var(--ok)' : conn.status==='err' ? 'var(--danger)' : 'var(--muted)',
                   fontSize: 12
                 }}>
-                  {conn.status==='ok' ? `✓ 正常${conn.latency_ms ? ` · ${conn.latency_ms}ms` : ''}` :
-                   conn.status==='err' ? '✗ 错误' :
-                   conn.status==='checking' ? '同步中…' : '未测试'}
+                  {conn.status==='ok' ? `✓ ${t('mobile.settings.models.conn_ok')}${conn.latency_ms ? ` · ${conn.latency_ms}ms` : ''}` :
+                   conn.status==='err' ? `✗ ${t('common.error')}` :
+                   conn.status==='checking' ? t('mobile.settings.models.conn_syncing') : t('mobile.settings.models.conn_untested')}
                 </span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--muted)' }}>模型数</span>
-                <span style={{ color: 'var(--text-quiet)' }}>{enabledCount} / {api.models.length} 已启用</span>
+                <span style={{ color: 'var(--muted)' }}>{t('mobile.settings.models.model_count')}</span>
+                <span style={{ color: 'var(--text-quiet)' }}>{t('mobile.settings.models.model_count_value', { enabled: enabledCount, total: api.models.length })}</span>
               </div>
             </div>
           </div>
@@ -313,16 +316,16 @@ function ProviderDetail({ api, onBack, onSync, onToggleModel, onDeleteKey, nav }
           {/* 模型列表 */}
           <div className="pl-sec">
             <div className="pl-sec-head">
-              <h2>模型 · {api.models.length}</h2>
+              <h2>{t('mobile.settings.models.models_heading', { count: api.models.length })}</h2>
               <button className="act" onClick={() => setShowModels(v => !v)}>
-                {showModels ? '收起' : '展开'} <Icon name={showModels ? 'chevron_up' : 'chevron_down'} size={13} />
+                {showModels ? t('mobile.settings.common.collapse') : t('mobile.settings.common.expand')} <Icon name={showModels ? 'chevron_up' : 'chevron_down'} size={13} />
               </button>
             </div>
             {showModels && (
               <div className="pl-group">
                 {api.models.length === 0 && (
                   <div style={{ padding: '18px 14px', color: 'var(--muted)', fontSize: 13, textAlign: 'center' }}>
-                    点右上角刷新按钮同步模型
+                    {t('mobile.settings.models.no_models_hint')}
                   </div>
                 )}
                 {api.models.map(m => (
@@ -370,6 +373,7 @@ const readPref = readScopedPref;
 const readNumPref = readNumberPref;
 
 function ModelParamsSection() {
+  const { t } = useTranslation();
   const save = usePrefSave('settings');
   const [preset, setPreset] = useState('balanced');
   const [params, setParams] = useState(MP_DEFAULTS);
@@ -424,54 +428,54 @@ function ModelParamsSection() {
   return (
     <>
       {/* 预设 */}
-      <MField label="采样预设" desc="快速套用常用配置；手动调节后自动切到「自定义」">
+      <MField label={t('mobile.settings.modelparams.preset')} desc={t('mobile.settings.modelparams.preset_desc')}>
         <Seg
-          options={[['balanced','均衡'],['conservative','保守'],['creative','创意'],['deterministic','确定性'],['custom','自定义']]}
+          options={[['balanced',t('mobile.settings.modelparams.preset_balanced')],['conservative',t('mobile.settings.modelparams.preset_conservative')],['creative',t('mobile.settings.modelparams.preset_creative')],['deterministic',t('mobile.settings.modelparams.preset_deterministic')],['custom',t('mobile.settings.modelparams.preset_custom')]]}
           value={preset}
           onChange={applyPreset}
         />
       </MField>
 
-      <MSlider label="Temperature" desc="越高越随机；0 = 最确定；建议 0.4–1.0"
+      <MSlider label="Temperature" desc={t('mobile.settings.modelparams.temperature_desc')}
         value={params.temperature} min={0} max={2} step={0.05}
         onChange={(v) => { setPreset('custom'); u('temperature', v); }} />
 
       {/* 推理强度 */}
-      <MField label="推理强度 (reasoning effort)" desc="仅对支持推理的模型生效(如 o3/DeepSeek-R1)">
+      <MField label={t('mobile.settings.modelparams.reasoning_effort')} desc={t('mobile.settings.modelparams.reasoning_effort_desc')}>
         <Seg
-          options={[['low','低'],['medium','中'],['high','高']]}
+          options={[['low',t('mobile.settings.modelparams.effort_low')],['medium',t('mobile.settings.modelparams.effort_medium')],['high',t('mobile.settings.modelparams.effort_high')]]}
           value={effort}
           onChange={(v) => { setEffort(v); save('reasoning_effort', v); }}
         />
       </MField>
 
-      <MSlider label="Top-p" desc="累积概率截断，0.9–0.95 常用"
+      <MSlider label="Top-p" desc={t('mobile.settings.modelparams.top_p_desc')}
         value={params.top_p} min={0} max={1} step={0.01}
         onChange={(v) => { setPreset('custom'); u('top_p', v); }} />
 
-      <MSlider label="Top-k" desc="只从前 K 个 token 采样；0 = 关闭"
+      <MSlider label="Top-k" desc={t('mobile.settings.modelparams.top_k_desc')}
         value={params.top_k} min={0} max={200} step={1}
         onChange={(v) => { setPreset('custom'); u('top_k', v); }} />
 
-      <MSlider label="重复惩罚 (Repetition Penalty)" desc="抑制复读；1.0 无效果；1.15–1.2 适合长叙事"
+      <MSlider label={t('mobile.settings.modelparams.rep_penalty')} desc={t('mobile.settings.modelparams.rep_penalty_desc')}
         value={params.repetition_penalty} min={1} max={2} step={0.01}
         onChange={(v) => { setPreset('custom'); u('repetition_penalty', v); }} />
 
-      <MSlider label="Frequency Penalty" desc="按词频降权（OpenAI 风格）"
+      <MSlider label="Frequency Penalty" desc={t('mobile.settings.modelparams.freq_penalty_desc')}
         value={params.frequency_penalty} min={-2} max={2} step={0.05}
         onChange={(v) => { setPreset('custom'); u('frequency_penalty', v); }} />
 
-      <MSlider label="Presence Penalty" desc="鼓励引入新话题（OpenAI 风格）"
+      <MSlider label="Presence Penalty" desc={t('mobile.settings.modelparams.presence_penalty_desc')}
         value={params.presence_penalty} min={-2} max={2} step={0.05}
         onChange={(v) => { setPreset('custom'); u('presence_penalty', v); }} />
 
       {/* 数值输入 */}
-      <MField label="最大生成 token" desc="单次回复最多生成的 token 数">
+      <MField label={t('mobile.settings.modelparams.max_tokens')} desc={t('mobile.settings.modelparams.max_tokens_desc')}>
         <input className="pl-input" type="number" value={params.max_tokens}
           onChange={(e) => { setPreset('custom'); u('max_tokens', Number(e.target.value)); }} />
       </MField>
 
-      <MField label="上下文大小" desc="每次请求传给模型的最大历史长度">
+      <MField label={t('mobile.settings.modelparams.context_size')} desc={t('mobile.settings.modelparams.context_size_desc')}>
         <select className="pl-input" value={String(params.context_size)}
           onChange={(e) => u('context_size', Number(e.target.value))}>
           {[['4096','4K'],['8192','8K'],['16384','16K'],['32768','32K'],['65536','64K'],['131072','128K'],['1048576','1M']].map(([v,l]) => (
@@ -480,32 +484,32 @@ function ModelParamsSection() {
         </select>
       </MField>
 
-      <MField label="随机种子 (Seed)" desc="-1 = 每次随机">
+      <MField label={t('mobile.settings.modelparams.seed')} desc={t('mobile.settings.modelparams.seed_desc')}>
         <input className="pl-input" type="number" value={params.seed}
           onChange={(e) => u('seed', Number(e.target.value))} placeholder="-1" />
       </MField>
 
-      <MField label="停止词 (Stop)" desc="用 | 分隔多个停止词">
+      <MField label={t('mobile.settings.modelparams.stop')} desc={t('mobile.settings.modelparams.stop_desc')}>
         <input className="pl-input" value={params.stop}
           onChange={(e) => u('stop', e.target.value)} placeholder="player:|system:" />
       </MField>
 
       {/* NSFW */}
-      <MField label="内容过滤模式">
+      <MField label={t('mobile.settings.modelparams.content_filter')}>
         <Seg
-          options={[['block','屏蔽'],['soft','温和'],['open','开放'],['explicit','显式']]}
+          options={[['block',t('mobile.settings.modelparams.nsfw_block')],['soft',t('mobile.settings.modelparams.nsfw_soft')],['open',t('mobile.settings.modelparams.nsfw_open')],['explicit',t('mobile.settings.modelparams.nsfw_explicit')]]}
           value={nsfw.mode}
           onChange={(v) => updateNsfw({ mode: v })}
         />
       </MField>
 
       {nsfw.mode !== 'block' && (
-        <MSlider label="NSFW 强度" desc="越高内容越露骨；仅在 soft/open/explicit 模式下生效"
+        <MSlider label={t('mobile.settings.modelparams.nsfw_intensity')} desc={t('mobile.settings.modelparams.nsfw_intensity_desc')}
           value={nsfw.intensity} min={0} max={1} step={0.05}
           onChange={(v) => updateNsfw({ intensity: v })} />
       )}
 
-      <MField label="NSFW 附加提示词" desc="强制附加到系统提示(如：All characters must be 18+)">
+      <MField label={t('mobile.settings.modelparams.nsfw_extra_prompt')} desc={t('mobile.settings.modelparams.nsfw_extra_prompt_desc')}>
         <input className="pl-input" value={nsfw.extra_prompt}
           onChange={(e) => updateNsfw({ extra_prompt: e.target.value })}
           placeholder="All characters must be 18+" />
@@ -513,19 +517,19 @@ function ModelParamsSection() {
 
       {/* Mirostat */}
       <div className="pl-setrow">
-        <div className="pl-setrow-tx"><strong>Mirostat 高级采样</strong><span>针对 llama.cpp / Ollama 后端的困惑度控制</span></div>
+        <div className="pl-setrow-tx"><strong>{t('mobile.settings.modelparams.mirostat')}</strong><span>{t('mobile.settings.modelparams.mirostat_desc')}</span></div>
         <Toggle on={advanced} onChange={setAdvanced} />
       </div>
       {advanced && (
         <>
-          <MField label="Mirostat 模式">
-            <Seg options={[['off','关闭'],['v1','v1'],['v2','v2']]} value={params.mirostat_mode}
+          <MField label={t('mobile.settings.modelparams.mirostat_mode')}>
+            <Seg options={[['off',t('mobile.settings.modelparams.mirostat_off')],['v1','v1'],['v2','v2']]} value={params.mirostat_mode}
               onChange={(v) => u('mirostat_mode', v)} />
           </MField>
-          <MSlider label="Mirostat τ (tau)" desc="目标困惑度；5 是常用值"
+          <MSlider label="Mirostat τ (tau)" desc={t('mobile.settings.modelparams.mirostat_tau_desc')}
             value={params.mirostat_tau} min={0} max={10} step={0.1}
             onChange={(v) => u('mirostat_tau', v)} />
-          <MSlider label="Mirostat η (eta)" desc="学习率"
+          <MSlider label="Mirostat η (eta)" desc={t('mobile.settings.modelparams.mirostat_eta_desc')}
             value={params.mirostat_eta} min={0} max={1} step={0.01}
             onChange={(v) => u('mirostat_eta', v)} />
         </>
@@ -534,7 +538,7 @@ function ModelParamsSection() {
       {/* JSON 预览 */}
       <div style={{ marginTop: 8 }}>
         <button className="pl-btn-ghost" style={{ height: 38, fontSize: 13 }} onClick={() => setShowJson(v => !v)}>
-          <Icon name={showJson ? 'chevron_up' : 'chevron_down'} size={14} /> {showJson ? '收起' : '查看参数 JSON'}
+          <Icon name={showJson ? 'chevron_up' : 'chevron_down'} size={14} /> {showJson ? t('mobile.settings.common.collapse') : t('mobile.settings.modelparams.view_json')}
         </button>
         {showJson && (
           <pre className="quote mono" style={{ fontSize: 11, marginTop: 8, overflowX: 'auto' }}>
@@ -562,24 +566,10 @@ function ModelParamsSection() {
 //   dict 模块(sub_agent / console)走 persistShape="dict" + dictKey={api_id, model};
 //   embedder / image_gen allowInherit=false(必须自己选);其它可「跟随主 GM」。
 // 结构字段走单一来源 AGENT_MODULES;移动端 label/tip 文案精简(与桌面端不同),保留本地按 id 取。
-const _MOD_LABELS = {
-  gm:'主 GM 默认模型', sub_agent:'上下文子代理', set_parser:'指令解析代理',
-  console:'控制台助手', extractor:'叙事提取器', card_gen:'角色卡生成器',
-  card_import:'AI 整理卡字段', critic:'一致性评分', verifier:'接受条件验证',
-  phase_digest:'阶段浓缩 (compact)', black_swan:'黑天鹅事件代理', agent:'通用子代理兜底',
-  embedder:'向量嵌入 (RAG)', image_gen:'图像生成模型',
-};
-const _MOD_TIPS = {
-  gm:'玩家对话主模型', sub_agent:'整理意图+检索;跟随主 GM', set_parser:'/set 命令自然语言解析',
-  console:'侧栏控制台;跟随主 GM', extractor:'GM 叙事二次解析(两步 GM)', card_gen:'创意工具:生成/微调角色卡',
-  card_import:'导入酒馆卡时 LLM 整理字段;跟随主 GM', critic:'角色卡生成的一致性评分子代理',
-  verifier:'GM 输出是否满足 acceptance 条件', phase_digest:'长局历史按阶段浓缩成摘要',
-  black_swan:'主动触发世界突发事件', agent:'未单独配置模型的子代理兜底',
-  embedder:'RAG 召回用 embedding 模型', image_gen:'生图功能默认 provider/模型;需配 BYOK key',
-};
-const MODULES = AGENT_MODULES.map((m) => ({ ...m, label:_MOD_LABELS[m.id], tip:_MOD_TIPS[m.id] }));
+const MODULES = AGENT_MODULES.map((m) => ({ ...m }));
 
 function ModuleModelsSection({ nav }) {
+  const { t } = useTranslation();
   // embedder 平台兜底状态:仅 admin/vip 显示平台 vertex embedding(后端已 _is_admin gate)。
   const [embedStatus, setEmbedStatus] = useState(null);
   useEffect(() => {
@@ -591,13 +581,13 @@ function ModuleModelsSection({ nav }) {
   return (
     <>
       <div className="pl-sec-note" style={{ marginBottom: 14 }}>
-        每个子代理可单独指定模型——把贵的留给主 GM 叙事，把检索/抽取交给便宜快速的模型。
+        {t('mobile.settings.modules.intro')}
       </div>
       {MODULES.map(mod => (
         <div key={mod.id} className="pl-card" style={{ marginBottom: 10 }}>
           <div style={{ marginBottom: 10 }}>
-            <strong style={{ fontSize: 14 }}>{mod.label}</strong>
-            <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{mod.tip}</div>
+            <strong style={{ fontSize: 14 }}>{t(`mobile.settings.modules.label.${mod.id}`)}</strong>
+            <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{t(`mobile.settings.modules.tip.${mod.id}`)}</div>
           </div>
           <AgentModelPicker
             prefPrefix={mod.prefPrefix}
@@ -614,13 +604,13 @@ function ModuleModelsSection({ nav }) {
           />
           {mod.id==='embedder' && embedStatus && !embedStatus.user_configured && !platformVertexAllowed && (
             <div style={{ fontSize: 11, color: 'var(--warn)', marginTop: 8, lineHeight: 1.5 }}>
-              未配置 embedding key，RAG 召回可能降级
+              {t('mobile.settings.modules.embedder_no_key')}
             </div>
           )}
         </div>
       ))}
       <div style={{ fontSize: 11.5, color: 'var(--muted)', lineHeight: 1.6, marginTop: 8 }}>
-        切换 embedding 模型后，已嵌过的剧本需重新嵌入才会用新模型。
+        {t('mobile.settings.modules.embedder_switch_note')}
       </div>
     </>
   );
@@ -630,6 +620,7 @@ function ModuleModelsSection({ nav }) {
 /* SECTION: 记忆 (memory)                                              */
 /* ────────────────────────────────────────────────────────────────── */
 function MemorySection() {
+  const { t } = useTranslation();
   const save = usePrefSave('memory');
   const [recallDepth, setRecallDepth] = useState(6);
   const [summaryWindow, setSummaryWindow] = useState(8);
@@ -671,48 +662,48 @@ function MemorySection() {
 
   return (
     <>
-      <SetGroup title="召回行为">
+      <SetGroup title={t('mobile.settings.memory.recall_behavior')}>
         <div className="pl-setrow" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 10 }}>
-          <MSlider label={`召回深度 · ${recallDepth}`} desc="每轮召回的记忆片段数上限（2–20）"
+          <MSlider label={t('mobile.settings.memory.recall_depth_label', { n: recallDepth })} desc={t('mobile.settings.memory.recall_depth_desc')}
             value={recallDepth} min={2} max={20} step={1}
             onChange={(v) => setRecallDepth(v)} />
           <button className="pl-btn-ghost" style={{ height:36, fontSize:13 }}
             onClick={() => { const n=Math.max(2,Math.min(20,recallDepth)); save('recall_depth',n); }}>
-            <Icon name="save" size={14} /> 保存
+            <Icon name="save" size={14} /> {t('common.save')}
           </button>
         </div>
         <div className="pl-setrow" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 10 }}>
-          <MSlider label={`摘要窗口 · ${summaryWindow}`} desc="每次摘要覆盖的轮次数（3–20）"
+          <MSlider label={t('mobile.settings.memory.summary_window_label', { n: summaryWindow })} desc={t('mobile.settings.memory.summary_window_desc')}
             value={summaryWindow} min={3} max={20} step={1}
             onChange={(v) => setSummaryWindow(v)} />
           <button className="pl-btn-ghost" style={{ height:36, fontSize:13 }}
             onClick={() => { const n=Math.max(3,Math.min(20,summaryWindow)); save('summary_window',n); }}>
-            <Icon name="save" size={14} /> 保存
+            <Icon name="save" size={14} /> {t('common.save')}
           </button>
         </div>
         <div className="pl-setrow" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 10 }}>
-          <MSlider label={`token 预算 · ${tokenBudget}`} desc="注入记忆的 token 上限（200–2000）"
+          <MSlider label={t('mobile.settings.memory.token_budget_label', { n: tokenBudget })} desc={t('mobile.settings.memory.token_budget_desc')}
             value={tokenBudget} min={200} max={2000} step={50}
             onChange={(v) => setTokenBudget(v)} />
           <button className="pl-btn-ghost" style={{ height:36, fontSize:13 }}
             onClick={() => { const n=Math.max(200,Math.min(2000,tokenBudget)); save('token_budget',n); }}>
-            <Icon name="save" size={14} /> 保存
+            <Icon name="save" size={14} /> {t('common.save')}
           </button>
         </div>
         <div className="pl-setrow" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 10 }}>
-          <MSlider label={`自动归档 · 每 ${autoArchive} 轮`} desc="超过此轮数时触发阶段归档（10–200）"
+          <MSlider label={t('mobile.settings.memory.auto_archive_label', { n: autoArchive })} desc={t('mobile.settings.memory.auto_archive_desc')}
             value={autoArchive} min={10} max={200} step={5}
             onChange={(v) => setAutoArchive(v)} />
           <button className="pl-btn-ghost" style={{ height:36, fontSize:13 }}
             onClick={() => { const n=Math.max(10,Math.min(200,autoArchive)); save('auto_archive_after_turns',n); }}>
-            <Icon name="save" size={14} /> 保存
+            <Icon name="save" size={14} /> {t('common.save')}
           </button>
         </div>
       </SetGroup>
 
-      <SetGroup title="记忆桶配置">
+      <SetGroup title={t('mobile.settings.memory.buckets')}>
         <div className="pl-setrow">
-          <div className="pl-setrow-tx"><strong>固定记忆上限</strong><span>每局最多保持的固定记忆条数</span></div>
+          <div className="pl-setrow-tx"><strong>{t('mobile.settings.memory.pinned_max')}</strong><span>{t('mobile.settings.memory.pinned_max_desc')}</span></div>
           <input
             type="number" min={5} max={100} value={pinnedMax}
             onChange={(e) => setPinnedMax(Number(e.target.value))}
@@ -721,15 +712,15 @@ function MemorySection() {
           />
         </div>
         <div className="pl-setrow">
-          <div className="pl-setrow-tx"><strong>固定记忆桶</strong><span>每轮强制注入的固定条目</span></div>
+          <div className="pl-setrow-tx"><strong>{t('mobile.settings.memory.bucket_pinned')}</strong><span>{t('mobile.settings.memory.bucket_pinned_desc')}</span></div>
           <Toggle on={bucketPinned} onChange={(v) => { setBucketPinned(v); save('bucket_pinned_enabled',v); }} />
         </div>
         <div className="pl-setrow">
-          <div className="pl-setrow-tx"><strong>世界知识桶</strong><span>场景 / 地图 / 规则等世界观记忆</span></div>
+          <div className="pl-setrow-tx"><strong>{t('mobile.settings.memory.bucket_world')}</strong><span>{t('mobile.settings.memory.bucket_world_desc')}</span></div>
           <Toggle on={bucketWorld} onChange={(v) => { setBucketWorld(v); save('bucket_world_enabled',v); }} />
         </div>
         <div className="pl-setrow">
-          <div className="pl-setrow-tx"><strong>角色关系桶</strong><span>NPC 人际关系 / 历史事件</span></div>
+          <div className="pl-setrow-tx"><strong>{t('mobile.settings.memory.bucket_char')}</strong><span>{t('mobile.settings.memory.bucket_char_desc')}</span></div>
           <Toggle on={bucketChar} onChange={(v) => { setBucketChar(v); save('bucket_character_enabled',v); }} />
         </div>
       </SetGroup>
@@ -744,6 +735,7 @@ const HIGH_RISK_ALL = ['timeline.pending_jump','player.background','world.constr
 const CUSTOM_WL_RE = /^[a-zA-Z_][a-zA-Z0-9_.*]*$/;
 
 function PermissionsSection({ nav }) {
+  const { t } = useTranslation();
   const save = usePrefSave('perm');
   const [mode, setMode] = useState('review');
   const [whitelist, setWhitelist] = useState(['timeline.pending_jump','player.background','world.constraints']);
@@ -788,11 +780,11 @@ function PermissionsSection({ nav }) {
 
   const addCustom = () => {
     const val = customInput.trim();
-    if (!val) { setCustomErr('不能为空'); return; }
-    if (val.length > 80) { setCustomErr('不超过 80 个字符'); return; }
-    if (!CUSTOM_WL_RE.test(val)) { setCustomErr('只允许字母、数字、下划线、点、*'); return; }
-    if (HIGH_RISK_ALL.includes(val)) { setCustomErr('已在内置列表中'); return; }
-    if (custom.includes(val)) { setCustomErr('已存在'); return; }
+    if (!val) { setCustomErr(t('mobile.settings.perm.custom_err_empty')); return; }
+    if (val.length > 80) { setCustomErr(t('mobile.settings.perm.custom_err_too_long')); return; }
+    if (!CUSTOM_WL_RE.test(val)) { setCustomErr(t('mobile.settings.perm.custom_err_format')); return; }
+    if (HIGH_RISK_ALL.includes(val)) { setCustomErr(t('mobile.settings.perm.custom_err_builtin')); return; }
+    if (custom.includes(val)) { setCustomErr(t('mobile.settings.perm.custom_err_exists')); return; }
     saveCustom([...custom, val]);
     setCustomInput(''); setCustomErr('');
   };
@@ -804,49 +796,49 @@ function PermissionsSection({ nav }) {
       const perms = (s && (s.permissions || s.state?.permissions)) || {};
       const log = Array.isArray(perms.audit_log) ? perms.audit_log : [];
       setAuditEntries(log.slice().reverse());
-    } catch (e) { setAuditErr(e?.message || '加载失败'); }
+    } catch (e) { setAuditErr(e?.message || t('mobile.settings.perm.load_failed')); }
     finally { setAuditLoading(false); }
   }, []);
 
   const KIND_META = {
-    write:            { label:'写入', color:'var(--ok)' },
-    parse_error:      { label:'解析错误', color:'var(--warn)' },
-    rejected:         { label:'拒绝', color:'var(--danger)' },
-    hard_forbidden:   { label:'硬禁止', color:'var(--danger)' },
-    extractor_error:  { label:'提取错误', color:'var(--warn)' },
-    set_parser_error: { label:'指令错误', color:'var(--warn)' },
-    clarify_yield:    { label:'反问', color:'var(--ok)' },
-    acceptance_unmet: { label:'条件未满足', color:'var(--warn)' },
-    question_skip:    { label:'跳过问题', color:'var(--muted)' },
+    write:            { label: t('mobile.settings.perm.kind_write'), color:'var(--ok)' },
+    parse_error:      { label: t('mobile.settings.perm.kind_parse_error'), color:'var(--warn)' },
+    rejected:         { label: t('mobile.settings.perm.kind_rejected'), color:'var(--danger)' },
+    hard_forbidden:   { label: t('mobile.settings.perm.kind_hard_forbidden'), color:'var(--danger)' },
+    extractor_error:  { label: t('mobile.settings.perm.kind_extractor_error'), color:'var(--warn)' },
+    set_parser_error: { label: t('mobile.settings.perm.kind_set_parser_error'), color:'var(--warn)' },
+    clarify_yield:    { label: t('mobile.settings.perm.kind_clarify_yield'), color:'var(--ok)' },
+    acceptance_unmet: { label: t('mobile.settings.perm.kind_acceptance_unmet'), color:'var(--warn)' },
+    question_skip:    { label: t('mobile.settings.perm.kind_question_skip'), color:'var(--muted)' },
   };
   const filteredAudit = auditFilter==='all' ? auditEntries : auditEntries.filter(e => e.kind===auditFilter);
 
   return (
     <>
       {/* 默认权限模式 */}
-      <SetGroup title="GM 写入权限">
+      <SetGroup title={t('mobile.settings.perm.gm_write_perm')}>
         <div className="pl-setrow">
           <div className="pl-setrow-tx">
-            <strong>默认模式</strong>
-            <span>决定 GM 能否直接改写世界状态，还是需要玩家确认</span>
+            <strong>{t('mobile.settings.perm.default_mode')}</strong>
+            <span>{t('mobile.settings.perm.default_mode_desc')}</span>
           </div>
         </div>
         <div style={{ padding: '8px 13px 13px' }}>
           <div className="pl-seg2">
-            {[['default','默认'],['review','审查'],['full_access','全权']].map(([id, l]) => (
+            {[['default',t('mobile.settings.perm.mode_default')],['review',t('mobile.settings.perm.mode_review')],['full_access',t('mobile.settings.perm.mode_full_access')]].map(([id, l]) => (
               <button key={id} className={mode===id?'active accent':''} onClick={() => { setMode(id); save('default_mode',id); }}>{l}</button>
             ))}
           </div>
           <div style={{ fontSize: 11, color: 'var(--muted-2)', marginTop: 8, lineHeight: 1.5 }}>
-            {mode==='review' ? '高风险写入需要玩家在确认条上明确批准' : mode==='full_access' ? 'GM 可自由修改所有字段，无需确认' : '按系统默认规则处理，中风险需确认'}
+            {mode==='review' ? t('mobile.settings.perm.mode_review_hint') : mode==='full_access' ? t('mobile.settings.perm.mode_full_access_hint') : t('mobile.settings.perm.mode_default_hint')}
           </div>
         </div>
 
         {/* 高风险字段白名单 */}
         <div className="pl-setrow" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 10 }}>
           <div>
-            <strong>高风险字段白名单</strong>
-            <div style={{ fontSize: 11.5, color: 'var(--muted-2)', marginTop: 2 }}>选中的字段不触发高风险确认</div>
+            <strong>{t('mobile.settings.perm.high_risk_whitelist')}</strong>
+            <div style={{ fontSize: 11.5, color: 'var(--muted-2)', marginTop: 2 }}>{t('mobile.settings.perm.high_risk_whitelist_desc')}</div>
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
             {HIGH_RISK_ALL.map(field => (
@@ -865,9 +857,9 @@ function PermissionsSection({ nav }) {
         {/* 自定义白名单 */}
         <div className="pl-setrow" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 10 }}>
           <div>
-            <strong>自定义高风险白名单</strong>
+            <strong>{t('mobile.settings.perm.custom_whitelist')}</strong>
             <div style={{ fontSize: 11.5, color: 'var(--muted-2)', marginTop: 2 }}>
-              格式: <span className="mono">player.hp</span> 或 <span className="mono">world.*</span>
+              {t('mobile.settings.perm.custom_whitelist_format_prefix')} <span className="mono">player.hp</span> {t('mobile.settings.perm.custom_whitelist_format_or')} <span className="mono">world.*</span>
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8, width: '100%' }}>
@@ -901,16 +893,16 @@ function PermissionsSection({ nav }) {
               ))}
             </div>
           )}
-          {custom.length===0 && <span style={{ fontSize: 12, color: 'var(--muted)' }}>暂无自定义条目</span>}
+          {custom.length===0 && <span style={{ fontSize: 12, color: 'var(--muted)' }}>{t('mobile.settings.perm.no_custom_entries')}</span>}
         </div>
       </SetGroup>
 
       {/* 审计日志 */}
       <div className="pl-sec" style={{ marginTop: 18 }}>
         <div className="pl-sec-head">
-          <h2>审计日志</h2>
+          <h2>{t('mobile.settings.perm.audit_log')}</h2>
           <button className="act" onClick={() => { if (!showAudit) loadAudit(); setShowAudit(v => !v); }}>
-            {showAudit ? '收起' : '展开'} <Icon name={showAudit ? 'chevron_up' : 'chevron_down'} size={13} />
+            {showAudit ? t('mobile.settings.common.collapse') : t('mobile.settings.common.expand')} <Icon name={showAudit ? 'chevron_up' : 'chevron_down'} size={13} />
           </button>
         </div>
         {showAudit && (
@@ -918,7 +910,7 @@ function PermissionsSection({ nav }) {
             <div style={{ display: 'flex', gap: 8, marginBottom: 10, alignItems: 'center' }}>
               <button className="pl-btn-ghost" style={{ height: 36, fontSize: 12, flex: 1 }}
                 disabled={auditLoading} onClick={loadAudit}>
-                <Icon name="refresh" size={13} /> {auditLoading ? '加载中…' : '刷新日志'}
+                <Icon name="refresh" size={13} /> {auditLoading ? t('common.loading') : t('mobile.settings.perm.refresh_log')}
               </button>
             </div>
             {auditErr && <div style={{ fontSize: 12, color: 'var(--danger)', marginBottom: 8 }}>{auditErr}</div>}
@@ -933,7 +925,7 @@ function PermissionsSection({ nav }) {
                     <button key={k} onClick={() => setAuditFilter(k)}
                       className={auditFilter===k ? 'pill accent' : 'pill'}
                       style={{ cursor: 'pointer', fontSize: 10.5, height: 26, transition: 'all .15s' }}>
-                      {k==='all' ? '全部' : (KIND_META[k]?.label || k)} · {count}
+                      {k==='all' ? t('common.all') : (KIND_META[k]?.label || k)} · {count}
                     </button>
                   );
                 })}
@@ -942,7 +934,7 @@ function PermissionsSection({ nav }) {
 
             {auditEntries.length===0 && !auditLoading && (
               <div style={{ fontSize: 12.5, color: 'var(--muted)', textAlign: 'center', padding: '16px 0' }}>
-                暂无审计日志（需要有活跃存档）
+                {t('mobile.settings.perm.no_audit_log')}
               </div>
             )}
 
@@ -983,6 +975,7 @@ function PermissionsSection({ nav }) {
 /* SECTION: 账户 (account)                                             */
 /* ────────────────────────────────────────────────────────────────── */
 function AccountSection({ nav }) {
+  const { t } = useTranslation();
   const user = useReactiveUser();
   const isCoBuilder = user?.is_co_builder === true;
   const [cbChecked, setCbChecked] = useState(() => !user?.co_builder_opt_out);
@@ -998,9 +991,9 @@ function AccountSection({ nav }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ co_builder_opt_out: !v }),
       });
-      nav.toast('Co-Builder 设置已保存', 'ok', 'check');
+      nav.toast(t('mobile.settings.account.co_builder_saved'), 'ok', 'check');
     } catch (e) {
-      nav.toast('保存失败', 'danger', 'warn');
+      nav.toast(t('mobile.settings.account.save_failed'), 'danger', 'warn');
       setCbChecked(!v);
     } finally { setCbSaving(false); }
   };
@@ -1033,8 +1026,8 @@ function AccountSection({ nav }) {
       const url = window.api.account.migrateExportUrl(includeChunks);
       const a = document.createElement('a'); a.href=url; a.rel='noopener';
       document.body.appendChild(a); a.click(); a.remove();
-      nav.toast('已开始下载数据包', 'ok', 'download');
-    } catch (e) { nav.toast('导出失败: ' + (e?.message||''), 'danger', 'warn'); }
+      nav.toast(t('mobile.settings.account.export_started'), 'ok', 'download');
+    } catch (e) { nav.toast(t('mobile.settings.account.export_failed', { msg: e?.message||'' }), 'danger', 'warn'); }
     finally { setTimeout(() => setExporting(false), 800); }
   };
 
@@ -1046,8 +1039,8 @@ function AccountSection({ nav }) {
       const job = s?.job || {};
       const summary = (job.usage_actual && job.usage_actual.summary) || {};
       setImportResult({ scripts: summary.scripts??0, saves: summary.saves??0, cards: summary.cards??0, warnings: job.warnings||[] });
-      nav.toast(`导入完成: 剧本 ${summary.scripts??0}·存档 ${summary.saves??0}·卡 ${summary.cards??0}`, 'ok', 'check');
-    } catch (e) { nav.toast('导入失败: ' + (e?.message||''), 'danger', 'warn'); }
+      nav.toast(t('mobile.settings.account.import_done_toast', { scripts: summary.scripts??0, saves: summary.saves??0, cards: summary.cards??0 }), 'ok', 'check');
+    } catch (e) { nav.toast(t('mobile.settings.account.import_failed', { msg: e?.message||'' }), 'danger', 'warn'); }
     finally { setImportJob(null); setImporting(false); }
   };
 
@@ -1058,10 +1051,10 @@ function AccountSection({ nav }) {
     try {
       const r = await window.api.account.migrateImport(importFile);
       jobId = r?.job_id;
-      if (!jobId) throw new Error(r?.error || '未返回作业号');
+      if (!jobId) throw new Error(r?.error || t('mobile.settings.account.import_no_job_id'));
     } catch (e) {
       setImporting(false); setImportJob(null);
-      nav.toast('导入失败: ' + (e?.payload?.error || e?.message || ''), 'danger', 'warn');
+      nav.toast(t('mobile.settings.account.import_failed', { msg: e?.payload?.error || e?.message || '' }), 'danger', 'warn');
       return;
     }
     const isTerminal = (st) => ['done','done_with_errors','failed','cancelled'].includes(st);
@@ -1103,20 +1096,20 @@ function AccountSection({ nav }) {
   useEffect(() => { if (conn?.base_url) setConnBase(conn.base_url); }, [conn?.base_url]);
 
   const savePat = async () => {
-    if (!connToken.trim()) { nav.toast('请粘贴访问令牌', 'warn', 'key'); return; }
+    if (!connToken.trim()) { nav.toast(t('mobile.settings.account.pat_empty'), 'warn', 'key'); return; }
     setConnBusy(true);
     try {
       await window.api.federation.connectorSet(connBase.trim(), connToken.trim());
-      nav.toast('已连接在线剧本库', 'ok', 'check');
+      nav.toast(t('mobile.settings.account.federation_connected'), 'ok', 'check');
       setConnToken(''); reloadConn();
-    } catch (e) { nav.toast('连接失败: ' + (e?.payload?.error||e?.message||''), 'danger', 'warn'); }
+    } catch (e) { nav.toast(t('mobile.settings.account.federation_connect_failed', { msg: e?.payload?.error||e?.message||'' }), 'danger', 'warn'); }
     finally { setConnBusy(false); }
   };
 
   const disconnect = async () => {
     setConnBusy(true);
-    try { await window.api.federation.connectorSet(connBase.trim(), ''); nav.toast('已断开', 'ok', 'unlock'); reloadConn(); }
-    catch (e) { nav.toast('操作失败', 'danger', 'warn'); }
+    try { await window.api.federation.connectorSet(connBase.trim(), ''); nav.toast(t('mobile.settings.account.federation_disconnected'), 'ok', 'unlock'); reloadConn(); }
+    catch (e) { nav.toast(t('mobile.settings.account.operation_failed'), 'danger', 'warn'); }
     finally { setConnBusy(false); }
   };
 
@@ -1143,48 +1136,48 @@ function AccountSection({ nav }) {
       {/* 30 天用量 */}
       {usage && (
         <div className="pl-sec" style={{ marginBottom: 18 }}>
-          <div className="pl-sec-head"><h2>API 用量(近 30 天)</h2></div>
+          <div className="pl-sec-head"><h2>{t('mobile.settings.account.api_usage')}</h2></div>
           <div className="pl-stats">
             <div className="pl-stat">
               <span className="n accent">{(usage.total_tokens||0).toLocaleString()}</span>
-              <div className="l">总 token</div>
+              <div className="l">{t('mobile.settings.account.total_tokens')}</div>
             </div>
             <div className="pl-stat">
               <span className="n">{(usage.total_calls||0).toLocaleString()}</span>
-              <div className="l">总调用</div>
+              <div className="l">{t('mobile.settings.account.total_calls')}</div>
             </div>
             <div className="pl-stat">
               <span className="n">{(usage.cache_hit_rate != null ? `${Math.round(usage.cache_hit_rate*100)}%` : '—')}</span>
-              <div className="l">缓存命中</div>
+              <div className="l">{t('mobile.settings.account.cache_hit')}</div>
             </div>
           </div>
         </div>
       )}
 
       {/* Co-Builder 计划 */}
-      <SetGroup title="账号设置">
+      <SetGroup title={t('mobile.settings.account.account_settings')}>
         <div className="pl-setrow">
           <div className="pl-setrow-tx">
-            <strong>Beta Co-Builder 参与</strong>
-            <span>{isCoBuilder ? '参与内测共建，可提前体验新功能' : '未加入 Co-Builder 计划'}</span>
+            <strong>{t('mobile.settings.account.co_builder_title')}</strong>
+            <span>{isCoBuilder ? t('mobile.settings.account.co_builder_active') : t('mobile.settings.account.co_builder_inactive')}</span>
           </div>
           {isCoBuilder ? (
             <Toggle on={cbChecked} onChange={handleCoBuilder} />
           ) : (
-            <span style={{ fontSize: 12, color: 'var(--muted)' }}>未开放</span>
+            <span style={{ fontSize: 12, color: 'var(--muted)' }}>{t('mobile.settings.account.co_builder_unavailable')}</span>
           )}
         </div>
       </SetGroup>
 
       {/* 数据迁移 */}
       <div className="pl-sec" style={{ marginTop: 18 }}>
-        <div className="pl-sec-head"><h2>数据迁移(导出 / 导入)</h2></div>
+        <div className="pl-sec-head"><h2>{t('mobile.settings.account.data_migration')}</h2></div>
         <div className="pl-card" style={{ display: 'grid', gap: 14 }}>
           <div style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.6 }}>
-            把全部个人数据(剧本/存档/角色卡)打包迁移到本地实例。出于安全，不含 API 密钥。
+            {t('mobile.settings.account.data_migration_desc')}
             {est && (
               <div style={{ marginTop: 6, color: 'var(--text-quiet)' }}>
-                剧本 {est.scripts??0} · 存档 {est.saves??0} · 角色卡 {est.cards??0} · 模型条目 {est.model_entries??0}
+                {t('mobile.settings.account.data_migration_est', { scripts: est.scripts??0, saves: est.saves??0, cards: est.cards??0, model_entries: est.model_entries??0 })}
               </div>
             )}
           </div>
@@ -1192,17 +1185,17 @@ function AccountSection({ nav }) {
           {/* 包含切片 */}
           <div style={{ display:'flex', alignItems:'center', gap:10 }}>
             <Toggle on={includeChunks} onChange={setIncludeChunks} />
-            <span style={{ fontSize: 12.5, color: 'var(--text-quiet)' }}>包含原文切片（体积更大，用于本地 RAG）</span>
+            <span style={{ fontSize: 12.5, color: 'var(--text-quiet)' }}>{t('mobile.settings.account.include_chunks')}</span>
           </div>
 
           <button className="pl-btn-primary" disabled={exporting} onClick={doExport}>
-            <Icon name="download" size={16} /> {exporting ? '准备下载…' : '导出数据包(.zip)'}
+            <Icon name="download" size={16} /> {exporting ? t('mobile.settings.account.export_preparing') : t('mobile.settings.account.export_btn')}
           </button>
 
           {/* 导入 */}
           <div>
             <label style={{ fontSize: 12.5, color: 'var(--text-quiet)', display: 'block', marginBottom: 8 }}>
-              导入数据包（选择从在线服务导出的 account-*.zip）
+              {t('mobile.settings.account.import_label')}
             </label>
             <input
               ref={fileRef} type="file" accept=".zip,application/zip"
@@ -1210,7 +1203,7 @@ function AccountSection({ nav }) {
               style={{ fontSize: 13, color: 'var(--text-quiet)', marginBottom: 8 }}
             />
             <button className="pl-btn-ghost" disabled={!importFile||importing} onClick={doImport}>
-              <Icon name="upload" size={14} /> {importing ? '导入中…' : '导入到当前账号'}
+              <Icon name="upload" size={14} /> {importing ? t('mobile.settings.account.importing') : t('mobile.settings.account.import_btn')}
             </button>
           </div>
 
@@ -1218,8 +1211,8 @@ function AccountSection({ nav }) {
           {importJob && (
             <div>
               <div style={{ fontSize: 12.5, color: 'var(--text-quiet)', marginBottom: 6 }}>
-                {{ scripts:'导入剧本', saves:'导入存档', cards:'导入角色卡', done:'完成' }[importJob.stage] || importJob.stage || '处理中'}
-                {importJob.stage_total ? ` ${importJob.stage_progress||0}/${importJob.stage_total}` : '…'}
+                {{ scripts: t('mobile.settings.account.stage_scripts'), saves: t('mobile.settings.account.stage_saves'), cards: t('mobile.settings.account.stage_cards'), done: t('mobile.settings.account.stage_done') }[importJob.stage] || importJob.stage || t('mobile.settings.account.stage_processing')}
+                {importJob.stage_total ? ` ${importJob.stage_progress||0}/${importJob.stage_total}` : '...'}
               </div>
               <div style={{ height:5, background:'var(--panel-3)', borderRadius:3, overflow:'hidden' }}>
                 <div style={{ height:'100%', background:'var(--accent)', borderRadius:3,
@@ -1234,12 +1227,12 @@ function AccountSection({ nav }) {
             <div style={{ padding:12, borderRadius:10, border:'1px solid var(--line)',
               background: importResult.warnings?.length ? 'var(--warn-soft)' : 'var(--ok-soft)',
               fontSize: 12.5, color: 'var(--text-quiet)' }}>
-              <div style={{ fontWeight:600, marginBottom:4 }}>导入完成</div>
-              <div>剧本 {importResult.scripts} · 存档 {importResult.saves} · 角色卡 {importResult.cards}</div>
+              <div style={{ fontWeight:600, marginBottom:4 }}>{t('mobile.settings.account.import_done')}</div>
+              <div>{t('mobile.settings.account.import_result', { scripts: importResult.scripts, saves: importResult.saves, cards: importResult.cards })}</div>
               {importResult.warnings?.length > 0 && (
                 <ul style={{ margin:'6px 0 0', paddingLeft:16, fontSize:11.5 }}>
                   {importResult.warnings.slice(0,10).map((w,i) => <li key={i}>{w}</li>)}
-                  {importResult.warnings.length>10 && <li>…另 {importResult.warnings.length-10} 条</li>}
+                  {importResult.warnings.length>10 && <li>{t('mobile.settings.account.import_more_warnings', { n: importResult.warnings.length-10 })}</li>}
                 </ul>
               )}
             </div>
@@ -1249,34 +1242,34 @@ function AccountSection({ nav }) {
 
       {/* 在线剧本库联邦 */}
       <div className="pl-sec" style={{ marginTop: 18 }}>
-        <div className="pl-sec-head"><h2>在线剧本库</h2></div>
+        <div className="pl-sec-head"><h2>{t('mobile.settings.account.online_library')}</h2></div>
         <div className="pl-card" style={{ display: 'grid', gap: 14 }}>
           {conn?.connected ? (
             <>
               <div style={{ fontSize: 13, color: 'var(--ok)' }}>
-                ✓ 已连接: {conn.base_url}
+                ✓ {t('mobile.settings.account.connected_to', { url: conn.base_url })}
               </div>
               <button className="pl-btn-ghost" disabled={connBusy} onClick={disconnect}>
-                <Icon name="unlock" size={14} /> 断开连接
+                <Icon name="unlock" size={14} /> {t('mobile.settings.account.disconnect')}
               </button>
             </>
           ) : (
             <>
               <div style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.5 }}>
-                连接在线服务，浏览公开剧本库 / 导入 / 发布自有剧本
+                {t('mobile.settings.account.online_library_desc')}
               </div>
-              <MField label="在线服务地址">
+              <MField label={t('mobile.settings.account.service_url')}>
                 <input className="pl-input" value={connBase}
                   onChange={(e) => setConnBase(e.target.value)}
                   placeholder={DEFAULT_ONLINE_BASE} />
               </MField>
-              <MField label="个人访问令牌(PAT)" desc="在在线服务「个人访问令牌」里生成后粘贴">
+              <MField label={t('mobile.settings.account.pat_label')} desc={t('mobile.settings.account.pat_desc')}>
                 <input className="pl-input" type="password" value={connToken}
                   onChange={(e) => setConnToken(e.target.value)}
                   placeholder="rpgpat_…" />
               </MField>
               <button className="pl-btn-primary" disabled={connBusy} onClick={savePat}>
-                <Icon name="link" size={15} /> {connBusy ? '连接中…' : '保存并连接'}
+                <Icon name="link" size={15} /> {connBusy ? t('mobile.settings.account.connecting') : t('mobile.settings.account.save_and_connect')}
               </button>
             </>
           )}
@@ -1290,6 +1283,7 @@ function AccountSection({ nav }) {
 /* SECTION: 危险区 (danger)                                            */
 /* ────────────────────────────────────────────────────────────────── */
 function DangerSection({ nav }) {
+  const { t } = useTranslation();
   const { saves = [] } = usePlatformData();
   const nSaves = saves.length;
   const [showClearSheet, setShowClearSheet] = useState(false);
@@ -1300,7 +1294,7 @@ function DangerSection({ nav }) {
   const closeClear = () => { setShowClearSheet(false); setConfirmText(''); };
 
   const doDelete = async () => {
-    if (nSaves === 0) { nav.toast('没有存档可清空', 'ok', 'info'); closeClear(); return; }
+    if (nSaves === 0) { nav.toast(t('mobile.settings.danger.no_saves'), 'ok', 'info'); closeClear(); return; }
     setClearProgress({ done:0, total:nSaves });
     let done=0, fail=0;
     for (const s of saves) {
@@ -1310,41 +1304,41 @@ function DangerSection({ nav }) {
     }
     setClearProgress(null);
     closeClear();
-    nav.toast(fail ? `清除 ${done-fail} 个，${fail} 个失败` : `已清除 ${done} 个存档`, fail ? 'warn' : 'ok', 'trash');
+    nav.toast(fail ? t('mobile.settings.danger.clear_partial', { done: done-fail, fail }) : t('mobile.settings.danger.clear_done', { done }), fail ? 'warn' : 'ok', 'trash');
     try { window.dispatchEvent(new CustomEvent('rpg-saves-updated')); } catch (_) {}
   };
 
   return (
     <>
       <div style={{ padding:'11px 13px', borderRadius:10, background:'var(--danger-soft)', border:'1px solid rgba(200,103,93,0.3)', fontSize:12.5, color:'var(--danger)', lineHeight:1.6, marginBottom:16 }}>
-        以下操作不可逆，请谨慎操作。
+        {t('mobile.settings.danger.irreversible_warning')}
       </div>
 
-      <SetGroup title="危险操作">
+      <SetGroup title={t('mobile.settings.danger.dangerous_ops')}>
         {/* 清空存档 */}
         <div className="pl-setrow">
           <div className="pl-setrow-tx">
-            <strong>清空所有存档</strong>
-            <span>删除账号下全部 {nSaves} 个存档（不可恢复）</span>
+            <strong>{t('mobile.settings.danger.clear_saves')}</strong>
+            <span>{t('mobile.settings.danger.clear_saves_desc', { n: nSaves })}</span>
           </div>
           <button
             style={{ fontSize:13, color:'var(--danger)', background:'var(--danger-soft)', border:'1px solid rgba(200,103,93,0.3)', borderRadius:8, padding:'7px 14px' }}
             onClick={openClear}
           >
-            清空
+            {t('mobile.settings.danger.clear_btn')}
           </button>
         </div>
 
         {/* 重置平台 */}
         <div className="pl-setrow">
           <div className="pl-setrow-tx">
-            <strong>重置平台数据</strong>
-            <span>需要通过命令行执行，不支持从 UI 操作</span>
+            <strong>{t('mobile.settings.danger.reset_platform')}</strong>
+            <span>{t('mobile.settings.danger.reset_platform_desc')}</span>
           </div>
           <span style={{ fontSize: 11, color: 'var(--muted-2)', fontFamily: 'var(--font-mono)' }}>CLI</span>
         </div>
         <div style={{ padding:'6px 13px 12px', fontSize:11.5, color:'var(--muted)', lineHeight:1.5 }}>
-          重置命令(在服务器运行):
+          {t('mobile.settings.danger.reset_cmd_label')}
           <code className="mono" style={{ display:'block', marginTop:6, padding:'7px 10px', borderRadius:7, background:'var(--bg-deep)', border:'1px solid var(--line-soft)', fontSize:11, userSelect:'all', wordBreak:'break-all' }}>
             python -m rpg.platform_app.migrate reset --confirm
           </code>
@@ -1357,39 +1351,39 @@ function DangerSection({ nav }) {
           <div className="sheet-scrim" onClick={closeClear} />
           <div className="sheet" style={{ maxHeight: '75%' }}>
             <div className="sheet-grip" />
-            <div className="sheet-title" style={{ color: 'var(--danger)' }}>清空所有存档</div>
+            <div className="sheet-title" style={{ color: 'var(--danger)' }}>{t('mobile.settings.danger.clear_saves')}</div>
             <div className="sheet-sub">
-              此操作将删除账号下全部 <strong style={{ color: 'var(--text)' }}>{nSaves}</strong> 个存档，<strong style={{ color: 'var(--danger)' }}>不可恢复</strong>。
+              {t('mobile.settings.danger.confirm_desc_prefix')} <strong style={{ color: 'var(--text)' }}>{nSaves}</strong> {t('mobile.settings.danger.confirm_desc_suffix')}
             </div>
             <div className="confirm-preview">
-              游戏进度、分支记录、GM 上下文将全部丢失，请确认后再继续。
+              {t('mobile.settings.danger.confirm_preview')}
             </div>
             <div style={{ marginBottom: 14 }}>
               <label style={{ fontSize: 12.5, color: 'var(--muted)', display:'block', marginBottom:8 }}>
-                输入 <strong style={{ color:'var(--danger)' }}>清空</strong> 以确认
+                {t('mobile.settings.danger.confirm_input_prefix')} <strong style={{ color:'var(--danger)' }}>{t('mobile.settings.danger.confirm_keyword')}</strong> {t('mobile.settings.danger.confirm_input_suffix')}
               </label>
               <input
                 className="pl-input"
                 value={confirmText}
                 onChange={(e) => setConfirmText(e.target.value)}
-                placeholder="清空"
+                placeholder={t('mobile.settings.danger.confirm_keyword')}
                 autoFocus
               />
             </div>
             {clearProgress && (
               <div style={{ marginBottom: 12, fontSize: 12.5, color: 'var(--text-quiet)' }}>
-                正在删除 {clearProgress.done} / {clearProgress.total}…
+                {t('mobile.settings.danger.deleting_progress', { done: clearProgress.done, total: clearProgress.total })}
                 <div style={{ height:4, background:'var(--panel-3)', borderRadius:2, marginTop:6, overflow:'hidden' }}>
                   <div style={{ height:'100%', background:'var(--danger)', borderRadius:2, width:`${Math.round(clearProgress.done/clearProgress.total*100)}%`, transition:'width .2s' }} />
                 </div>
               </div>
             )}
             <div className="sheet-actions">
-              <button className="sheet-btn" onClick={closeClear} disabled={!!clearProgress}>取消</button>
+              <button className="sheet-btn" onClick={closeClear} disabled={!!clearProgress}>{t('common.cancel')}</button>
               <button className="sheet-btn danger"
-                disabled={confirmText !== '清空' || !!clearProgress}
+                disabled={confirmText !== t('mobile.settings.danger.confirm_keyword') || !!clearProgress}
                 onClick={doDelete}>
-                <Icon name="trash" size={14} /> 清空存档
+                <Icon name="trash" size={14} /> {t('mobile.settings.danger.clear_saves_confirm_btn')}
               </button>
             </div>
           </div>
@@ -1403,14 +1397,14 @@ function DangerSection({ nav }) {
 /* 主组件                                                               */
 /* ────────────────────────────────────────────────────────────────── */
 const SECTIONS = [
-  { id:'preferences',   label:'偏好',     icon:'settings',  sub:'语言 / 字体 / 黑天鹅' },
-  { id:'models',        label:'API 设置', icon:'cpu',       sub:'供应商密钥 (BYOK)', tone:'accent' },
-  { id:'modelparams',   label:'模型参数', icon:'gauge',     sub:'温度 / top-p / 采样' },
-  { id:'modules',       label:'模块分配', icon:'layers',    sub:'各子代理用哪个模型', tone:'info' },
-  { id:'memory',        label:'记忆',     icon:'memory',    sub:'召回深度 / 记忆桶' },
-  { id:'permissions',   label:'权限',     icon:'shield',    sub:'GM 写入权限 + 审计', tone:'ok' },
-  { id:'account',       label:'账户',     icon:'user',      sub:'Co-Builder / 数据迁移 / 联邦' },
-  { id:'danger',        label:'高危操作', icon:'warn',      sub:'清空存档 / 重置平台', tone:'warn' },
+  { id:'preferences',   icon:'settings',  tone:'' },
+  { id:'models',        icon:'cpu',       tone:'accent' },
+  { id:'modelparams',   icon:'gauge',     tone:'' },
+  { id:'modules',       icon:'layers',    tone:'info' },
+  { id:'memory',        icon:'memory',    tone:'' },
+  { id:'permissions',   icon:'shield',    tone:'ok' },
+  { id:'account',       icon:'user',      tone:'' },
+  { id:'danger',        icon:'warn',      tone:'warn' },
 ];
 
 // 把路由 id 映射到 section id
@@ -1426,6 +1420,7 @@ const ROUTE_MAP = {
 };
 
 export function MobileSettings({ nav }) {
+  const { t } = useTranslation();
   // 外部路由可以通过 nav.params.section 指定起始分节
   const [section, setSection] = useState(() => {
     // 支持初始路由直达
@@ -1458,7 +1453,7 @@ export function MobileSettings({ nav }) {
       <>
         <div className="pl-head">
           <div className="pl-head-title center">
-            <strong>设置</strong>
+            <strong>{t('mobile.settings.title')}</strong>
           </div>
         </div>
         <div className="pl-body tabbed">
@@ -1466,7 +1461,7 @@ export function MobileSettings({ nav }) {
             {SECTIONS.map(s => (
               <button key={s.id} className="pl-row" onClick={() => setSection(s.id)}>
                 <span className={`pl-row-ic ${s.tone||''}`}><Icon name={s.icon} size={18} /></span>
-                <span className="pl-row-tx"><strong>{s.label}</strong><span>{s.sub}</span></span>
+                <span className="pl-row-tx"><strong>{t(`mobile.settings.section.${s.id}.label`)}</strong><span>{t(`mobile.settings.section.${s.id}.sub`)}</span></span>
                 <span className="pl-row-chev"><Icon name="chevron_right" size={17} /></span>
               </button>
             ))}
@@ -1492,8 +1487,8 @@ export function MobileSettings({ nav }) {
               <Icon name="chevron_left" size={20} />
             </button>
             <div className="pl-head-title">
-              <strong>{meta?.label || '设置'}</strong>
-              <span className="sub">{meta?.sub || ''}</span>
+              <strong>{meta ? t(`mobile.settings.section.${meta.id}.label`) : t('mobile.settings.title')}</strong>
+              <span className="sub">{meta ? t(`mobile.settings.section.${meta.id}.sub`) : ''}</span>
             </div>
           </div>
           <div className="pl-body tabbed">
@@ -1515,6 +1510,7 @@ export function MobileSettings({ nav }) {
 
 /* models section 需要直接渲染(含内部子视图切换),包装一层让 onBack 工作 */
 function ModelsSection({ nav, onBack }) {
+  const { t } = useTranslation();
   const [selected, setSelected] = useState(null);
   const [apis, setApis] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -1588,18 +1584,18 @@ function ModelsSection({ nav, onBack }) {
         ...a, models,
         connectivity: { status:'ok', latency_ms:r.latency_ms, remote_total:r.remote_total??models.length },
       } : a));
-      if (!silent) nav.toast(`同步完成：${models.length} 个模型`, 'ok', 'refresh');
+      if (!silent) nav.toast(t('mobile.settings.models.sync_done', { count: models.length }), 'ok', 'refresh');
     } catch (e) {
       setApis(arr => arr.map(a => a.id===aId ? { ...a, connectivity: { status:'err', error:e?.message||'' } } : a));
-      if (!silent) nav.toast('同步失败: ' + (e?.message||''), 'danger', 'warn');
+      if (!silent) nav.toast(t('mobile.settings.models.sync_failed', { msg: e?.message||'' }), 'danger', 'warn');
     }
   }, [mapModel, nav]);
 
   const reload = useCallback(async () => {
     try { setLoadErr(''); await load(); }
-    catch (e) { setLoadErr(e?.message || '加载失败'); }
+    catch (e) { setLoadErr(e?.message || t('mobile.settings.models.load_failed')); }
     finally { setLoading(false); }
-  }, [load]);
+  }, [load, t]);
 
   useEffect(() => { reload(); }, [reload]);
 
@@ -1631,17 +1627,17 @@ function ModelsSection({ nav, onBack }) {
           } catch (e) {
             // POST /api/models/model 是 admin-only,非 admin 部署模式 403 → 回滚乐观翻转并提示。
             setApis(arr => arr.map(a => a.id===selectedApi.id ? { ...a, models: a.models.map(x => x.id===mId ? { ...x, enabled: prev } : x) } : a));
-            nav.toast(e?.status===403 ? '仅管理员可修改全局模型开关' : ('保存失败: ' + (e?.message||'')), 'danger', 'warn');
+            nav.toast(e?.status===403 ? t('mobile.settings.models.admin_only') : t('mobile.settings.models.save_failed', { msg: e?.message||'' }), 'danger', 'warn');
           }
         }}
         onDeleteKey={async () => {
-          if (!window.confirm(`删除「${selectedApi.name}」的 API 密钥?删除后需回电脑端重新配置。`)) return;
+          if (!window.confirm(t('mobile.settings.models.delete_key_confirm', { name: selectedApi.name }))) return;
           try {
             await window.api.credentials.remove({ api_id: credId(selectedApi.id) });
             setSelected(null);
             setApis(arr => arr.filter(a => a.id!==selectedApi.id));
-            nav.toast('已删除密钥', 'ok', 'trash');
-          } catch (e) { nav.toast('删除失败: '+(e?.message||''), 'danger', 'warn'); }
+            nav.toast(t('mobile.settings.models.key_deleted'), 'ok', 'trash');
+          } catch (e) { nav.toast(t('mobile.settings.models.delete_failed', { msg: e?.message||'' }), 'danger', 'warn'); }
         }}
       />
     );
@@ -1653,8 +1649,8 @@ function ModelsSection({ nav, onBack }) {
       <div className="pl-head">
         <button className="pl-back" onClick={onBack}><Icon name="chevron_left" size={20} /></button>
         <div className="pl-head-title">
-          <strong>API 设置</strong>
-          <span className="sub">供应商密钥 · {apis.length} 家已配置</span>
+          <strong>{t('mobile.settings.section.models.label')}</strong>
+          <span className="sub">{t('mobile.settings.models.provider_count', { count: apis.length })}</span>
         </div>
       </div>
       <div className="pl-body tabbed">
@@ -1662,23 +1658,23 @@ function ModelsSection({ nav, onBack }) {
           {loading && (
             <div className="pl-empty">
               <div className="ic"><Icon name="cpu" size={22} /></div>
-              <p>加载中…</p>
+              <p>{t('common.loading')}</p>
             </div>
           )}
           {!loading && loadErr && (
             <div className="pl-empty">
               <div className="ic"><Icon name="warn" size={22} /></div>
-              <h3>加载失败</h3>
+              <h3>{t('mobile.settings.models.load_failed')}</h3>
               <p>{loadErr}</p>
               <button className="pl-btn-ghost" style={{ marginTop:12, height:38, fontSize:13, width:'auto', padding:'0 18px' }}
-                onClick={() => { setLoading(true); setLoadErr(''); reload(); }}>重试</button>
+                onClick={() => { setLoading(true); setLoadErr(''); reload(); }}>{t('mobile.settings.models.retry')}</button>
             </div>
           )}
           {!loading && !loadErr && apis.length===0 && (
             <div className="pl-empty">
               <div className="ic"><Icon name="key" size={22} /></div>
-              <h3>尚未配置任何供应商</h3>
-              <p>请在电脑端「设置 → 模型」添加 API 密钥后再来这里管理</p>
+              <h3>{t('mobile.settings.models.no_providers')}</h3>
+              <p>{t('mobile.settings.models.no_providers_hint')}</p>
             </div>
           )}
           {!loading && !loadErr && apis.map(pv => {
@@ -1695,14 +1691,14 @@ function ModelsSection({ nav, onBack }) {
                   <span className="pl-prov-id">
                     <strong>
                       {pv.name}
-                      {pv.enabled===false && <span style={{ marginLeft:6, fontSize:11, fontWeight:600, color:'var(--muted-2)', border:'1px solid var(--line-soft)', borderRadius:4, padding:'1px 6px' }}>已禁用</span>}
+                      {pv.enabled===false && <span style={{ marginLeft:6, fontSize:11, fontWeight:600, color:'var(--muted-2)', border:'1px solid var(--line-soft)', borderRadius:4, padding:'1px 6px' }}>{t('common.disabled')}</span>}
                     </strong>
                     <span className="key mono">•••• {pv.key_hint}</span>
                   </span>
                   <span className={`pl-status ${statusOk?'online':''}`}>
                     <span className="d" style={statusErr ? { background:'var(--danger)' } : statusBusy ? { background:'var(--warn)' } : {}} />
-                    {statusOk ? `✓ ${conn.latency_ms||''}${conn.latency_ms?'ms':'已连接'}` :
-                     statusErr ? '✗ 错误' : statusBusy ? '同步中' : '未测试'}
+                    {statusOk ? `✓ ${conn.latency_ms||''}${conn.latency_ms?'ms':t('mobile.settings.models.status_connected')}` :
+                     statusErr ? `✗ ${t('common.error')}` : statusBusy ? t('mobile.settings.models.status_syncing') : t('mobile.settings.models.conn_untested')}
                   </span>
                   <Icon name="chevron_right" size={16} style={{ color:'var(--muted-3)', marginLeft:4 }} />
                 </div>
@@ -1716,15 +1712,15 @@ function ModelsSection({ nav, onBack }) {
                 ))}
                 {pv.models.length > 0 && (
                   <div className="pl-model-row" style={{ justifyContent:'flex-end', color:'var(--muted-2)', fontSize:11 }}>
-                    {enabledCnt}/{pv.models.length} 已启用
-                    {pv.models.length > 2 && ` · +${pv.models.length-2} 个`}
+                    {t('mobile.settings.models.enabled_count', { enabled: enabledCnt, total: pv.models.length })}
+                    {pv.models.length > 2 && ` · +${pv.models.length-2}`}
                   </div>
                 )}
               </button>
             );
           })}
           <div style={{ padding:'8px 0', fontSize:12, color:'var(--muted)', textAlign:'center', lineHeight:1.6 }}>
-            添加新供应商请在电脑端「设置 → 模型」操作
+            {t('mobile.settings.models.add_provider_hint')}
           </div>
         </div>
       </div>

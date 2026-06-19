@@ -387,6 +387,7 @@ function CardsPage({ subPage = "user" }) {
 /* 在线角色卡库 — 浏览并完整导入其他用户公开分享的 PC 角色卡。
    GET /api/cards/public · POST /api/cards/public/{id}/clone(完整复制进自己卡库,非指针) */
 function OnlineCardsView() {
+  const { t } = useTranslation();
   const [items, setItems] = React.useState(null);
   const [q, setQ] = React.useState('');
   const [loading, setLoading] = React.useState(true);
@@ -398,9 +399,9 @@ function OnlineCardsView() {
     try {
       const r = await window.api.cards.publicList(query ? { q: query } : undefined);
       setItems((r && r.items) || []);
-    } catch (e) { setErr(e?.message || '加载失败'); setItems([]); }
+    } catch (e) { setErr(e?.message || t('cards.page.online.load_fail')); setItems([]); }
     finally { setLoading(false); }
-  }, []);
+  }, [t]);
 
   React.useEffect(() => { load(''); }, [load]);
 
@@ -408,10 +409,10 @@ function OnlineCardsView() {
     setImporting((p) => ({ ...p, [c.id]: true }));
     try {
       await window.api.cards.cloneFromPublic(c.id);
-      window.__apiToast?.('已导入到「我的角色卡」', { kind: 'ok', duration: 2200, detail: `「${c.name}」已复制为你自己的卡,可在「我的角色卡」编辑使用。` });
+      window.__apiToast?.(t('cards.page.online.import_ok'), { kind: 'ok', duration: 2200, detail: t('cards.page.online.import_ok_detail', { name: c.name }) });
       load(q);  // 刷新热度
     } catch (e) {
-      window.__apiToast?.('导入失败', { kind: 'danger', detail: e?.payload?.error || e?.message });
+      window.__apiToast?.(t('cards.page.online.import_fail'), { kind: 'danger', detail: e?.payload?.error || e?.message });
     } finally {
       setImporting((p) => ({ ...p, [c.id]: false }));
     }
@@ -421,21 +422,21 @@ function OnlineCardsView() {
     <CSSpaceBetween size="l">
       <CSHeader
         variant="h1"
-        description="浏览其他玩家公开分享的角色卡。点「导入」会把整张卡完整复制进你自己的「我的角色卡」,之后可自由编辑、挂任意剧本使用。"
-        actions={<CSButton iconName="refresh" loading={loading} onClick={() => load(q)}>刷新</CSButton>}
-      >在线角色卡库</CSHeader>
+        description={t('cards.page.online.header_desc')}
+        actions={<CSButton iconName="refresh" loading={loading} onClick={() => load(q)}>{t('common.refresh')}</CSButton>}
+      >{t('cards.page.online.title')}</CSHeader>
 
       <div style={{ display: 'flex', gap: 8, maxWidth: 460 }}>
         <div style={{ flex: 1 }}>
-          <CSInput value={q} onChange={({ detail }) => setQ(detail.value)} placeholder="搜角色名 / 身份…"
+          <CSInput value={q} onChange={({ detail }) => setQ(detail.value)} placeholder={t('cards.page.online.search_placeholder')}
             onKeyDown={(e) => { if (e.detail.key === 'Enter') load(q); }} type="search" />
         </div>
-        <CSButton onClick={() => load(q)}>搜索</CSButton>
+        <CSButton onClick={() => load(q)}>{t('cards.page.online.btn_search')}</CSButton>
       </div>
 
-      {err && <CSAlert type="error" header="加载失败">{err}</CSAlert>}
-      {loading && items == null ? <CSBox color="text-body-secondary" padding="m">正在加载在线角色卡…</CSBox>
-        : (items && items.length === 0) ? <CSBox textAlign="center" color="text-body-secondary" padding={{ vertical: 'xl' }}>暂无公开角色卡。你可以在「我的角色卡」里把卡设为公开,分享给大家。</CSBox>
+      {err && <CSAlert type="error" header={t('cards.page.online.load_fail')}>{err}</CSAlert>}
+      {loading && items == null ? <CSBox color="text-body-secondary" padding="m">{t('cards.page.online.loading')}</CSBox>
+        : (items && items.length === 0) ? <CSBox textAlign="center" color="text-body-secondary" padding={{ vertical: 'xl' }}>{t('cards.page.online.empty')}</CSBox>
         : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 14 }}>
             {(items || []).map((c) => (
@@ -443,20 +444,20 @@ function OnlineCardsView() {
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <AvatarImg src={c.avatar_path || null} name={c.name || '?'} size={40} shape="rounded" />
-                    <strong style={{ fontSize: 15 }}>{c.name || '(未命名)'}</strong>
+                    <strong style={{ fontSize: 15 }}>{c.name || t('cards.detail.unnamed')}</strong>
                   </div>
                   <span style={{ fontSize: 11, color: 'var(--text-quiet, #9a948c)' }}>♥ {c.clone_count || 0}</span>
                 </div>
                 {c.identity && <div style={{ fontSize: 12, color: 'var(--accent, #c96442)' }}>{String(c.identity).slice(0, 40)}</div>}
                 <div style={{ fontSize: 12, color: 'var(--text-quiet, #9a948c)', lineHeight: 1.5, minHeight: 36, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                  {(c.personality || c.background || c.appearance || '暂无简介').slice(0, 90)}
+                  {(c.personality || c.background || c.appearance || t('cards.page.online.no_bio')).slice(0, 90)}
                 </div>
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                   {(c.tags || []).slice(0, 3).map((tg) => <CSBadge key={tg}>{tg}</CSBadge>)}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 2 }}>
-                  <span style={{ fontSize: 11, color: 'var(--muted, #b8b2a8)' }}>by {c.owner_name || '匿名'}</span>
-                  <CSButton variant="primary" loading={!!importing[c.id]} onClick={() => doImport(c)}>导入</CSButton>
+                  <span style={{ fontSize: 11, color: 'var(--muted, #b8b2a8)' }}>by {c.owner_name || t('cards.page.online.anon')}</span>
+                  <CSButton variant="primary" loading={!!importing[c.id]} onClick={() => doImport(c)}>{t('cards.page.online.btn_import')}</CSButton>
                 </div>
               </div>
             ))}
@@ -660,7 +661,7 @@ function UserCardsView() {
       } else if (payload?.type === "card_json" && payload.json_string) {
         await window.api.cards.importJson({ json_string: payload.json_string, ai_split: payload.aiSplit });
       } else if (payload?.type === "chat" && payload.jsonl) {
-        const title = payload.charName ? `[酒馆导入] ${payload.charName}` : undefined;
+        const title = payload.charName ? t('cards.page.import.chat_title_prefix', { name: payload.charName }) : undefined;
         await window.api.chats.importTavern({ jsonl: payload.jsonl, title });
         window.__apiToast?.(t('cards.toast.chat_imported'), { kind: "ok" });
         setImporting(false);
@@ -790,6 +791,7 @@ function UserCardsView() {
 
 /* 人设图历史画廊 — 仅 persona/pc 卡显示 */
 function PersonaImageGallery({ cardId, onAvatarRefresh }) {
+  const { t } = useTranslation();
   const [images, setImages] = useStatePL(null);   // null=未加载, []=空
   const [loading, setLoading] = useStatePL(false);
   const [setting, setSetting] = useStatePL(null); // 正在 set-current 的 image_id
@@ -800,10 +802,10 @@ function PersonaImageGallery({ cardId, onAvatarRefresh }) {
       const r = await window.api.cards.personaImages(cardId);
       setImages(Array.isArray(r) ? r : (r?.images || r?.items || []));
     } catch (e) {
-      window.__apiToast?.('加载人设图历史失败', { kind: 'danger', detail: e?.message });
+      window.__apiToast?.(t('cards.page.persona.gallery_load_fail'), { kind: 'danger', detail: e?.message });
       setImages([]);
     } finally { setLoading(false); }
-  }, [cardId]);
+  }, [cardId, t]);
 
   // 挂载时自动加载
   useEffectPL(() => { load(); }, [load]);
@@ -819,13 +821,13 @@ function PersonaImageGallery({ cardId, onAvatarRefresh }) {
     setSetting(img.id);
     try {
       await window.api.cards.personaSetCurrent(cardId, img.id);
-      window.__apiToast?.('已设为当前人设图', { kind: 'ok', duration: 2000 });
+      window.__apiToast?.(t('cards.page.persona.set_current_ok'), { kind: 'ok', duration: 2000 });
       // 刷新列表
       await load();
       // 通知父组件更新头像显示
       if (onAvatarRefresh) onAvatarRefresh(img.image_url);
     } catch (e) {
-      window.__apiToast?.('设为当前失败', { kind: 'danger', detail: e?.message });
+      window.__apiToast?.(t('cards.page.persona.set_current_fail'), { kind: 'danger', detail: e?.message });
     } finally { setSetting(null); }
   };
 
@@ -836,15 +838,19 @@ function PersonaImageGallery({ cardId, onAvatarRefresh }) {
       return d.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
     } catch (_) { return s; }
   };
-  const sourceLabel = { auto_sync: '自动', manual: '手动', import: '导入' };
+  const sourceLabel = {
+    auto_sync: t('cards.page.persona.source_auto'),
+    manual: t('cards.page.persona.source_manual'),
+    import: t('cards.page.persona.source_import'),
+  };
 
   if (loading && images === null) {
-    return <CSBox color="text-body-secondary" padding="s">正在加载历史…</CSBox>;
+    return <CSBox color="text-body-secondary" padding="s">{t('cards.page.persona.gallery_loading')}</CSBox>;
   }
   if (!images || images.length === 0) {
     return (
       <CSBox color="text-body-secondary" padding="s">
-        暂无人设图历史。点「生成人设图」生成第一张。
+        {t('cards.page.persona.gallery_empty')}
       </CSBox>
     );
   }
@@ -852,7 +858,7 @@ function PersonaImageGallery({ cardId, onAvatarRefresh }) {
   return (
     <CSSpaceBetween size="m">
       <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-        <CSButton iconName="refresh" variant="inline-link" loading={loading} onClick={load}>刷新</CSButton>
+        <CSButton iconName="refresh" variant="inline-link" loading={loading} onClick={load}>{t('common.refresh')}</CSButton>
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
         {images.map((img) => {
@@ -889,7 +895,7 @@ function PersonaImageGallery({ cardId, onAvatarRefresh }) {
                     position: 'absolute', bottom: 0, left: 0, right: 0,
                     background: 'rgba(201,100,66,.85)', color: '#fff',
                     fontSize: 10, textAlign: 'center', padding: '2px 0', fontWeight: 600, letterSpacing: '.04em',
-                  }}>当前</div>
+                  }}>{t('cards.page.persona.badge_current')}</div>
                 )}
               </div>
               <div style={{ padding: '5px 7px', fontSize: 10.5, color: 'var(--text-quiet, #9a948c)', lineHeight: 1.5 }}>
@@ -897,7 +903,7 @@ function PersonaImageGallery({ cardId, onAvatarRefresh }) {
                 <div style={{ color: 'var(--muted, #b8b2a8)' }}>{fmtDate(img.created_at)}</div>
                 {!isCurrent && (
                   <div style={{ marginTop: 3, color: 'var(--accent-soft, rgba(201,100,66,.8))', fontSize: 10 }}>
-                    {isSettingThis ? '设置中…' : '点击设为当前'}
+                    {isSettingThis ? t('cards.page.persona.setting_in_progress') : t('cards.page.persona.click_to_set_current')}
                   </div>
                 )}
               </div>
@@ -913,6 +919,7 @@ function PersonaImageGallery({ cardId, onAvatarRefresh }) {
    点缩略图 → ImageLightbox 预览 + 裁剪(裁剪后存为新的当前人设图);hover 显「设为当前」。
    空(无人设图)时不渲染,不占位;完整管理仍在「人设图」tab。 */
 function PersonaThumbStrip({ cardId, onAvatarRefresh }) {
+  const { t } = useTranslation();
   const [images, setImages] = useStatePL(null);
   const [preview, setPreview] = useStatePL(null);
 
@@ -936,8 +943,8 @@ function PersonaThumbStrip({ cardId, onAvatarRefresh }) {
       await window.api.cards.personaSetCurrent(cardId, img.id);
       await load();
       onAvatarRefresh && onAvatarRefresh(img.image_url);
-      window.__apiToast?.('已设为当前人设图', { kind: 'ok', duration: 1500 });
-    } catch (e) { window.__apiToast?.('操作失败', { kind: 'danger', detail: e?.message }); }
+      window.__apiToast?.(t('cards.page.persona.set_current_ok'), { kind: 'ok', duration: 1500 });
+    } catch (e) { window.__apiToast?.(t('common.error'), { kind: 'danger', detail: e?.message }); }
   };
 
   const onCrop = async (blob) => {
@@ -946,7 +953,7 @@ function PersonaThumbStrip({ cardId, onAvatarRefresh }) {
     const url = r && (r.url || r.image_url);
     await load();
     if (url && onAvatarRefresh) onAvatarRefresh(url);
-    window.__apiToast?.('裁剪后的人设图已存为当前', { kind: 'ok', duration: 2000 });
+    window.__apiToast?.(t('cards.page.persona.crop_saved'), { kind: 'ok', duration: 2000 });
     setPreview(null);
   };
 
@@ -954,19 +961,19 @@ function PersonaThumbStrip({ cardId, onAvatarRefresh }) {
 
   return (
     <div className="pstrip">
-      <div className="pstrip__head">人设图 <span className="pstrip__count">{images.length}</span></div>
+      <div className="pstrip__head">{t('cards.page.persona.strip_title')} <span className="pstrip__count">{images.length}</span></div>
       <div className="pstrip__row">
         {images.map((img) => (
           <div key={img.id} className={`pstrip__cell${img.is_current ? ' is-current' : ''}`}>
-            <img src={img.image_url} alt="" loading="lazy" onClick={() => setPreview(img.image_url)} title="点击预览 / 裁剪" />
+            <img src={img.image_url} alt="" loading="lazy" onClick={() => setPreview(img.image_url)} title={t('cards.page.persona.thumb_title')} />
             {img.is_current
-              ? <span className="pstrip__badge">当前</span>
-              : <button className="pstrip__set" onClick={() => setCurrent(img)}>设为当前</button>}
+              ? <span className="pstrip__badge">{t('cards.page.persona.badge_current')}</span>
+              : <button className="pstrip__set" onClick={() => setCurrent(img)}>{t('cards.page.persona.btn_set_current')}</button>}
           </div>
         ))}
       </div>
       <ImageLightbox open={!!preview} src={preview} onClose={() => setPreview(null)}
-        onCrop={onCrop} cropHint="裁剪后将存为新的当前人设图" />
+        onCrop={onCrop} cropHint={t('cards.page.persona.crop_hint')} />
     </div>
   );
 }
@@ -1014,10 +1021,10 @@ function CardDetailPanel({ card, kind, onSave, onDuplicate, onDelete }) {
     setAutoSyncBusy(true);
     try {
       await window.api.cards.personaAutoSync(raw.id ?? card.id, checked);
-      window.__apiToast?.(checked ? '已开启人设自动同步' : '已关闭人设自动同步', { kind: 'ok', duration: 1800 });
+      window.__apiToast?.(checked ? t('cards.page.persona.auto_sync_on') : t('cards.page.persona.auto_sync_off'), { kind: 'ok', duration: 1800 });
     } catch (e) {
       setAutoSync(!checked); // 回滚
-      window.__apiToast?.('操作失败', { kind: 'danger', detail: e?.message });
+      window.__apiToast?.(t('common.error'), { kind: 'danger', detail: e?.message });
     } finally { setAutoSyncBusy(false); }
   };
 
@@ -1025,9 +1032,9 @@ function CardDetailPanel({ card, kind, onSave, onDuplicate, onDelete }) {
     setGenPersonaBusy(true);
     try {
       await window.api.cards.personaGenerate(raw.id ?? card.id);
-      window.__apiToast?.('已加入生成队列，完成后将自动更新人设图', { kind: 'ok', duration: 2800 });
+      window.__apiToast?.(t('cards.page.persona.gen_queued'), { kind: 'ok', duration: 2800 });
     } catch (e) {
-      window.__apiToast?.('生成请求失败', { kind: 'danger', detail: e?.message });
+      window.__apiToast?.(t('cards.page.persona.gen_fail'), { kind: 'danger', detail: e?.message });
     } finally { setGenPersonaBusy(false); }
   };
 
@@ -1037,13 +1044,13 @@ function CardDetailPanel({ card, kind, onSave, onDuplicate, onDelete }) {
     if (!file) return;
     e.target.value = '';
     setUploadAvatarBusy(true);
-    window.__apiToast?.('正在上传头像…', { kind: 'info', duration: 2000 });
+    window.__apiToast?.(t('cards.page.persona.uploading_avatar'), { kind: 'info', duration: 2000 });
     try {
       const res = await window.api.cards.uploadAvatar(raw.id ?? card.id, file);
       if (res && res.url) setAvatarUrl(res.url);
-      window.__apiToast?.('头像已更新', { kind: 'ok', duration: 2000 });
+      window.__apiToast?.(t('cards.page.persona.avatar_updated'), { kind: 'ok', duration: 2000 });
     } catch (e2) {
-      window.__apiToast?.('上传失败', { kind: 'danger', detail: e2?.message });
+      window.__apiToast?.(t('cards.page.persona.upload_fail'), { kind: 'danger', detail: e2?.message });
     } finally { setUploadAvatarBusy(false); }
   };
 
@@ -1053,13 +1060,13 @@ function CardDetailPanel({ card, kind, onSave, onDuplicate, onDelete }) {
     if (!file) return;
     e.target.value = '';
     setUploadPersonaBusy(true);
-    window.__apiToast?.('正在上传人设图…', { kind: 'info', duration: 2000 });
+    window.__apiToast?.(t('cards.page.persona.uploading_persona'), { kind: 'info', duration: 2000 });
     try {
       const res = await window.api.cards.uploadPersonaImage(raw.id ?? card.id, file);
       if (res && res.url) setAvatarUrl(res.url);
-      window.__apiToast?.('人设图已上传并设为当前', { kind: 'ok', duration: 2200 });
+      window.__apiToast?.(t('cards.page.persona.persona_uploaded'), { kind: 'ok', duration: 2200 });
     } catch (e2) {
-      window.__apiToast?.('上传失败', { kind: 'danger', detail: e2?.message });
+      window.__apiToast?.(t('cards.page.persona.upload_fail'), { kind: 'danger', detail: e2?.message });
     } finally { setUploadPersonaBusy(false); }
   };
 
@@ -1108,7 +1115,7 @@ function CardDetailPanel({ card, kind, onSave, onDuplicate, onDelete }) {
         actions={
           <CSSpaceBetween direction="horizontal" size="xs">
             {isPersonaOrPc && (
-              <CSButton iconName="gen-ai" loading={genPersonaBusy} onClick={doGenPersonaImage}>生成人设图</CSButton>
+              <CSButton iconName="gen-ai" loading={genPersonaBusy} onClick={doGenPersonaImage}>{t('cards.page.persona.btn_gen_persona')}</CSButton>
             )}
             <CSButton variant="primary" iconName="check" loading={saving} onClick={doSave}>{t('cards.detail.btn_save')}</CSButton>
             <CSButton iconName="copy" onClick={onDuplicate}>{t('cards.detail.btn_duplicate')}</CSButton>
@@ -1159,21 +1166,21 @@ function CardDetailPanel({ card, kind, onSave, onDuplicate, onDelete }) {
         // Phase 4: 人设图标签页 — 仅 persona/pc 卡显示
         ...(isPersonaOrPc ? [{
           id: 'persona_images',
-          label: '人设图',
+          label: t('cards.page.persona.tab_label'),
           content: (
             <CSSpaceBetween size="l">
               {/* 自动维护开关 */}
-              <CSContainer header={<CSHeader variant="h3">自动维护设置</CSHeader>}>
+              <CSContainer header={<CSHeader variant="h3">{t('cards.page.persona.auto_section_title')}</CSHeader>}>
                 <CSSpaceBetween size="s">
                   <CSToggle
                     checked={autoSync}
                     disabled={autoSyncBusy}
                     onChange={({ detail }) => doToggleAutoSync(detail.checked)}
                   >
-                    人设更新时自动同步人设图
+                    {t('cards.page.persona.auto_sync_label')}
                   </CSToggle>
                   <CSBox color="text-body-secondary" fontSize="body-s">
-                    开启后，每次保存角色卡时若人设内容（名字/外貌/性格/背景）发生变化，将自动触发重新生成人设图。需要已配置生图模型 API Key。
+                    {t('cards.page.persona.auto_sync_desc')}
                   </CSBox>
                 </CSSpaceBetween>
               </CSContainer>
@@ -1181,21 +1188,21 @@ function CardDetailPanel({ card, kind, onSave, onDuplicate, onDelete }) {
               {/* 手动生成 */}
               <CSContainer header={<CSHeader variant="h3" actions={
                 <CSSpaceBetween direction="horizontal" size="xs">
-                  <CSButton iconName="gen-ai" loading={genPersonaBusy} onClick={doGenPersonaImage}>立即生成</CSButton>
+                  <CSButton iconName="gen-ai" loading={genPersonaBusy} onClick={doGenPersonaImage}>{t('cards.page.persona.btn_gen_now')}</CSButton>
                   <CSButton iconName="upload" loading={uploadPersonaBusy} disabled={uploadPersonaBusy}
-                    onClick={() => personaInputRef.current && personaInputRef.current.click()}>上传人设图</CSButton>
+                    onClick={() => personaInputRef.current && personaInputRef.current.click()}>{t('cards.page.persona.btn_upload_persona')}</CSButton>
                 </CSSpaceBetween>
-              }>手动生成人设图</CSHeader>}>
+              }>{t('cards.page.persona.manual_section_title')}</CSHeader>}>
                 <CSBox color="text-body-secondary" fontSize="body-s">
-                  根据当前角色的外貌、性格等描述生成人设图，加入异步队列后将自动更新头像。也可直接上传本地图片作为人设图。
+                  {t('cards.page.persona.manual_section_desc')}
                 </CSBox>
               </CSContainer>
 
               {/* 历史画廊 */}
               <CSExpandableSection
                 variant="container"
-                headerText="人设图历史"
-                headerDescription="点击缩略图可将其设为当前人设图（同时更新头像）"
+                headerText={t('cards.page.persona.history_title')}
+                headerDescription={t('cards.page.persona.history_desc')}
                 defaultExpanded
               >
                 {tab === 'persona_images' && (
@@ -1247,16 +1254,16 @@ function TavernImportModal({ open, onClose, onConfirm }) {
     const MAX_FILES = 8;
     const arr = [...list].slice(0, MAX_FILES);
     if (list.length > MAX_FILES) {
-      window.__apiToast?.(`一次最多 ${MAX_FILES} 张角色卡,已截取前 ${MAX_FILES} 张`, { kind: 'warn', duration: 2400 });
+      window.__apiToast?.(t('cards.page.import.too_many_files', { max: MAX_FILES }), { kind: 'warn', duration: 2400 });
     }
     const valid = arr.filter(f => {
       if (!f) return false;
       if (!/\.(png|json|webp)$/i.test(f.name || '')) {
-        window.__apiToast?.(`不支持的文件类型: ${f.name}`, { kind: 'danger', duration: 2400 });
+        window.__apiToast?.(t('cards.page.import.invalid_type', { name: f.name }), { kind: 'danger', duration: 2400 });
         return false;
       }
       if (f.size > MAX_BYTES) {
-        window.__apiToast?.(`文件过大: ${f.name} (>${MAX_BYTES / 1024 / 1024}MB)`, { kind: 'danger', duration: 2400 });
+        window.__apiToast?.(t('cards.page.import.file_too_large', { name: f.name, mb: MAX_BYTES / 1024 / 1024 }), { kind: 'danger', duration: 2400 });
         return false;
       }
       return true;
@@ -1315,11 +1322,11 @@ function TavernImportModal({ open, onClose, onConfirm }) {
     if (!f) return;
     // task 68: size + ext 校验
     if (!/\.(jsonl?)$/i.test(f.name || '')) {
-      setChatError('仅支持 .jsonl / .json 聊天记录文件');
+      setChatError(t('cards.page.import.chat_invalid_ext'));
       return;
     }
     if (f.size > 20 * 1024 * 1024) {  // 20MB / chat (聊天记录可能较长)
-      setChatError('文件过大 (>20MB)');
+      setChatError(t('cards.page.import.chat_too_large'));
       return;
     }
     setChatFile(f); setChatError(null); setChatParsed(null);

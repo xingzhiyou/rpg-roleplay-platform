@@ -2,6 +2,7 @@
 // 把当前剧本 + 打开文件作为 page_context 传入,LLM 可用 script 级直写工具改库;destructive 工具走二次确认;
 // 写成功后回调 onWriteComplete 让编辑器刷新对应标签。设计 docs/design/N_md_editor.md §5。
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Composer } from '../game-composer.jsx';
 
 const { useState, useRef, useCallback, useEffect, forwardRef, useImperativeHandle } = React;
@@ -50,6 +51,7 @@ async function consumeSSE(res, onEvent) {
 }
 
 const MdEditorAgent = forwardRef(function MdEditorAgent({ scriptId, activeTab, onWriteComplete, onContinue }, ref) {
+  const { t } = useTranslation();
   const [messages, setMessages] = useState([]);   // [{role, text, tools:[{call_id,tool,args,status,result}]}]
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
@@ -128,7 +130,7 @@ const MdEditorAgent = forwardRef(function MdEditorAgent({ scriptId, activeTab, o
       return;
     }
     if (event === 'error') {
-      setMessages((m) => m.map((msg, i) => i === assistantIdx ? { ...msg, error: data.message || '出错了' } : msg));
+      setMessages((m) => m.map((msg, i) => i === assistantIdx ? { ...msg, error: data.message || t('components.md_editor_agent.error_generic') } : msg));
       return;
     }
     // done / navigation_required / context_usage 等:忽略或可扩展。
@@ -217,13 +219,12 @@ const MdEditorAgent = forwardRef(function MdEditorAgent({ scriptId, activeTab, o
     <div className="mde-agent">
       <div className="mde-agent-head">
         <span className="mde-agent-head-icon">AI</span>
-        <span className="mde-agent-head-title">助手{activeTab ? ` · ${activeTab.label}` : ''}</span>
+        <span className="mde-agent-head-title">{t('components.md_editor_agent.title')}{activeTab ? ` · ${activeTab.label}` : ''}</span>
       </div>
       <div className="mde-agent-msgs" ref={scrollRef}>
         {messages.length === 0 && (
           <div className="mde-agent-hint">
-            让 AI 帮你改这个剧本 —— 例如「把这个角色的性格改得更阴郁」「给这章正文润色」「新建一条世界书:XX」。
-            AI 会直接改库(危险操作会先让你确认)。
+            {t('components.md_editor_agent.hint')}
           </div>
         )}
         {messages.map((m, i) => (
@@ -232,18 +233,18 @@ const MdEditorAgent = forwardRef(function MdEditorAgent({ scriptId, activeTab, o
             {(m.tools || []).map((tc, j) => (
               <div key={j} className={'mde-agent-tool ' + tc.status}>
                 <span className="mde-agent-tool-name">{tc.tool}</span>
-                <span className="mde-agent-tool-status">{tc.status === 'running' ? '执行中…' : tc.status === 'error' ? '失败' : '完成'}</span>
+                <span className="mde-agent-tool-status">{tc.status === 'running' ? t('components.md_editor_agent.tool_status.running') : tc.status === 'error' ? t('components.md_editor_agent.tool_status.error') : t('components.md_editor_agent.tool_status.done')}</span>
                 {tc.error && <div className="mde-agent-tool-err">{tc.error}</div>}
               </div>
             ))}
             {m.pendingConfirm && (
               <div className="mde-agent-confirm">
                 <div className="mde-agent-confirm-q">
-                  AI 想执行 <b>{m.pendingConfirm.tool}</b>(覆盖写入){m.pendingConfirm.description ? `:${m.pendingConfirm.description}` : ''}。确认?
+                  {t('components.md_editor_agent.confirm_prompt', { tool: m.pendingConfirm.tool })}{m.pendingConfirm.description ? `:${m.pendingConfirm.description}` : ''}
                 </div>
                 <div className="mde-agent-confirm-btns">
-                  <button className="ok" disabled={busy} onClick={() => resolveConfirm(i, 'approve')}>确认执行</button>
-                  <button className="no" disabled={busy} onClick={() => resolveConfirm(i, 'reject')}>取消</button>
+                  <button className="ok" disabled={busy} onClick={() => resolveConfirm(i, 'approve')}>{t('components.md_editor_agent.confirm_approve')}</button>
+                  <button className="no" disabled={busy} onClick={() => resolveConfirm(i, 'reject')}>{t('common.cancel')}</button>
                 </div>
               </div>
             )}
@@ -255,10 +256,10 @@ const MdEditorAgent = forwardRef(function MdEditorAgent({ scriptId, activeTab, o
         <div className="mde-agent-toolbar">
           <button
             className="mde-agent-continue"
-            title="把输入框作为指令(可空),让 AI 在当前正文光标处续写 / 选中段改写。也可在编辑器里按 ⌘K。"
+            title={t('components.md_editor_agent.continue_btn_title')}
             onClick={() => { onContinue(input.trim()); setInput(''); }}
-          >续写到正文(光标处)</button>
-          <span className="mde-agent-toolbar-hint">或在正文按 ⌘K</span>
+          >{t('components.md_editor_agent.continue_btn')}</button>
+          <span className="mde-agent-toolbar-hint">{t('components.md_editor_agent.continue_hint')}</span>
         </div>
       )}
       <div className="mde-agent-composer">
@@ -281,7 +282,7 @@ const MdEditorAgent = forwardRef(function MdEditorAgent({ scriptId, activeTab, o
           hideImageGen
           hideModel
           hideContextUsage
-          placeholder={scriptId ? '让 AI 改这个剧本…(改角色卡 / 世界书 / 正文)' : '先选剧本'}
+          placeholder={scriptId ? t('components.md_editor_agent.placeholder_with_script') : t('components.md_editor_agent.placeholder_no_script')}
         />
       </div>
     </div>

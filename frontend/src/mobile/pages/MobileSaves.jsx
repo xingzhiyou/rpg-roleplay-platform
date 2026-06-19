@@ -12,6 +12,7 @@
    铁律:零 Cloudscape / 零桌面 UI 组件;仅用 window.api.*。
 */
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Icon } from '../icons.jsx';
 import { ConfirmSheet } from '../Sheet.jsx';
 
@@ -26,10 +27,10 @@ const normSave = (x) => (window.__normalizeSave ? window.__normalizeSave(x) : x)
 const normScript = (x) => (window.__normalizeScript ? window.__normalizeScript(x) : x);
 
 /* ── 排序选项 ─────────────────────────────────────────────── */
-const SORT_OPTS = [
-  { value: 'played', label: '最近游玩' },
-  { value: 'name',   label: '名称' },
-  { value: 'created', label: '创建时间' },
+const getSortOpts = (t) => [
+  { value: 'played',  label: t('mobile.saves.sort.played') },
+  { value: 'name',    label: t('mobile.saves.sort.name') },
+  { value: 'created', label: t('mobile.saves.sort.created') },
 ];
 const PAGE_SIZE = 50;
 
@@ -39,6 +40,7 @@ const PAGE_SIZE = 50;
 
 /* ── 导出弹窗 ────────────────────────────────────────────── */
 function ExportSheet({ open, save, onClose, onToast }) {
+  const { t } = useTranslation();
   const [tier, setTier] = useState('no_vectors');
   const [estimate, setEstimate] = useState(null);
   const [estLoading, setEstLoading] = useState(false);
@@ -61,12 +63,12 @@ function ExportSheet({ open, save, onClose, onToast }) {
   if (!open || !save) return null;
 
   const fmtBytes = (b) => {
-    if (b == null) return estLoading ? '估算中…' : '未知';
+    if (b == null) return estLoading ? t('mobile.saves.export.estimating') : t('common.unknown');
     const mb = b / (1024 * 1024);
     if (mb >= 0.1) return (mb < 10 ? mb.toFixed(1) : Math.round(mb)) + ' MB';
     return Math.round(b / 1024) + ' KB';
   };
-  const sizeOf = (k) => estimate?.tiers ? fmtBytes(estimate.tiers[k]) : (estLoading ? '估算中…' : '—');
+  const sizeOf = (k) => estimate?.tiers ? fmtBytes(estimate.tiers[k]) : (estLoading ? t('mobile.saves.export.estimating') : '—');
 
   const doDownload = () => {
     const safe = (save.title || 'save').replace(/[^\w一-鿿]+/g, '_');
@@ -75,12 +77,12 @@ function ExportSheet({ open, save, onClose, onToast }) {
     a.download = `save-${save.id}-${safe}-${tier}.zip`;
     document.body.appendChild(a); a.click(); a.remove();
     onClose();
-    onToast('导出已开始', 'ok');
+    onToast(t('mobile.saves.export.started'), 'ok');
   };
 
   const TIERS = [
-    { key: 'no_vectors', label: '标准包', desc: '存档数据 + 历史，不含向量索引', isDefault: estimate?.default_tier === 'no_vectors' || !estimate },
-    { key: 'full',       label: '完整包', desc: '含全部向量嵌入，文件较大', isDefault: estimate?.default_tier === 'full' },
+    { key: 'no_vectors', label: t('mobile.saves.export.tier_standard'), desc: t('mobile.saves.export.tier_standard_desc'), isDefault: estimate?.default_tier === 'no_vectors' || !estimate },
+    { key: 'full',       label: t('mobile.saves.export.tier_full'),     desc: t('mobile.saves.export.tier_full_desc'),     isDefault: estimate?.default_tier === 'full' },
   ];
 
   return (
@@ -88,8 +90,8 @@ function ExportSheet({ open, save, onClose, onToast }) {
       <div className="sheet-scrim" />
       <div className="sheet" style={{ maxHeight: '70%' }} onClick={(e) => e.stopPropagation()}>
         <div className="sheet-grip" />
-        <div className="sheet-title">导出存档包</div>
-        <div className="sheet-sub">选择导出规格后下载 .zip 文件，可在其他设备导入。</div>
+        <div className="sheet-title">{t('mobile.saves.export.title')}</div>
+        <div className="sheet-sub">{t('mobile.saves.export.subtitle')}</div>
         <div style={{ display: 'grid', gap: 9, marginBottom: 16 }}>
           {TIERS.map(({ key, label, desc, isDefault }) => {
             const sel = tier === key;
@@ -112,7 +114,7 @@ function ExportSheet({ open, save, onClose, onToast }) {
                         fontSize: 10, padding: '2px 7px', borderRadius: 99,
                         background: 'var(--ok-soft)', color: 'var(--ok)',
                         border: '1px solid rgba(126,184,142,0.3)', fontWeight: 600,
-                      }}>推荐</span>
+                      }}>{t('mobile.saves.export.recommended')}</span>
                     )}
                   </div>
                   <div style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.5 }}>{desc}</div>
@@ -125,9 +127,9 @@ function ExportSheet({ open, save, onClose, onToast }) {
           })}
         </div>
         <div style={{ display: 'flex', gap: 9 }}>
-          <button className="sheet-btn" onClick={onClose} style={{ flex: 1 }}>取消</button>
+          <button className="sheet-btn" onClick={onClose} style={{ flex: 1 }}>{t('common.cancel')}</button>
           <button className="sheet-btn primary" onClick={doDownload} style={{ flex: 2 }}>
-            <Icon name="download" size={16} /> 下载
+            <Icon name="download" size={16} /> {t('mobile.saves.export.download_btn')}
           </button>
         </div>
       </div>
@@ -137,6 +139,7 @@ function ExportSheet({ open, save, onClose, onToast }) {
 
 /* ── 存档设置表单(内嵌) ─────────────────────────────────── */
 function SaveSettingsPane({ saveId, onToast }) {
+  const { t } = useTranslation();
   const [schema, setSchema] = useState(null);
   const [vals, setVals] = useState({});
   const [init, setInit] = useState({});
@@ -155,7 +158,7 @@ function SaveSettingsPane({ saveId, onToast }) {
           const v = {};
           (d.schema?.fields || []).forEach(f => { v[f.key] = (d.settings && d.settings[f.key]) ?? f.default; });
           setVals(v); setInit(v);
-        } else setLoadErr(d.error || '加载失败');
+        } else setLoadErr(d.error || t('mobile.saves.settings.load_failed'));
       })
       .catch(e => { if (!dead) setLoadErr(String(e)); });
     return () => { dead = true; };
@@ -167,7 +170,7 @@ function SaveSettingsPane({ saveId, onToast }) {
   if (!schema) return (
     <div className="pl-empty" style={{ padding: 32 }}>
       <div className="ic"><Icon name="settings" size={22} /></div>
-      <p>加载设置中…</p>
+      <p>{t('mobile.saves.settings.loading')}</p>
     </div>
   );
 
@@ -188,9 +191,9 @@ function SaveSettingsPane({ saveId, onToast }) {
       if (r.applied !== undefined) {
         setInit(vals);
         const rej = r.rejected && Object.keys(r.rejected);
-        if (rej && rej.length) onToast(`部分字段锁定无法修改：${rej.join('/')}`, 'warn');
-        else onToast('设置已保存', 'ok');
-      } else { setErr(r.error || '保存失败'); }
+        if (rej && rej.length) onToast(t('mobile.saves.settings.partial_locked', { fields: rej.join('/') }), 'warn');
+        else onToast(t('mobile.saves.settings.saved'), 'ok');
+      } else { setErr(r.error || t('mobile.saves.settings.save_failed')); }
     } catch (e) { setErr(String(e)); }
     setSaving(false);
   };
@@ -232,7 +235,7 @@ function SaveSettingsPane({ saveId, onToast }) {
         onClick={save}
         style={{ opacity: (!dirty || saving) ? 0.5 : 1 }}
       >
-        {saving ? '保存中…' : '保存设置'}
+        {saving ? t('mobile.saves.settings.saving') : t('mobile.saves.settings.save_btn')}
       </button>
     </div>
   );
@@ -240,6 +243,7 @@ function SaveSettingsPane({ saveId, onToast }) {
 
 /* ── 分支节点列表(内嵌) ─────────────────────────────────── */
 function BranchListPane({ save, onToast, onContinue }) {
+  const { t } = useTranslation();
   const [nodes, setNodes] = useState(null);
   const [activeId, setActiveId] = useState(null);
   const [activating, setActivating] = useState(null);
@@ -253,7 +257,7 @@ function BranchListPane({ save, onToast, onContinue }) {
       setActiveId(aid);
       const ns = (r?.nodes || r?.commits || []).map((n, i) => ({
         id: n.id,
-        summary: n.summary || n.message || n.content_preview || `节点 #${n.id}`,
+        summary: n.summary || n.message || n.content_preview || t('mobile.saves.branch.node_fallback', { id: n.id }),
         turn: n.turn_index ?? i,
         kind: n.kind || 'round',
         current: n.id === aid,
@@ -272,23 +276,23 @@ function BranchListPane({ save, onToast, onContinue }) {
     setActivating(n.id);
     try {
       await window.api.branches.activate({ save_id: save.id, commit_id: n.id, node_id: n.id });
-      onToast('已切换到该节点', 'ok');
+      onToast(t('mobile.saves.branch.switched'), 'ok');
       await reload();
-    } catch (e) { onToast('切换失败：' + (e?.message || ''), 'danger'); }
+    } catch (e) { onToast(t('mobile.saves.branch.switch_failed', { msg: e?.message || '' }), 'danger'); }
     setActivating(null);
   };
 
   if (!nodes) return (
     <div className="pl-empty" style={{ padding: 32 }}>
       <div className="ic"><Icon name="branch" size={22} /></div>
-      <p>加载分支中…</p>
+      <p>{t('mobile.saves.branch.loading')}</p>
     </div>
   );
   if (!nodes.length) return (
     <div className="pl-empty" style={{ padding: 32 }}>
       <div className="ic"><Icon name="branch" size={22} /></div>
-      <h3>暂无分支节点</h3>
-      <p>进入游戏后会自动生成分支记录。</p>
+      <h3>{t('mobile.saves.branch.empty_title')}</h3>
+      <p>{t('mobile.saves.branch.empty_desc')}</p>
     </div>
   );
 
@@ -324,8 +328,8 @@ function BranchListPane({ save, onToast, onContinue }) {
             </div>
             <div className="branch-at">
               turn {n.turn} · {n.kind}
-              {activating === n.id ? ' · 切换中…' : ''}
-              {!n.current && ' · 点击切换'}
+              {activating === n.id ? ` · ${t('mobile.saves.branch.switching')}` : ''}
+              {!n.current && ` · ${t('mobile.saves.branch.click_to_switch')}`}
             </div>
           </button>
         </div>
@@ -336,6 +340,7 @@ function BranchListPane({ save, onToast, onContinue }) {
 
 /* ── 存档详情 (overview / 设置 / 分支) ─────────────────────── */
 function SaveDetail({ save, scripts, onBack, onContinue, onToast, onReload }) {
+  const { t } = useTranslation();
   const [tab, setTab] = useState('overview');
   const [renaming, setRenaming] = useState(false);
   const [renameVal, setRenameVal] = useState('');
@@ -351,19 +356,19 @@ function SaveDetail({ save, scripts, onBack, onContinue, onToast, onReload }) {
     if (!v || v === save.title) { setRenaming(false); return; }
     try {
       await window.api.saves.rename(save.id, v);
-      onToast('已重命名', 'ok');
+      onToast(t('mobile.saves.detail.renamed'), 'ok');
       setRenaming(false);
       onReload();
-    } catch (e) { onToast('重命名失败：' + (e?.message || ''), 'danger'); }
+    } catch (e) { onToast(t('mobile.saves.detail.rename_failed', { msg: e?.message || '' }), 'danger'); }
   };
 
   const doActivate = async () => {
     setActivating(true);
     try {
       await window.api.saves.activate(save.id);
-      onToast('已设为当前存档', 'ok');
+      onToast(t('mobile.saves.detail.activated'), 'ok');
       onReload();
-    } catch (e) { onToast('激活失败：' + (e?.message || ''), 'danger'); }
+    } catch (e) { onToast(t('mobile.saves.detail.activate_failed', { msg: e?.message || '' }), 'danger'); }
     setActivating(false);
   };
 
@@ -371,18 +376,18 @@ function SaveDetail({ save, scripts, onBack, onContinue, onToast, onReload }) {
     setDeleting(true);
     try {
       await window.api.saves.remove(save.id);
-      onToast('已删除', 'ok');
+      onToast(t('mobile.saves.detail.deleted'), 'ok');
       setDelConfirm(false);
       onBack();
       onReload();
-    } catch (e) { onToast('删除失败：' + (e?.message || ''), 'danger'); }
+    } catch (e) { onToast(t('mobile.saves.detail.delete_failed', { msg: e?.message || '' }), 'danger'); }
     setDeleting(false);
   };
 
   const TABS = [
-    { id: 'overview', label: '概览' },
-    { id: 'settings', label: '设置' },
-    { id: 'branches', label: '分支' },
+    { id: 'overview', label: t('mobile.saves.detail.tab_overview') },
+    { id: 'settings', label: t('mobile.saves.detail.tab_settings') },
+    { id: 'branches', label: t('mobile.saves.detail.tab_branches') },
   ];
 
   return (
@@ -406,8 +411,8 @@ function SaveDetail({ save, scripts, onBack, onContinue, onToast, onReload }) {
             </div>
           ) : (
             <>
-              <strong className="serif" style={{ fontSize: 15 }}>{save.title || `存档 #${save.id}`}</strong>
-              <span className="sub">{script?.title || '自由模式'}</span>
+              <strong className="serif" style={{ fontSize: 15 }}>{save.title || t('mobile.saves.save_fallback', { id: save.id })}</strong>
+              <span className="sub">{script?.title || t('mobile.saves.free_mode')}</span>
             </>
           )}
         </div>
@@ -442,16 +447,16 @@ function SaveDetail({ save, scripts, onBack, onContinue, onToast, onReload }) {
           {/* 继续游戏 + 激活按钮 */}
           <div style={{ display: 'flex', gap: 9, marginBottom: 18 }}>
             <button className="pl-btn-primary" style={{ flex: 2 }} onClick={() => onContinue(save)}>
-              <Icon name="play" size={18} />继续游戏
+              <Icon name="play" size={18} />{t('mobile.saves.detail.continue_btn')}
             </button>
             {!save.current && (
               <button className="pl-btn-ghost" style={{ flex: 1 }} onClick={doActivate} disabled={activating}>
-                {activating ? '…' : '设为当前'}
+                {activating ? '…' : t('mobile.saves.detail.set_current_btn')}
               </button>
             )}
             {save.current && (
               <span className="pill accent" style={{ alignSelf: 'center', height: 36, paddingInline: 12, fontSize: 12 }}>
-                <span className="dot accent" style={{ animation: 'mk-pulse-dot 1.6s infinite' }} /> 当前
+                <span className="dot accent" style={{ animation: 'mk-pulse-dot 1.6s infinite' }} /> {t('mobile.saves.detail.current_label')}
               </span>
             )}
           </div>
@@ -461,14 +466,14 @@ function SaveDetail({ save, scripts, onBack, onContinue, onToast, onReload }) {
             <>
               <div className="pl-kvgrid" style={{ marginBottom: 16 }}>
                 {[
-                  { k: '剧本', v: script?.title || '自由模式' },
-                  { k: '玩家', v: save._raw?.player_name || '—' },
-                  { k: '回合', v: save._raw?.turn != null ? `第 ${save._raw.turn} 回合` : '—' },
-                  { k: '分支节点', v: `${Number(save.branch_count) || 0} 个` },
-                  { k: '世界时间', v: save._raw?.world_time || '—' },
-                  { k: '最近游玩', v: fmtDate(save.last_played_at || save.last_played_ts) },
-                  { k: '创建时间', v: fmtDate(save.created_ts) },
-                  { k: '状态', v: save.current ? '当前存档' : '闲置' },
+                  { k: t('mobile.saves.detail.kv_script'),   v: script?.title || t('mobile.saves.free_mode') },
+                  { k: t('mobile.saves.detail.kv_player'),   v: save._raw?.player_name || '—' },
+                  { k: t('mobile.saves.detail.kv_turn'),     v: save._raw?.turn != null ? t('mobile.saves.detail.kv_turn_value', { turn: save._raw.turn }) : '—' },
+                  { k: t('mobile.saves.detail.kv_branches'), v: t('mobile.saves.detail.kv_branches_value', { count: Number(save.branch_count) || 0 }) },
+                  { k: t('mobile.saves.detail.kv_world_time'), v: save._raw?.world_time || '—' },
+                  { k: t('mobile.saves.detail.kv_last_played'), v: fmtDate(save.last_played_at || save.last_played_ts) },
+                  { k: t('mobile.saves.detail.kv_created'),  v: fmtDate(save.created_ts) },
+                  { k: t('mobile.saves.detail.kv_status'),   v: save.current ? t('mobile.saves.detail.kv_status_current') : t('mobile.saves.detail.kv_status_idle') },
                 ].map(({ k, v }) => (
                   <div key={k} className="pl-kv">
                     <div className="k">{k}</div>
@@ -480,7 +485,7 @@ function SaveDetail({ save, scripts, onBack, onContinue, onToast, onReload }) {
               {/* 最新片段 */}
               {(save._raw?.snippet || save._raw?.last_message) && (
                 <div className="pl-sec">
-                  <div className="pl-sec-head"><h2>最新片段</h2></div>
+                  <div className="pl-sec-head"><h2>{t('mobile.saves.detail.latest_snippet')}</h2></div>
                   <blockquote className="quote">
                     {save._raw.snippet || save._raw.last_message}
                   </blockquote>
@@ -492,7 +497,7 @@ function SaveDetail({ save, scripts, onBack, onContinue, onToast, onReload }) {
           {/* ── settings ─────────────────────────────────────────── */}
           {tab === 'settings' && (
             <div className="pl-sec" style={{ marginTop: 0 }}>
-              <div className="pl-sec-head"><h2>游戏设置</h2></div>
+              <div className="pl-sec-head"><h2>{t('mobile.saves.detail.game_settings')}</h2></div>
               <SaveSettingsPane saveId={save.id} onToast={onToast} />
             </div>
           )}
@@ -501,7 +506,7 @@ function SaveDetail({ save, scripts, onBack, onContinue, onToast, onReload }) {
           {tab === 'branches' && (
             <div className="pl-sec" style={{ marginTop: 0 }}>
               <div className="pl-sec-head">
-                <h2>分支节点 · {Number(save.branch_count) || '?'} 个</h2>
+                <h2>{t('mobile.saves.detail.branches_heading', { count: Number(save.branch_count) || '?' })}</h2>
               </div>
               <BranchListPane save={save} onToast={onToast} onContinue={() => onContinue(save)} />
             </div>
@@ -512,10 +517,10 @@ function SaveDetail({ save, scripts, onBack, onContinue, onToast, onReload }) {
       {/* 删除确认 */}
       <ConfirmSheet
         open={delConfirm}
-        title="删除存档"
-        body={`确定要删除「${save.title}」吗？此操作不可恢复。`}
+        title={t('mobile.saves.detail.del_confirm_title')}
+        body={t('mobile.saves.detail.del_confirm_body', { title: save.title })}
         danger
-        confirmLabel="删除"
+        confirmLabel={t('common.delete')}
         onCancel={() => setDelConfirm(false)}
         onConfirm={doDelete}
         loading={deleting}
@@ -534,6 +539,7 @@ function SaveDetail({ save, scripts, onBack, onContinue, onToast, onReload }) {
 
 /* ── 分支树页 (saves-branches) ───────────────────────────── */
 function BranchesPage({ nav }) {
+  const { t } = useTranslation();
   const [saves, setSaves] = useState([]);
   const [savesLoaded, setSavesLoaded] = useState(false);
   const [selectedSave, setSelectedSave] = useState(null);
@@ -573,7 +579,7 @@ function BranchesPage({ nav }) {
         const shortRefs = refNames.map(rn => String(rn).startsWith('refs/') ? String(rn).split('/').slice(2).join('/') : rn);
         return {
           id: n.id,
-          summary: n.summary || n.message || n.content_preview || `节点 #${n.id}`,
+          summary: n.summary || n.message || n.content_preview || t('mobile.saves.branch.node_fallback', { id: n.id }),
           turn: n.turn_index ?? i,
           kind: n.kind || 'round',
           ref_names: refNames,
@@ -583,7 +589,7 @@ function BranchesPage({ nav }) {
         };
       });
       setTreePayload({ nodes, refs: r?.refs || [], active_commit_id: aid });
-    } catch (e) { setTreeErr(e?.message || '加载失败'); setTreePayload(null); }
+    } catch (e) { setTreeErr(e?.message || t('mobile.saves.branches_page.load_failed')); setTreePayload(null); }
     setTreeLoading(false);
   }, [selectedSave]);
 
@@ -593,9 +599,9 @@ function BranchesPage({ nav }) {
     setActivating(nodeId);
     try {
       await window.api.branches.activate({ save_id: selectedSave, commit_id: nodeId, node_id: nodeId });
-      nav.toast('已切换到该节点', 'ok');
+      nav.toast(t('mobile.saves.branch.switched'), 'ok');
       await reloadTree();
-    } catch (e) { nav.toast('切换失败', 'danger'); }
+    } catch (e) { nav.toast(t('mobile.saves.branches_page.switch_failed'), 'danger'); }
     setActivating(null);
   };
 
@@ -605,10 +611,10 @@ function BranchesPage({ nav }) {
     setDeleting(true);
     try {
       await window.api.branches.delete({ save_id: selectedSave, node_id: cid, commit_id: cid });
-      nav.toast('已删除节点', 'ok');
+      nav.toast(t('mobile.saves.branches_page.node_deleted'), 'ok');
       setDelTarget(null);
       await reloadTree();
-    } catch (e) { nav.toast('删除失败', 'danger'); }
+    } catch (e) { nav.toast(t('mobile.saves.branches_page.delete_failed'), 'danger'); }
     setDeleting(false);
   };
 
@@ -625,16 +631,16 @@ function BranchesPage({ nav }) {
       <>
         <div className="pl-head">
           <button className="pl-back" onClick={() => nav.go('saves')}><Icon name="chevron_left" size={20} /></button>
-          <div className="pl-head-title center"><strong>分支树</strong></div>
+          <div className="pl-head-title center"><strong>{t('mobile.saves.branches_page.title')}</strong></div>
         </div>
         <div className="pl-body tabbed">
           <div className="pl-pad">
             <div className="pl-empty">
               <div className="ic"><Icon name="branch" size={24} /></div>
-              <h3>还没有存档</h3>
-              <p>先创建一个存档，再来这里查看分支历史。</p>
+              <h3>{t('mobile.saves.list.empty_title')}</h3>
+              <p>{t('mobile.saves.branches_page.no_saves_desc')}</p>
               <button className="pl-btn-primary" style={{ marginTop: 16, maxWidth: 200 }} onClick={() => nav.go('saves')}>
-                <Icon name="save" size={17} />去存档页
+                <Icon name="save" size={17} />{t('mobile.saves.branches_page.go_saves_btn')}
               </button>
             </div>
           </div>
@@ -648,8 +654,8 @@ function BranchesPage({ nav }) {
       <div className="pl-head">
         <button className="pl-back" onClick={() => nav.go('saves')}><Icon name="chevron_left" size={20} /></button>
         <div className="pl-head-title">
-          <strong>分支树</strong>
-          <span className="sub">{nodes.length} 个节点</span>
+          <strong>{t('mobile.saves.branches_page.title')}</strong>
+          <span className="sub">{t('mobile.saves.branches_page.node_count', { count: nodes.length })}</span>
         </div>
         <div className="pl-head-actions">
           <button className="pl-headbtn" onClick={reloadTree}><Icon name="refresh" size={18} /></button>
@@ -669,7 +675,7 @@ function BranchesPage({ nav }) {
               color: 'var(--text)', fontSize: 16, padding: '0 12px', outline: 'none',
             }}
           >
-            {saves.map(s => <option key={s.id} value={s.id}>{s.title || `存档 #${s.id}`}</option>)}
+            {saves.map(s => <option key={s.id} value={s.id}>{s.title || t('mobile.saves.save_fallback', { id: s.id })}</option>)}
           </select>
         </div>
       )}
@@ -679,24 +685,24 @@ function BranchesPage({ nav }) {
           {treeLoading && (
             <div className="pl-empty" style={{ padding: 32 }}>
               <div className="ic"><Icon name="branch" size={22} /></div>
-              <p>加载中…</p>
+              <p>{t('common.loading')}</p>
             </div>
           )}
           {!treeLoading && treeErr && (
             <div className="pl-empty">
               <div className="ic"><Icon name="warn" size={22} /></div>
-              <h3>加载失败</h3>
+              <h3>{t('mobile.saves.branches_page.load_failed')}</h3>
               <p>{treeErr}</p>
               <button className="pl-btn-ghost" style={{ marginTop: 14, maxWidth: 160 }} onClick={reloadTree}>
-                <Icon name="refresh" size={16} />重试
+                <Icon name="refresh" size={16} />{t('mobile.saves.branches_page.retry_btn')}
               </button>
             </div>
           )}
           {!treeLoading && !treeErr && nodes.length === 0 && (
             <div className="pl-empty">
               <div className="ic"><Icon name="branch" size={22} /></div>
-              <h3>暂无分支节点</h3>
-              <p>进入游戏后会自动生成提交记录。</p>
+              <h3>{t('mobile.saves.branch.empty_title')}</h3>
+              <p>{t('mobile.saves.branches_page.empty_desc')}</p>
             </div>
           )}
           {!treeLoading && !treeErr && nodes.length > 0 && (
@@ -737,7 +743,7 @@ function BranchesPage({ nav }) {
                             disabled={activating === n.id}
                           >
                             <Icon name="play" size={14} />
-                            {n.current ? '从此继续' : (activating === n.id ? '切换中…' : '切换到此')}
+                            {n.current ? t('mobile.saves.branches_page.continue_from') : (activating === n.id ? t('mobile.saves.branch.switching') : t('mobile.saves.branches_page.switch_to'))}
                           </button>
                           {!n.current && (
                             <button
@@ -758,7 +764,7 @@ function BranchesPage({ nav }) {
                 ))}
               </div>
               <div className="pl-note" style={{ marginTop: 14 }}>
-                分支像 Git 一样工作。删除节点后历史仍保留在 <span className="mono" style={{ fontSize: 11 }}>refs/trash</span>，30 天内可恢复。
+                {t('mobile.saves.branches_page.git_note_prefix')}<span className="mono" style={{ fontSize: 11 }}>refs/trash</span>{t('mobile.saves.branches_page.git_note_suffix')}
               </div>
             </>
           )}
@@ -768,10 +774,10 @@ function BranchesPage({ nav }) {
       {/* 删除节点确认 */}
       <ConfirmSheet
         open={!!delTarget}
-        title={`删除节点 #${delTarget?.id}`}
-        body={`确定删除「${delTarget?.summary || '该节点'}」？此操作不可立即恢复，30 天内可在 refs/trash 找回。`}
+        title={t('mobile.saves.branches_page.del_node_title', { id: delTarget?.id })}
+        body={t('mobile.saves.branches_page.del_node_body', { summary: delTarget?.summary || t('mobile.saves.branches_page.this_node') })}
         danger
-        confirmLabel="删除节点"
+        confirmLabel={t('mobile.saves.branches_page.del_node_btn')}
         onCancel={() => setDelTarget(null)}
         onConfirm={doDelete}
         loading={deleting}
@@ -785,6 +791,8 @@ function BranchesPage({ nav }) {
    路由:saves(列表/详情) + saves-branches(分支树页)
    ══════════════════════════════════════════════════════════ */
 export function MobileSaves({ nav }) {
+  const { t } = useTranslation();
+
   /* ── 路由:saves-branches 分支树整页 ─────────────────────── */
   if (nav?.currentPage === 'saves-branches') {
     return (
@@ -867,25 +875,25 @@ export function MobileSaves({ nav }) {
   const paged = visible.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   useEffect(() => { setPage(1); }, [query, sortBy]);
 
-  const scriptTitle = s => scripts.find(x => x.id === s.script_id)?.title || '自由模式';
+  const scriptTitle = s => scripts.find(x => x.id === s.script_id)?.title || t('mobile.saves.free_mode');
 
   /* ── 导入存档 ─────────────────────────────────────────── */
   const onImport = async (file) => {
     if (!file) return;
     if (!/\.(json|zip)$/i.test(file.name || '')) {
-      showToast('只支持 .json / .zip 格式', 'danger'); return;
+      showToast(t('mobile.saves.import.bad_format'), 'danger'); return;
     }
     if (file.size > 200 * 1024 * 1024) {
-      showToast('文件过大 (>200MB)', 'danger'); return;
+      showToast(t('mobile.saves.import.too_large'), 'danger'); return;
     }
-    showToast('导入中…', 'ok');
+    showToast(t('mobile.saves.import.importing'), 'ok');
     try {
       const r = await window.api.saves.importFile(file);
-      if (r && r.ok === false) throw new Error(r.error || r.detail || '导入失败');
-      if (r?.warnings?.length) showToast(`导入完成，${r.warnings.length} 条警告`, 'ok');
-      else showToast('导入成功', 'ok');
+      if (r && r.ok === false) throw new Error(r.error || r.detail || t('mobile.saves.import.failed'));
+      if (r?.warnings?.length) showToast(t('mobile.saves.import.done_with_warnings', { count: r.warnings.length }), 'ok');
+      else showToast(t('mobile.saves.import.success'), 'ok');
       reload();
-    } catch (e) { showToast('导入失败：' + (e?.message || ''), 'danger'); }
+    } catch (e) { showToast(t('mobile.saves.import.failed_msg', { msg: e?.message || '' }), 'danger'); }
   };
 
   /* ── 详情视图 ─────────────────────────────────────────── */
@@ -915,8 +923,8 @@ export function MobileSaves({ nav }) {
       {/* 头部 */}
       <div className="pl-head">
         <div className="pl-head-title">
-          <strong style={{ fontSize: 17, fontFamily: 'var(--font-serif)' }}>存档</strong>
-          <span className="sub">{saves.length} 个存档</span>
+          <strong style={{ fontSize: 17, fontFamily: 'var(--font-serif)' }}>{t('mobile.saves.list.title')}</strong>
+          <span className="sub">{t('mobile.saves.list.count', { count: saves.length })}</span>
         </div>
         <div className="pl-head-actions">
           <button className="pl-headbtn" onClick={() => importRef.current?.click()}>
@@ -943,7 +951,7 @@ export function MobileSaves({ nav }) {
         <div className="pl-search">
           <Icon name="search" size={16} />
           <input
-            placeholder="搜索存档或剧本名…"
+            placeholder={t('mobile.saves.list.search_placeholder')}
             value={query}
             onChange={e => setQuery(e.target.value)}
             style={{ fontSize: 16 }}
@@ -960,7 +968,7 @@ export function MobileSaves({ nav }) {
           onClick={() => setSortOpen(p => !p)}
         >
           <Icon name="filter" size={14} />
-          {SORT_OPTS.find(o => o.value === sortBy)?.label}
+          {getSortOpts(t).find(o => o.value === sortBy)?.label}
         </button>
       </div>
 
@@ -970,9 +978,9 @@ export function MobileSaves({ nav }) {
           <div className="sheet-scrim" />
           <div className="sheet" onClick={e => e.stopPropagation()}>
             <div className="sheet-grip" />
-            <div className="sheet-title">排序方式</div>
+            <div className="sheet-title">{t('mobile.saves.list.sort_title')}</div>
             <div className="sheet-list" style={{ marginTop: 8 }}>
-              {SORT_OPTS.map(o => (
+              {getSortOpts(t).map(o => (
                 <button
                   key={o.value}
                   className={'sheet-item ' + (sortBy === o.value ? 'active' : '')}
@@ -997,17 +1005,17 @@ export function MobileSaves({ nav }) {
           {loading && (
             <div className="pl-empty">
               <div className="ic"><Icon name="save" size={22} /></div>
-              <p>加载中…</p>
+              <p>{t('common.loading')}</p>
             </div>
           )}
 
           {!loading && saves.length === 0 && (
             <div className="pl-empty">
               <div className="ic"><Icon name="save" size={22} /></div>
-              <h3>还没有存档</h3>
-              <p>选一部剧本开始新游戏，或导入已有存档。</p>
+              <h3>{t('mobile.saves.list.empty_title')}</h3>
+              <p>{t('mobile.saves.list.empty_desc')}</p>
               <button className="pl-btn-primary" style={{ marginTop: 16, maxWidth: 220 }} onClick={() => (nav.push ? nav.push('new-game') : nav.switchTab && nav.switchTab('scripts'))}>
-                <Icon name="book_open" size={17} />浏览剧本
+                <Icon name="book_open" size={17} />{t('mobile.saves.list.browse_scripts_btn')}
               </button>
             </div>
           )}
@@ -1015,8 +1023,8 @@ export function MobileSaves({ nav }) {
           {!loading && saves.length > 0 && visible.length === 0 && (
             <div className="pl-empty">
               <div className="ic"><Icon name="search" size={22} /></div>
-              <h3>没有匹配结果</h3>
-              <p>试试其他关键词。</p>
+              <h3>{t('mobile.saves.list.no_results_title')}</h3>
+              <p>{t('mobile.saves.list.no_results_desc')}</p>
             </div>
           )}
 
@@ -1032,18 +1040,18 @@ export function MobileSaves({ nav }) {
                   <Icon name={isCur ? 'play' : 'save'} size={18} />
                 </span>
                 <span className="pl-row-tx">
-                  <strong className="serif">{s.title || `存档 #${s.id}`}</strong>
+                  <strong className="serif">{s.title || t('mobile.saves.save_fallback', { id: s.id })}</strong>
                   <span>
                     {scriptTitle(s)}
                     <span className="mono">
-                      {' '}· {Number(s.branch_count) || 0} 分支
+                      {' '}· {t('mobile.saves.list.branch_count', { count: Number(s.branch_count) || 0 })}
                       {s.last_played_at ? ` · ${fmtDate(s.last_played_at)}` : ''}
                     </span>
                   </span>
                 </span>
                 <span className="pl-row-end" style={{ flexDirection: 'column', gap: 4, alignItems: 'flex-end' }}>
                   {isCur && (
-                    <span style={{ fontSize: 9.5, padding: '2px 7px', borderRadius: 99, background: 'var(--accent-soft)', color: 'var(--accent)', border: '1px solid var(--accent-edge)', fontWeight: 600, whiteSpace: 'nowrap' }}>当前</span>
+                    <span style={{ fontSize: 9.5, padding: '2px 7px', borderRadius: 99, background: 'var(--accent-soft)', color: 'var(--accent)', border: '1px solid var(--accent-edge)', fontWeight: 600, whiteSpace: 'nowrap' }}>{t('mobile.saves.detail.current_label')}</span>
                   )}
                   <button
                     style={{
@@ -1055,7 +1063,7 @@ export function MobileSaves({ nav }) {
                     }}
                     onClick={e => { e.stopPropagation(); nav.openGame(s); }}
                   >
-                    <Icon name="play" size={13} />继续
+                    <Icon name="play" size={13} />{t('mobile.saves.list.continue_btn')}
                   </button>
                 </span>
               </button>
@@ -1086,29 +1094,29 @@ export function MobileSaves({ nav }) {
           {/* 底部操作区 */}
           {!loading && (
             <div className="pl-sec" style={{ marginTop: 24 }}>
-              <div className="pl-sec-head"><h2>操作</h2></div>
+              <div className="pl-sec-head"><h2>{t('mobile.saves.list.actions_heading')}</h2></div>
               <div style={{ display: 'grid', gap: 8 }}>
                 <button className="pl-row" onClick={() => importRef.current?.click()}>
                   <span className="pl-row-ic info"><Icon name="upload" size={18} /></span>
                   <span className="pl-row-tx">
-                    <strong>导入存档</strong>
-                    <span>支持 .json / .zip 存档包</span>
+                    <strong>{t('mobile.saves.import.action_title')}</strong>
+                    <span>{t('mobile.saves.import.action_desc')}</span>
                   </span>
                   <span className="pl-row-chev"><Icon name="chevron_right" size={17} /></span>
                 </button>
                 <button className="pl-row" onClick={() => nav.go('saves-branches')}>
                   <span className="pl-row-ic"><Icon name="branch" size={18} /></span>
                   <span className="pl-row-tx">
-                    <strong>分支树</strong>
-                    <span>查看全部存档的分支历史</span>
+                    <strong>{t('mobile.saves.branches_page.title')}</strong>
+                    <span>{t('mobile.saves.branches_page.action_desc')}</span>
                   </span>
                   <span className="pl-row-chev"><Icon name="chevron_right" size={17} /></span>
                 </button>
                 <button className="pl-row" onClick={() => (nav.push ? nav.push('new-game') : nav.switchTab && nav.switchTab('scripts'))}>
                   <span className="pl-row-ic accent"><Icon name="plus" size={18} /></span>
                   <span className="pl-row-tx">
-                    <strong>新游戏</strong>
-                    <span>从剧本页选择剧本开始</span>
+                    <strong>{t('mobile.saves.list.new_game_title')}</strong>
+                    <span>{t('mobile.saves.list.new_game_desc')}</span>
                   </span>
                   <span className="pl-row-chev"><Icon name="chevron_right" size={17} /></span>
                 </button>

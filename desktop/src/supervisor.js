@@ -173,6 +173,9 @@ class Supervisor extends EventEmitter {
       ...process.env,
       DATABASE_URL: this._databaseUrl(),
       RPG_DEPLOYMENT_MODE: 'desktop',
+      // 单一真源:把外壳版本(= package.json)注入后端,使 /api/health.app_version 与控制台一致。
+      // 否则捆绑包内无仓库根 VERSION 文件,core.version 回退 "0.0.0-dev"。
+      RPG_APP_VERSION: ((() => { try { return require('../package.json').version; } catch (_) { return ''; } })()),
       RPG_MASTER_KEY: c.masterKey,
       // 自部署反馈转发的中央服务器 + 本机设备 id(供后端把 app 内反馈转走 + 归并)
       RPG_CENTRAL_URL: c.onlineUrl || 'https://rpg-roleplay.stellatrix.icu',

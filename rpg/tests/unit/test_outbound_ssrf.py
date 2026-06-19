@@ -299,6 +299,25 @@ class SafeHttpxClientGate(unittest.TestCase):
         self.assertFalse(client.follow_redirects)
         self.assertIsInstance(getattr(client, "_transport", None), outbound._SsrfGuardTransport)
 
+    def test_safe_httpx_client_http2_when_available_else_fallback(self):
+        # http2=True(默认)在装了 h2 时开 HTTP/2(run 内多流式调用多路复用同连接,省 ×N 握手);
+        # 没装 h2 时优雅回退 HTTP/1.1 不报错。守卫不变(上面已验)。
+        try:
+            import h2  # noqa: F401
+            h2_present = True
+        except Exception:
+            h2_present = False
+        client = outbound.safe_httpx_client(timeout=5)  # 默认 http2=True
+        self.addCleanup(client.close)
+        inner = client._transport._inner  # _SsrfGuardTransport 包的 httpx.HTTPTransport
+        pool = inner._pool
+        # httpcore 池的 http2 标志反映实际是否启用(装了 h2 → True;没装 → 回退 False)
+        self.assertEqual(bool(getattr(pool, "_http2", False)), h2_present)
+        # 显式关闭时一定是 HTTP/1.1
+        c1 = outbound.safe_httpx_client(timeout=5, http2=False)
+        self.addCleanup(c1.close)
+        self.assertFalse(bool(getattr(c1._transport._inner._pool, "_http2", False)))
+
 
 class ConsolidationSourceGuards(unittest.TestCase):
     """静态巡检:四处调用点必须收口到 safe_urlopen,不许裸 urlopen / 自建 redirect opener 复活。"""

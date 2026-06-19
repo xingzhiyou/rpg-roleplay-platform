@@ -256,7 +256,7 @@ class _SsrfGuardTransport:
         self._inner.__exit__(*a)
 
 
-def safe_httpx_client(*, timeout: float = 30.0, proxy: str | None = None):
+def safe_httpx_client(*, timeout: float = 30.0, proxy: str | None = None, http2: bool = True):
     """返回一个 SSRF 安全的 httpx.Client:不跟随重定向 + 传输层 use-time 私网校验(缓解 DNS rebinding)。
 
     用于把 user/admin 可控 base_url 喂给 OpenAI 兼容 SDK 的出站点(model_probe 拉模型、
@@ -265,10 +265,28 @@ def safe_httpx_client(*, timeout: float = 30.0, proxy: str | None = None):
 
     proxy:仅本地模式应传(用户在凭据里配的出站代理);托管多用户后端永不传(防 SSRF —— 代理可
     合法指向内网,无法用「禁私网」拦)。代理走内层 HTTPTransport,守卫仍校验目标 host。
+
+    http2(默认 True):开 HTTP/2。一个 GM run 内会发多个 LLM 调用(推理 + 工具轮),都走 stream=True;
+    OpenAI/Anthropic SDK 的流式响应到 [DONE] 即停、不 drain body → HTTP/1.1 下 httpx 无法把 socket
+    归还连接池 → 每次调用都重新 TCP+TLS 握手(×N 握手开销,见社区反馈)。HTTP/2 把每个调用变成同一
+    连接上的一条 stream(关 stream ≠ 关 connection),故即便 SDK 不 drain 也复用同一连接 → run 内
+    持久连接、省掉 ×N 握手。provider 不支持 h2 时 ALPN 自动回退 HTTP/1.1(行为同现状,无害)。
+    安全不变:_SsrfGuardTransport 仍每请求重解析校验;复用的 h2 连接已 pin 到首次校验过的公网 IP,
+    后续 stream 不再重解析 → DNS rebinding 对已建连接无效(与「不复用就每次新建」相比反而更少新解析)。
+    需 `h2` 包(httpx[http2]);缺包时 httpx 在建 h2 连接时报错,故仅在装了 h2 时开启,否则退回 1.1。
     """
     import httpx
 
-    inner = httpx.HTTPTransport(proxy=proxy) if proxy else httpx.HTTPTransport()
+    _h2 = bool(http2)
+    if _h2:
+        try:
+            import h2  # noqa: F401  # 仅探测是否可用
+        except Exception:
+            _h2 = False  # 没装 h2 包 → 退回 HTTP/1.1(不报错)
+    inner = (
+        httpx.HTTPTransport(proxy=proxy, http2=_h2) if proxy
+        else httpx.HTTPTransport(http2=_h2)
+    )
     return httpx.Client(
         follow_redirects=False,
         timeout=httpx.Timeout(timeout, connect=10.0),

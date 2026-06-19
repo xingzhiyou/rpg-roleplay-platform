@@ -9,6 +9,7 @@ dependencies = [
     "fsspec>=2026.6.0",
     "google-auth>=2.55.0",
     "google-genai>=2.9.0",
+    "httpx[http2]>=0.28",
     "openai>=2.43.0",
     "psycopg[binary]>=3.3",
     "psycopg-pool>=3.3",

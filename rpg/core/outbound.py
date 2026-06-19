@@ -34,6 +34,22 @@ class OutboundBlocked(ValueError):
     """目标解析到私有/本地/保留地址,出于 SSRF 防护拒绝连接。"""
 
 
+def _ssrf_enforced() -> bool:
+    """解析级 SSRF 拦截**仅在服务器(多租户)模式**启用。
+
+    本地/自部署单用户模式下「用户即操作者」:指向本机大模型(Ollama/LM Studio 127.0.0.1)、
+    或开着梯子(Clash fake-ip 把公网 API 域名解析成 198.18.x.x 这类保留段)都是合法用法,
+    解析级 IP 拦截会误杀(用户反馈:开代理→「api 使用了保留地址」连接失败)。
+    本地模式仍保留「不跟随重定向」这道结构性防线,只放开 IP 黑名单。
+    取不到配置时保守=启用(fail-safe)。
+    """
+    try:
+        from core.config import require_auth
+        return bool(require_auth())
+    except Exception:
+        return True
+
+
 def _ip_is_internal(ip_str: str) -> bool:
     """复用写时闸的内网判定(单一真源,避免逻辑漂移)。"""
     from platform_app.user_credentials import _ip_is_internal as _impl
@@ -145,13 +161,17 @@ def safe_urlopen(req, *, timeout=socket._GLOBAL_DEFAULT_TIMEOUT):
         raise OutboundBlocked("出站目标缺少 host")
     port = parsed.port or (443 if scheme == "https" else 80)
 
-    pinned_ip = _resolve_external_ip(host, port)
-
-    opener = urllib.request.build_opener(
-        _PinnedHTTPHandler(pinned_ip),
-        _PinnedHTTPSHandler(pinned_ip),
-        _NoRedirect(),
-    )
+    # 服务器模式:重解析 + IP pin(抗 rebinding);本地/自部署模式:不做 IP 拦截/pin
+    # (允许本机大模型 / 梯子 fake-ip),但仍保留不跟随重定向。
+    if _ssrf_enforced():
+        pinned_ip = _resolve_external_ip(host, port)
+        opener = urllib.request.build_opener(
+            _PinnedHTTPHandler(pinned_ip),
+            _PinnedHTTPSHandler(pinned_ip),
+            _NoRedirect(),
+        )
+    else:
+        opener = urllib.request.build_opener(_NoRedirect())
     return opener.open(req, timeout=timeout)
 
 
@@ -220,7 +240,9 @@ class _SsrfGuardTransport:
         if not host:
             raise OutboundBlocked("出站目标缺少 host")
         port = request.url.port or (443 if scheme == "https" else 80)
-        _resolve_external_ip(host, port)  # 内网即抛 OutboundBlocked(fail-closed)
+        # 服务器模式才做内网拦截;本地/自部署模式放行(本机大模型 / 梯子 fake-ip)。
+        if _ssrf_enforced():
+            _resolve_external_ip(host, port)  # 内网即抛 OutboundBlocked(fail-closed)
         return self._inner.handle_request(request)
 
     def close(self):

@@ -79,7 +79,15 @@ def _validate_base_url(url: str) -> None:
     if p.scheme not in {"https", "http"}:
         raise ValueError("base_url 必须是 http/https")
     from core.config import require_auth as _require_auth
-    if p.scheme == "http" and _require_auth():
+    # 本地/自部署单用户模式:用户自己的机器 + 自己的 key,SSRF「自我保护」无意义。而这里的
+    # 解析级 IP 拦截会**误杀两类合法本地用法**:① 指向本机大模型(Ollama/LM Studio 127.0.0.1)
+    # ② 开着梯子(Clash fake-ip 把公网 API 域名解析成 198.18.x.x 这类保留段)。真请求其实经代理/
+    # 本机能通,却被预校验当内网拒了(用户反馈:开代理→「api 使用了保留地址」连接失败)。
+    # SSRF 真防线在请求时的 safe_* 出站层 + 托管模式 byok_only 守卫;解析级拦截只是服务器自保,
+    # 故仅在服务器模式(require_auth)生效;本地模式只校验 scheme。
+    if not _require_auth():
+        return
+    if p.scheme == "http":
         raise ValueError("服务器模式下 base_url 必须是 https")
     host = (p.hostname or "").lower()
     if not host:

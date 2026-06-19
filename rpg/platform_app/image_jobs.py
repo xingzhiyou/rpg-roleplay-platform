@@ -151,6 +151,40 @@ def enqueue_image_generation(
     return {"image_id": image_id, "status": "pending"}
 
 
+def wait_for_image(image_id: int, *, timeout_s: float = 90.0, poll_s: float = 1.5) -> dict[str, Any]:
+    """阻塞轮询 ai_images 直到终态(done/failed/cancelled)或超时,返回 {status,url,error}。
+
+    闭环用(用户:生图后 LLM 不知道好没好):generate_image 在 LLM 自主路径上【确定性】等真实
+    结果,把成功/失败回灌进 agentic 工具循环,而非返回「已入队」回执。后处理在独立进程,故用
+    DB 轮询(跨进程可靠,不依赖 in-process 队列)。轮询跑在 GM 工作线程(asyncio.to_thread 桥接),
+    time.sleep 不阻塞事件循环、SSE 照常存活。超时返回当前(pending/generating)状态,调用方优雅收尾。
+    """
+    import time
+
+    from platform_app.db import connect
+    deadline = time.monotonic() + timeout_s
+    last: dict[str, Any] = {"status": "pending", "url": "", "error": ""}
+    while True:
+        try:
+            with connect() as db:
+                row = db.execute(
+                    "select status, url, error from ai_images where id = %s", (int(image_id),)
+                ).fetchone()
+            if row:
+                last = {
+                    "status": row.get("status") or "pending",
+                    "url": row.get("url") or "",
+                    "error": row.get("error") or "",
+                }
+                if last["status"] in ("done", "failed", "cancelled"):
+                    return last
+        except Exception as exc:
+            log.debug("[image_jobs] wait_for_image poll error: %s", exc)
+        if time.monotonic() >= deadline:
+            return last
+        time.sleep(poll_s)
+
+
 # ── Worker handler ───────────────────────────────────────────────────────
 
 async def handle_image_gen(payload: dict[str, Any]) -> None:

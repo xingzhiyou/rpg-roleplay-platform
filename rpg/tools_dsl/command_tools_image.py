@@ -276,6 +276,20 @@ def _execute_generate_image(state: Any, args: dict[str, Any]) -> str | dict[str,
             "[image_jobs] generate_image enqueued image_id=%s user=%s kind=%s origin=%s save_id=%s",
             image_id, user_id, kind, origin, enqueue_save_id,
         )
+        # 闭环(用户:生图后 LLM 不知道好没好)——LLM 自主路径上【确定性】等真实结果,把成功/失败
+        # 回灌进 agentic 工具循环(不靠模型自己去轮询=不违背 harness 确定性铁律);手动路径
+        # (ui_button/api_direct)仍即时返回回执,前端走 SSE 浮窗,不阻塞用户。
+        if image_id and origin in _AUTONOMOUS_ORIGINS:
+            from platform_app.image_jobs import wait_for_image
+            _r = wait_for_image(int(image_id))
+            _st = _r.get("status")
+            if _st == "done":
+                return f"生图成功(image_id={image_id}):图片已插入本轮对话,可据此继续叙述。"
+            if _st == "failed":
+                return f"生图失败(image_id={image_id}):{_r.get('error') or '未知错误'}。可调整提示词重试,或如实告知用户。"
+            if _st == "cancelled":
+                return f"生图已被取消(image_id={image_id})。"
+            return f"生图仍在后台生成中(image_id={image_id}),稍后会自动出现在对话里;本轮可先继续,无需空等。"
         return f"生图已入队：image_id={image_id}，status=pending。生成完成后通过 SSE 推送 URL。"
     except Exception as exc:
         log.exception("[image_jobs] enqueue_image_generation failed")

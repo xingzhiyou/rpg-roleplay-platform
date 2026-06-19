@@ -127,6 +127,23 @@ def _check_rate_limit(ip: str, username: str) -> None:
         _FAIL_BUCKETS_USER[user_key] = [t for t in _FAIL_BUCKETS_USER.get(user_key, []) if now - t < _USER_WINDOW_SEC]
 
 
+def _ip_budget_exceeded(bucket: str, ip: str, limit: int, window_sec: int = 600) -> bool:
+    """per-IP 「成功也计数」的发件/注册预算闸(Redis,优雅降级)。
+
+    与 _check_rate_limit/_record_login_fail 互补:那两个只在【失败】时计数,
+    对「每次都成功」的注册风暴/邮件轰炸完全无效。本闸对【每次调用】都 +1,
+    超过 limit 即返回 True(应拒)。Redis 不可用 → 返回 False(降级放行,不阻断真实用户)。
+    """
+    try:
+        import redis_bus
+        if redis_bus.get_sync_client() is None:
+            return False
+        cnt = redis_bus.rate_incr(f"{bucket}:{ip or '-'}", window_sec) or 0
+        return cnt > limit
+    except Exception:
+        return False
+
+
 def _record_login_fail(ip: str, username: str) -> int:
     """记录一次失败。返回 username bucket 内累计失败次数。超阈值会被锁定。"""
     # P2-5: 分别记录 per-IP 和 per-username bucket
@@ -380,6 +397,27 @@ def register(
             if not wl:
                 raise ValueError("该邮箱不在内测白名单。本批次仅向早期预约者开放,如需加入下一批请到 play.stellatrix.icu 留邮箱。")
 
+        # ── 注册风暴防护:成功路径也限流 ─────────────────────────────────────────
+        # _check_rate_limit/_record_login_fail 只在【失败】时计数,对「每次换新用户名+
+        # 新邮箱→每次都成功」的注册风暴无效 → 单 IP 可无限触发 SMTP 发件(Resend 计费)
+        # + email_verifications 表膨胀。这里对【成功路径】也加 per-email 冷却 + per-IP 预算。
+        # 仅 server 模式启用(本地无 Resend、单机无需);Redis 不可用时优雅降级。
+        from core.config import require_auth as _require_auth_reg0
+        if _require_auth_reg0():
+            try:
+                import redis_bus as _rb_reg
+                if _rb_reg.get_sync_client() is not None:
+                    rem = _rb_reg.lock_remaining(f"reg:email:{email_norm}")
+                    if rem and rem > 0:
+                        raise ValueError("请求过于频繁，请稍后再试")
+            except ValueError:
+                raise
+            except Exception:
+                pass
+            # per-IP:同 IP 注册(含成功)10 次/10min
+            if _ip_budget_exceeded("reg:ip", ip or "", 10, 600):
+                raise ValueError("请求过于频繁，请稍后再试")
+
         # ── 写 email_verifications (pending) ──────────────────────────────────
         code = generate_email_code(6)
         code_h = hash_email_code(code)
@@ -423,6 +461,13 @@ def register(
     from .email import EmailSendError, send_verification_email
     try:
         send_verification_email(email_norm, code)
+        # 发件成功 → 设 per-email 冷却(60s),阻断同邮箱快速重复注册刷件
+        try:
+            import redis_bus as _rb_reg2
+            if _rb_reg2.get_sync_client() is not None:
+                _rb_reg2.lock_set(f"reg:email:{email_norm}", 60)
+        except Exception:
+            pass
     except EmailSendError:
         _log.warning("send_verification_email failed (RESEND unconfigured?)")  # SEC(M-10): 不记明文验证码
 
@@ -897,6 +942,9 @@ def request_login_code(email: str, *, ip: str = "", ua: str = "") -> dict[str, A
     if not email_norm or "@" not in email_norm:
         raise ValueError("请填写有效的邮箱地址")
     _check_rate_limit(ip, email_norm)
+    # per-IP 发码预算:防单 IP 向任意已注册邮箱批量发登录码。静默返回 ok(防枚举)。
+    if _ip_budget_exceeded("logincode:ip", ip, 20, 600):
+        return {"ok": True, "pending_verify": True, "email_mask": _mask_email(email_norm)}
 
     init_db()
     user_id: int | None = None
@@ -1138,6 +1186,10 @@ def resend_verification_code(email: str, ip: str = "") -> None:
     if not email_norm or "@" not in email_norm:
         raise ValueError("无效邮箱")
 
+    # per-IP 发件预算:防单 IP 跨邮箱轮询放大重发(per-email 60s 冷却挡不住换邮箱)。
+    if _ip_budget_exceeded("resend:ip", ip, 10, 600):
+        raise ValueError("发送太频繁，请稍后再试")
+
     # Redis 共享冷却(workers>1 一致;否则用户轮询不同 worker 可绕过 60s 冷却刷验证码)
     import redis_bus
     if redis_bus.get_sync_client() is not None:
@@ -1234,6 +1286,9 @@ def request_password_reset(email: str, ip: str = "") -> dict:
         _check_reset_rate(email_norm)
     except ValueError:
         return {"ok": True}   # 限流也静默
+    # per-IP 预算:防单 IP 邮件轰炸(_check_reset_rate 是 per-email,换邮箱可绕)。静默 ok 防枚举。
+    if _ip_budget_exceeded("pwreset:ip", ip, 15, 600):
+        return {"ok": True}
 
     init_db()
     with connect() as db:

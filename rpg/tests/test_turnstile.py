@@ -35,8 +35,25 @@ def test_sitekey_passthrough(monkeypatch):
     assert ts.sitekey() == "0xABC"
 
 
+def test_enabled_requires_both_secret_and_sitekey(monkeypatch):
+    # 只配 secret → enabled()=False(防锁死),但 misconfigured()=True 告警
+    monkeypatch.setenv("RPG_TURNSTILE_SECRET", "sek")
+    assert ts.enabled() is False
+    assert ts.misconfigured() is True
+    # 只配 sitekey → 同样 enabled False + misconfigured True
+    monkeypatch.delenv("RPG_TURNSTILE_SECRET", raising=False)
+    monkeypatch.setenv("RPG_TURNSTILE_SITEKEY", "0xK")
+    assert ts.enabled() is False
+    assert ts.misconfigured() is True
+    # 两者齐备 → enabled True, 不再 misconfigured
+    monkeypatch.setenv("RPG_TURNSTILE_SECRET", "sek")
+    assert ts.enabled() is True
+    assert ts.misconfigured() is False
+
+
 def test_enabled_empty_token_rejected_without_network(monkeypatch):
     monkeypatch.setenv("RPG_TURNSTILE_SECRET", "sek")
+    monkeypatch.setenv("RPG_TURNSTILE_SITEKEY", "0xK")
     assert ts.enabled() is True
     # 空 token 在触网前就拒,确保不浪费一次 Cloudflare 调用
     with mock.patch("urllib.request.urlopen", side_effect=AssertionError("should not call")):
@@ -66,6 +83,10 @@ def test_enabled_verify_failure(monkeypatch):
 
 def test_enabled_network_error_fail_closed(monkeypatch):
     monkeypatch.setenv("RPG_TURNSTILE_SECRET", "sek")
-    with mock.patch("urllib.request.urlopen", side_effect=OSError("network down")):
+    # patch sleep 避免重试 backoff 拖慢测试;断言有界重试发生(2 次 urlopen)
+    with mock.patch("time.sleep") as _sl, \
+         mock.patch("urllib.request.urlopen", side_effect=OSError("network down")) as _uo:
         # fail-closed:网络异常时拒绝,宁可挡真人也不放过机器人
         assert ts.verify("token") is False
+        assert _uo.call_count == 2   # 有界重试:首次 + 1 次重试
+        assert _sl.call_count == 1

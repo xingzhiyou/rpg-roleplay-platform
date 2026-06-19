@@ -15,11 +15,14 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
+import time
 import urllib.parse
 import urllib.request
 
 _VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
+_log = logging.getLogger(__name__)
 
 
 def secret() -> str:
@@ -30,9 +33,20 @@ def sitekey() -> str:
     return (os.environ.get("RPG_TURNSTILE_SITEKEY") or "").strip()
 
 
+def misconfigured() -> bool:
+    """仅配了 secret 或仅配了 sitekey（XOR）—— 应同时配置或同时留空。"""
+    return bool(secret()) != bool(sitekey())
+
+
 def enabled() -> bool:
-    """后端是否强制校验。仅当配置了 secret 时为 True。"""
-    return bool(secret())
+    """后端是否强制校验。
+
+    **必须 secret 与 sitekey 同时配置** —— 否则若只配 secret:前端拿不到 sitekey
+    →不渲染挂件→提交不带 token→后端 fail-closed→所有真实用户被锁死注册。
+    要求两者齐备时,「只配 secret」回退为关闭态(=不强制,与 fail-safe 取向一致),
+    再由 misconfigured() + 调用方日志提醒运维「配了一半=没生效」。
+    """
+    return bool(secret()) and bool(sitekey())
 
 
 def verify(token: str, *, ip: str | None = None, timeout: float = 8.0) -> bool:
@@ -40,7 +54,7 @@ def verify(token: str, *, ip: str | None = None, timeout: float = 8.0) -> bool:
 
     secret 未配置 → 直接放行（关闭态）。已配置时:
       - token 为空        → False
-      - 网络/解析异常     → False（fail-closed：宁可拒绝也不放过机器人）
+      - 网络/解析异常     → False（fail-closed：宁可拒绝也不放过机器人；有界重试 + 告警）
       - Cloudflare 返回 success=true → True
     """
     s = secret()
@@ -53,11 +67,18 @@ def verify(token: str, *, ip: str | None = None, timeout: float = 8.0) -> bool:
     if ip:
         data["remoteip"] = ip
     body = urllib.parse.urlencode(data).encode("utf-8")
-    req = urllib.request.Request(_VERIFY_URL, data=body, method="POST")
-    req.add_header("Content-Type", "application/x-www-form-urlencoded")
-    try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310 (固定可信端点)
-            payload = json.loads(resp.read().decode("utf-8") or "{}")
-    except Exception:
-        return False
-    return bool(payload.get("success"))
+    # 网络异常有界重试(2 次, 0.5s backoff);CF 明确 success=false 不重试。坚持 fail-closed。
+    last_exc: Exception | None = None
+    for attempt in range(2):
+        req = urllib.request.Request(_VERIFY_URL, data=body, method="POST")
+        req.add_header("Content-Type", "application/x-www-form-urlencoded")
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310 (固定可信端点)
+                payload = json.loads(resp.read().decode("utf-8") or "{}")
+            return bool(payload.get("success"))
+        except Exception as exc:  # noqa: BLE001
+            last_exc = exc
+            if attempt == 0:
+                time.sleep(0.5)
+    _log.warning("[turnstile] siteverify network/parse error (fail-closed): %s", last_exc)
+    return False

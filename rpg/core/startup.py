@@ -148,6 +148,21 @@ async def lifespan(app: FastAPI):
     except Exception:
         log.exception("[startup] bootstrap_local_account failed")
 
+    # 0c. Turnstile 配置一致性:secret 与 sitekey 必须同时设置或同时留空。
+    #     只配一半 → enabled()=False(不强制,防锁死),但运维多半以为开了 → 启动期高声告警。
+    try:
+        from platform_app import turnstile as _ts
+        if _ts.misconfigured():
+            log.error(
+                "[startup] turnstile_misconfigured: RPG_TURNSTILE_SECRET 与 RPG_TURNSTILE_SITEKEY "
+                "必须同时配置(secret=%s sitekey=%s) —— 当前只配一半,人机验证【未生效】,请补全后重启。",
+                bool(_ts.secret()), bool(_ts.sitekey()),
+            )
+        elif _ts.enabled():
+            log.info("[startup] turnstile enabled (注册人机验证已启用)")
+    except Exception:
+        log.exception("[startup] turnstile config check failed")
+
     # 1. MCP health loop
     try:
         import mcp_broker

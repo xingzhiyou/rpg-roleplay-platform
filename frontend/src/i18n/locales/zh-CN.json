@@ -399,12 +399,30 @@
     "features": {
       "on": "已启用",
       "off": "已关闭",
-      "ctx_tiered": { "label": "分层上下文缓存", "desc": "把稳定前缀与动态内容分层,命中模型前缀缓存,显著省 token。" },
-      "recorder_unified": { "label": "史官三合一", "desc": "状态提取 + 世界线锚点判定合并为一次调用,省一次 LLM。" },
-      "narrator_slim": { "label": "文宗精简(去工具循环)", "desc": "主叙事单次成文、不带工具循环(最大 token 乘数),状态交史官落库。" },
-      "rag_gate": { "label": "RAG 检索闸", "desc": "由司命判定本回合是否需要检索原著,不需要则跳过,省检索 token。" },
-      "anchor_pace": { "label": "世界线锚点节奏", "desc": "按对话实际节奏推进锚点、同章逐个标记、角色死亡使相关锚点失效 —— 治跳章 / 不按锚点走。" },
-      "kb_state": { "label": "存档知识库 DB 化", "desc": "存档状态以数据库行存储(单一来源),便于精确检索与维护;关闭则用传统整档存储。" }
+      "ctx_tiered": {
+        "label": "分层上下文缓存",
+        "desc": "把稳定前缀与动态内容分层,命中模型前缀缓存,显著省 token。"
+      },
+      "recorder_unified": {
+        "label": "史官三合一",
+        "desc": "状态提取 + 世界线锚点判定合并为一次调用,省一次 LLM。"
+      },
+      "narrator_slim": {
+        "label": "文宗精简(去工具循环)",
+        "desc": "主叙事单次成文、不带工具循环(最大 token 乘数),状态交史官落库。"
+      },
+      "rag_gate": {
+        "label": "RAG 检索闸",
+        "desc": "由司命判定本回合是否需要检索原著,不需要则跳过,省检索 token。"
+      },
+      "anchor_pace": {
+        "label": "世界线锚点节奏",
+        "desc": "按对话实际节奏推进锚点、同章逐个标记、角色死亡使相关锚点失效 —— 治跳章 / 不按锚点走。"
+      },
+      "kb_state": {
+        "label": "存档知识库 DB 化",
+        "desc": "存档状态以数据库行存储(单一来源),便于精确检索与维护;关闭则用传统整档存储。"
+      }
     },
     "memory": {
       "title_recall": "记忆 · 召回行为",
@@ -5422,7 +5440,10 @@
         "card_btn": "导入角色卡",
         "card_btn_sub": "支持 .png(嵌入元数据) / .json / .webp",
         "jsonl_btn": "导入聊天记录",
-        "jsonl_btn_sub": "SillyTavern .jsonl → 转成一段新对话"
+        "jsonl_btn_sub": "SillyTavern .jsonl → 转成一段新对话",
+        "blank_btn": "直接开聊",
+        "blank_btn_sub": "空白起手,不预设角色 —— AI 即兴扮演,随时补设定",
+        "or": "或导入已有内容"
       },
       "list": {
         "back_to_app": "应用",
@@ -5433,7 +5454,8 @@
         "hero_drop_main": "选择或拖入角色卡",
         "hero_drop_sub": ".png（嵌入元数据）/ .json / .webp",
         "newchat_sub": "选一张角色卡,或导入 SillyTavern 卡",
-        "archived_toggle": "已归档 ({{count}})"
+        "archived_toggle": "已归档 ({{count}})",
+        "hero_quick_start": "直接开聊"
       },
       "msg_sheet": {
         "assistant_title": "这一段对话",
@@ -5466,7 +5488,8 @@
         "autotitle_fail": "自动命名失败",
         "sysprompt_saved": "系统提示词已保存",
         "save_fail": "保存失败",
-        "persona_saved": "persona 已保存"
+        "persona_saved": "persona 已保存",
+        "create_fail": "新建对话失败"
       }
     },
     "new_game": {
@@ -5623,7 +5646,8 @@
         "prev": "上一步",
         "next": "下一步",
         "creating": "创建中…",
-        "start": "开始游戏"
+        "start": "开始游戏",
+        "quick_start": "直接开始(跳过设定)"
       }
     },
     "saves": {
@@ -6084,7 +6108,9 @@
         "placeholder": "此刻你做什么…  / 命令  + 附件",
         "slash_aria": "命令",
         "model_fallback": "模型",
-        "context_aria": "上下文用量"
+        "context_aria": "上下文用量",
+        "send_aria": "发送",
+        "stop_aria": "停止"
       }
     },
     "game_panels": {

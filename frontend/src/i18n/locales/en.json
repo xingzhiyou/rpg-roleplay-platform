@@ -308,12 +308,30 @@
     "features": {
       "on": "On",
       "off": "Off",
-      "ctx_tiered": { "label": "Tiered context cache", "desc": "Splits the stable prefix from dynamic content to hit the model's prefix cache — significant token savings." },
-      "recorder_unified": { "label": "Unified Recorder", "desc": "Merges state extraction and storyline-anchor reconciliation into a single LLM call." },
-      "narrator_slim": { "label": "Slim Narrator (no tool loop)", "desc": "Main narration is written in one pass without the tool loop (the biggest token multiplier); state writes go to the Recorder." },
-      "rag_gate": { "label": "RAG retrieval gate", "desc": "The Planner decides whether this turn needs source retrieval; skips it when not, saving retrieval tokens." },
-      "anchor_pace": { "label": "Storyline anchor pacing", "desc": "Advances anchors at the conversation's real pace, marks same-chapter anchors one by one, and invalidates anchors when a character dies — fixes chapter-skipping / off-anchor drift." },
-      "kb_state": { "label": "DB-resident save knowledge base", "desc": "Stores save state as database rows (single source of truth) for precise retrieval and maintenance; off uses the traditional whole-save blob." }
+      "ctx_tiered": {
+        "label": "Tiered context cache",
+        "desc": "Splits the stable prefix from dynamic content to hit the model's prefix cache — significant token savings."
+      },
+      "recorder_unified": {
+        "label": "Unified Recorder",
+        "desc": "Merges state extraction and storyline-anchor reconciliation into a single LLM call."
+      },
+      "narrator_slim": {
+        "label": "Slim Narrator (no tool loop)",
+        "desc": "Main narration is written in one pass without the tool loop (the biggest token multiplier); state writes go to the Recorder."
+      },
+      "rag_gate": {
+        "label": "RAG retrieval gate",
+        "desc": "The Planner decides whether this turn needs source retrieval; skips it when not, saving retrieval tokens."
+      },
+      "anchor_pace": {
+        "label": "Storyline anchor pacing",
+        "desc": "Advances anchors at the conversation's real pace, marks same-chapter anchors one by one, and invalidates anchors when a character dies — fixes chapter-skipping / off-anchor drift."
+      },
+      "kb_state": {
+        "label": "DB-resident save knowledge base",
+        "desc": "Stores save state as database rows (single source of truth) for precise retrieval and maintenance; off uses the traditional whole-save blob."
+      }
     },
     "memory": {
       "title_recall": "Memory · Recall Behavior",
@@ -5422,7 +5440,10 @@
         "card_btn": "Import Character Card",
         "card_btn_sub": "Supports .png (embedded metadata) / .json / .webp",
         "jsonl_btn": "Import Chat History",
-        "jsonl_btn_sub": "SillyTavern .jsonl — imports as a new chat"
+        "jsonl_btn_sub": "SillyTavern .jsonl — imports as a new chat",
+        "blank_btn": "Start chatting",
+        "blank_btn_sub": "Blank start, no preset character — the AI improvises; add details anytime",
+        "or": "or import existing content"
       },
       "list": {
         "back_to_app": "App",
@@ -5433,7 +5454,8 @@
         "hero_drop_main": "Select or drop a character card",
         "hero_drop_sub": ".png (embedded metadata) / .json / .webp",
         "newchat_sub": "Pick a character card or import a SillyTavern card",
-        "archived_toggle": "Archived ({{count}})"
+        "archived_toggle": "Archived ({{count}})",
+        "hero_quick_start": "Start chatting"
       },
       "msg_sheet": {
         "assistant_title": "This response",
@@ -5466,7 +5488,8 @@
         "autotitle_fail": "Auto-title failed",
         "sysprompt_saved": "System prompt saved",
         "save_fail": "Save failed",
-        "persona_saved": "Persona saved"
+        "persona_saved": "Persona saved",
+        "create_fail": "Failed to create chat"
       }
     },
     "new_game": {
@@ -5623,7 +5646,8 @@
         "prev": "Previous",
         "next": "Next",
         "creating": "Creating…",
-        "start": "Start Game"
+        "start": "Start Game",
+        "quick_start": "Start now (skip setup)"
       }
     },
     "saves": {
@@ -6084,7 +6108,9 @@
         "placeholder": "What do you do…  /command  + attach",
         "slash_aria": "Commands",
         "model_fallback": "Model",
-        "context_aria": "Context usage"
+        "context_aria": "Context usage",
+        "send_aria": "Send",
+        "stop_aria": "Stop"
       }
     },
     "game_panels": {

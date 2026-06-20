@@ -12,6 +12,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import i18n from '../../i18n';
 import { Icon } from '../icons.jsx';
+import { MobileComposer } from '../Composer.jsx';
 import { MobilePanel, MOBILE_PANEL_TABS } from './panels.jsx';
 import AgentModelPicker from '../../components/AgentModelPicker.jsx';
 import { useStickToBottom } from '../../hooks/useStickToBottom.js';
@@ -566,24 +567,27 @@ export function MobileGame(gc) {
           </div>
         )}
 
-        {/* composer */}
-        <div className="composer-zone">
-          {!running && suggestions.length > 0 && (
+        {/* composer(统一组件 MobileComposer:leading=附件 / footer=chip 行 / topSlot=建议词) */}
+        <MobileComposer
+          value={text}
+          onChange={setText}
+          onSubmit={submit}
+          onStop={onStop}
+          running={running}
+          placeholder={t('mobile.game.composer.placeholder')}
+          sendAria={t('mobile.game.composer.send_aria')}
+          stopAria={t('mobile.game.composer.stop_aria')}
+          taRef={taRef}
+          topSlot={!running && suggestions.length > 0 ? (
             <div className="suggestions scroll">
               {suggestions.map((s, i) => <button key={i} className="sugg" onClick={() => { setText(s); setTimeout(() => taRef.current?.focus(), 50); }}>{s}</button>)}
             </div>
+          ) : null}
+          leading={(
+            <button className="c-plus" onClick={() => setSheet({ type: 'attach' })} aria-label={t('mobile.game.composer.attach_aria')}><Icon name="plus" size={20} /></button>
           )}
-          <div className="composer">
-            <div className="composer-input-row">
-              <button className="c-plus" onClick={() => setSheet({ type: 'attach' })} aria-label={t('mobile.game.composer.attach_aria')}><Icon name="plus" size={20} /></button>
-              <textarea ref={taRef} className="c-text" rows={1} placeholder={t('mobile.game.composer.placeholder')}
-                value={text} onChange={(e) => setText(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent?.isComposing) { e.preventDefault(); submit(); } }} />
-              <button className={`c-send ${(String(text || '').trim() && !running) || running ? '' : 'idle'}`} onClick={() => (running ? onStop() : submit())}>
-                <Icon name={running ? 'stop' : 'send'} size={18} />
-              </button>
-            </div>
-            <div className="composer-foot">
+          footer={(
+            <>
               <button className="c-chip" onClick={() => setSheet({ type: 'slash' })} aria-label={t('mobile.game.composer.slash_aria')}><Icon name="slash" size={14} /></button>
               <button className="c-chip" onClick={() => setSheet({ type: 'model' })}><Icon name="sparkle" size={13} /><span className="lbl">{(gc.model && (gc.model.label || gc.model.id)) || t('mobile.game.composer.model_fallback')}</span><Icon name="chevron_down" size={12} /></button>
               <button className={`c-chip perm ${permission}`} onClick={() => setSheet({ type: 'permission' })}><Icon name={(PERMISSIONS().find((x) => x.id === permission) || PERMISSIONS()[2]).icon} size={13} /></button>
@@ -595,9 +599,9 @@ export function MobileGame(gc) {
                 </svg>
                 <span className="c-ctx-pct mono">{Math.round(gc.lastUsage?.context_pct || 0)}%</span>
               </button>
-            </div>
-          </div>
-        </div>
+            </>
+          )}
+        />
 
         {/* 抽屉 + scrim + sheets */}
         <div className={`scrim ${leftOpen || rightOpen ? 'show' : ''}`} onClick={closeAll} />

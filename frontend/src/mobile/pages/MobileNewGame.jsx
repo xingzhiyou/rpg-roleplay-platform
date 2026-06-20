@@ -1216,8 +1216,23 @@ export function MobileNewGame({ nav, scriptId: propScriptId, onDone }) {
           position: 'absolute', bottom: 0, left: 0, right: 0,
           padding: '12px 16px calc(var(--safe-bottom) + 12px)',
           background: 'linear-gradient(to bottom, transparent, var(--bg) 30%)',
-          display: 'flex', gap: 10,
+          display: 'flex', flexDirection: 'column', gap: 8,
         }}>
+          {/* 快速开始:剧本+角色就绪后,跳过可选设定(身份/元知识)直接创建 —— 对齐酒馆「直接开聊」,
+              身份/元知识保持各自默认值。仅在已看过角色步骤(step≥1)且未在最后一步时出现。 */}
+          {step >= 1 && step < TOTAL_STEPS - 1 && step0Valid && step1Valid && (
+            <button
+              className="pl-btn-ghost"
+              style={{ width: '100%', fontSize: 13, opacity: submitting ? 0.45 : 1 }}
+              disabled={submitting}
+              onClick={handleCreate}
+            >
+              {submitting
+                ? <><Icon name="spinner" size={14} className="spin" /> {t('mobile.new_game.nav.creating')}</>
+                : <><Icon name="play" size={14} /> {t('mobile.new_game.nav.quick_start')}</>}
+            </button>
+          )}
+          <div style={{ display: 'flex', gap: 10 }}>
           {step > 0 && (
             <button className="pl-btn-ghost" style={{ flex: 1 }} onClick={() => setStep(s => s - 1)}>
               <Icon name="chevron_left" size={15} /> {t('mobile.new_game.nav.prev')}
@@ -1242,6 +1257,7 @@ export function MobileNewGame({ nav, scriptId: propScriptId, onDone }) {
               {submitting ? <><Icon name="spinner" size={15} className="spin" /> {t('mobile.new_game.nav.creating')}</> : <><Icon name="play" size={15} /> {t('mobile.new_game.nav.start')}</>}
             </button>
           )}
+          </div>
         </div>
       )}
     </>

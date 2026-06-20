@@ -13,6 +13,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import i18n from '../../i18n';
 import { Icon } from '../icons.jsx';
+import { MobileComposer } from '../Composer.jsx';
 import { useStickToBottom } from '../../hooks/useStickToBottom.js';
 import {
   useTavernChatRun, applyTavernState, abortRun,
@@ -499,16 +500,26 @@ function TwoCardDrawer({ open, character, persona, systemPrompt, onClose, onSave
 }
 
 /* ─── 导入 / 新对话 sheet ────────────────────────────────────────── */
-function ImportSheet({ show, onClose, onDropCard, onPickFile, onJsonlFile, onCreateFromCard }) {
+function ImportSheet({ show, onClose, onPickFile, onJsonlFile, onCreateBlank }) {
   const { t } = useTranslation();
   const fileRef = useRef(null);
   const jsonlRef = useRef(null);
 
-  /* 拖卡区(移动端没有 drag,所以只有 click 触发文件选择) */
   return (
     <BottomSheet show={show} onClose={onClose} maxHeight="88%">
       <div className="sheet-title">{t('mobile.tavern.import.title')}</div>
       <div className="sheet-sub">{t('mobile.tavern.import.sub')}</div>
+
+      {/* 主入口:空白开始(直接开聊,不预设角色卡)。放最上、accent 样式 = 推荐路径。 */}
+      <button className="tv-m-import-btn primary" onClick={onCreateBlank}>
+        <span className="tv-m-import-ic"><Icon name="feedback" size={20} /></span>
+        <span className="tv-m-import-tx">
+          <strong>{t('mobile.tavern.import.blank_btn')}</strong>
+          <span>{t('mobile.tavern.import.blank_btn_sub')}</span>
+        </span>
+      </button>
+
+      <div className="tv-m-import-or muted-2">{t('mobile.tavern.import.or')}</div>
 
       {/* 拖/选卡 —— 用 <label> 包裹 input 原生触发文件选择器:
           手机浏览器对 display:none input 的 .click() 多会拦截,改 label 关联 + 视觉隐藏(非 display:none)。 */}
@@ -550,9 +561,14 @@ function ChatListItem({ chat, active, onOpen, onMenu }) {
   const curTitle = chat.title || chat.character_name || t('mobile.tavern.chat.default_title', { id: chat.id });
 
   return (
-    <button
+    // 外层用 div[role=button] 而非 <button>:内部含「更多」菜单按钮,button 套 button =
+    // 非法 HTML / React 注水报错(In HTML, button cannot be a descendant of button)。
+    <div
+      role="button"
+      tabIndex={0}
       className={`tv-m-chat-item${active ? ' active' : ''}`}
       onClick={() => onOpen(chat)}
+      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(chat); } }}
     >
       <span className="tv-m-chat-av serif">{initial}</span>
       <span className="tv-m-chat-main">
@@ -571,12 +587,12 @@ function ChatListItem({ chat, active, onOpen, onMenu }) {
       >
         <Icon name="more" size={17} />
       </button>
-    </button>
+    </div>
   );
 }
 
 /* ─── 列表屏 ──────────────────────────────────────────────────────── */
-function ListView({ chats, archivedChats, activeId, loading, onExit, onOpen, onMenu, onNew }) {
+function ListView({ chats, archivedChats, activeId, loading, onExit, onOpen, onMenu, onNew, onQuickStart }) {
   const { t } = useTranslation();
   const [showArchived, setShowArchived] = useState(false);
   const empty = !loading && chats.length === 0 && archivedChats.length === 0;
@@ -605,6 +621,12 @@ function ListView({ chats, archivedChats, activeId, loading, onExit, onOpen, onM
           <div className="tv-m-hero-mark">✻</div>
           <h1 className="tv-m-hero-title serif">{t('mobile.tavern.list.hero_title')}</h1>
           <p className="tv-m-hero-sub muted">{t('mobile.tavern.list.hero_sub')}</p>
+          {/* 主操作:一键直接开聊(空白起手,不强制上传角色卡)。 */}
+          <button className="tv-m-hero-cta" onClick={onQuickStart}>
+            <Icon name="feedback" size={18} />
+            {t('mobile.tavern.list.hero_quick_start')}
+          </button>
+          {/* 次操作:导入角色卡 / 聊天记录。 */}
           <button className="tv-m-hero-drop" onClick={onNew}>
             <span className="tv-m-hero-drop-ic"><Icon name="upload" size={22} /></span>
             <span className="tv-m-hero-drop-main">{t('mobile.tavern.list.hero_drop_main')}</span>
@@ -680,13 +702,7 @@ function ChatView({
     withButton: true,
   });
 
-  /* textarea 自动增高 */
-  useEffect(() => {
-    const ta = taRef.current;
-    if (!ta) return;
-    ta.style.height = 'auto';
-    ta.style.height = Math.min(ta.scrollHeight, 120) + 'px';
-  }, [text]);
+  /* textarea 自动增高已下沉到 MobileComposer(taRef 仍传入,供其管理高度)。 */
 
   const submit = () => {
     const t = text.trim();
@@ -854,42 +870,18 @@ function ChatView({
         )}
       </div>
 
-      {/* Composer */}
-      <div className="composer-zone">
-        <div className={`composer${text ? '' : ''}`}>
-          <div className="composer-input-row">
-            <textarea
-              ref={taRef}
-              className="c-text"
-              rows={1}
-              value={text}
-              placeholder={t('mobile.tavern.chat.composer_placeholder', { name: charName })}
-              onChange={e => setText(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
-                  e.preventDefault();
-                  submit();
-                }
-              }}
-              disabled={running}
-            />
-            {running ? (
-              <button className="c-send" onClick={onStop} aria-label={t('mobile.tavern.chat.stop_aria')} style={{ background: 'var(--danger)' }}>
-                <Icon name="stop" size={14} />
-              </button>
-            ) : (
-              <button
-                className={`c-send${!text.trim() ? ' idle' : ''}`}
-                onClick={submit}
-                disabled={!text.trim()}
-                aria-label={t('mobile.tavern.chat.send_aria')}
-              >
-                <Icon name="send" size={14} />
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
+      {/* Composer(统一组件 MobileComposer:与游戏台同一套输入框,酒馆不带附件/chip 行) */}
+      <MobileComposer
+        value={text}
+        onChange={setText}
+        onSubmit={submit}
+        onStop={onStop}
+        running={running}
+        placeholder={t('mobile.tavern.chat.composer_placeholder', { name: charName })}
+        sendAria={t('mobile.tavern.chat.send_aria')}
+        stopAria={t('mobile.tavern.chat.stop_aria')}
+        taRef={taRef}
+      />
 
       {/* 长按消息 → 操作 sheet(与游戏台同一套交互;酒馆无存档/分支,故仅 复制 + 重新生成) */}
       <BottomSheet show={!!msgSheet} onClose={closeMsgSheet} maxHeight="50%">
@@ -1037,6 +1029,23 @@ export function MobileTavern({ nav }) {
       fireToast(t('mobile.tavern.toast.card_imported', { name: r.character_name || t('mobile.tavern.chat.default_char_name') }), 'ok');
     } catch (e) {
       fireToast(t('mobile.tavern.toast.import_fail') + (e?.message ? ': ' + e.message : ''), 'danger');
+    }
+  }, [openSaveId, fireToast, t]);
+
+  /* ── 空白开始(直接开聊,不预设角色卡)──────────────────────────────
+   * 后端 create_tavern_save 支持 character_card_id=None(空起手对话,由 agent 即兴扮演);
+   * 桌面端「新建对话」也是 tavern.create({}) → r.save.id。此前移动端 ImportSheet 只给「上传
+   * 角色卡 / 导入记录」两个入口 → 用户被强制上传 json 卡才能开聊(反馈:新酒馆聊天被拦住)。 */
+  const onCreateBlank = useCallback(async () => {
+    setImportOpen(false);
+    try {
+      const r = await window.api.tavern.create({});
+      if (r && r.ok === false) throw new Error(r.error || r.detail || t('mobile.tavern.toast.create_fail'));
+      const newId = (r && r.save && r.save.id) || r?.save_id || r?.id;
+      if (!newId) throw new Error(t('mobile.tavern.toast.create_fail'));
+      await openSaveId(newId, t('mobile.tavern.chat.default_char_name'));
+    } catch (e) {
+      fireToast(t('mobile.tavern.toast.create_fail') + (e?.message ? ': ' + e.message : ''), 'danger');
     }
   }, [openSaveId, fireToast, t]);
 
@@ -1206,6 +1215,7 @@ export function MobileTavern({ nav }) {
             onOpen={openChat}
             onMenu={openMenu}
             onNew={() => setImportOpen(true)}
+            onQuickStart={onCreateBlank}
           />
         </div>
 
@@ -1254,6 +1264,7 @@ export function MobileTavern({ nav }) {
         onClose={() => setImportOpen(false)}
         onPickFile={onPickCardFile}
         onJsonlFile={onPickJsonlFile}
+        onCreateBlank={onCreateBlank}
       />
 
       {/* ── 聊天菜单 sheet ── */}

@@ -128,6 +128,25 @@ def _strip_id_and_save_id(row: dict[str, Any], extra_strip: tuple[str, ...] = ()
 
 
 _COL_CACHE: dict[str, frozenset[str]] = {}
+_JSONB_COL_CACHE: dict[str, frozenset[str]] = {}
+
+
+def _jsonb_columns(db: Any, table: str) -> frozenset[str]:
+    """该表的 jsonb 列集合(缓存)。导入时 jsonb 列的【标量】值(如 kb_worldline_vars.value=3/turn)
+    也必须包 Jsonb —— 否则裸标量塞进 jsonb 列 → 'column is of type jsonb but expression is of type
+    integer' → 整行失败(kb_worldline_vars 全军覆没,核心存档态进不了 KB)。dict/list 原本就包,这里
+    把标量也覆盖。"""
+    cached = _JSONB_COL_CACHE.get(table)
+    if cached is not None:
+        return cached
+    rows = db.execute(
+        "select column_name from information_schema.columns "
+        "where table_schema = current_schema() and table_name = %s and data_type = 'jsonb'",
+        (table,),
+    ).fetchall()
+    cols = frozenset(r["column_name"] for r in rows)
+    _JSONB_COL_CACHE[table] = cols
+    return cols
 
 
 def _table_columns(db: Any, table: str) -> frozenset[str]:
@@ -155,11 +174,14 @@ def _table_columns(db: Any, table: str) -> frozenset[str]:
 
 def _build_insert(
     table: str, row: dict[str, Any], new_save_id: int, allowed_cols: frozenset[str],
+    jsonb_cols: frozenset[str] = frozenset(),
 ) -> tuple[str, tuple]:
     """根据 row 实际包含的列动态构造 INSERT,容忍前后端 schema 漂移。
 
     列名先按 allowed_cols(该表真实列,来自 DB 目录)过滤:非真实列直接丢弃,既防列名 SQL
     注入,又对 schema 漂移健壮。allowed_cols 永不为空时才会带额外列(save_id 恒在)。
+    jsonb_cols 给出的列(该表真实 jsonb 列):非 None 值一律包 Jsonb(含标量 3/"x"/true),
+    防裸标量塞 jsonb 列报类型错。
     """
     cols = ["save_id"]
     vals: list[Any] = [new_save_id]
@@ -167,9 +189,11 @@ def _build_insert(
         if k not in allowed_cols or k == "save_id":
             continue  # 未知/伪造列名一律丢弃(防注入 + schema 漂移容错)
         cols.append(k)
-        # jsonb 列 — 凡是 dict/list 一律包 Jsonb
-        if isinstance(v, (dict, list)):
-            vals.append(Jsonb(_check_json_size(v, f"{table}.{k}")))
+        if v is None:
+            vals.append(None)  # NULL(jsonb 列也用 SQL NULL,而非 'null'::jsonb)
+        elif k in jsonb_cols or isinstance(v, (dict, list)):
+            # jsonb 列的任意值(标量/对象/数组)都包 Jsonb;dict/list 再过大小校验。
+            vals.append(Jsonb(_check_json_size(v, f"{table}.{k}") if isinstance(v, (dict, list)) else v))
         else:
             vals.append(v)
     placeholders = ", ".join(["%s"] * len(cols))
@@ -328,6 +352,7 @@ def import_save(user_id: int, payload: dict[str, Any]) -> dict[str, Any]:
                 rows = state_tables.get(table) or []
                 # 该表真实列白名单(防列名 SQL 注入,见 _table_columns)。表不存在 → 空集 → 全丢。
                 allowed_cols = _table_columns(db, table)
+                jsonb_cols = _jsonb_columns(db, table)
                 count = 0
                 for raw_row in rows:
                     if not isinstance(raw_row, dict):
@@ -335,12 +360,39 @@ def import_save(user_id: int, payload: dict[str, Any]) -> dict[str, Any]:
                     row = _strip_id_and_save_id(raw_row)
                     if not row:
                         continue
+                    # commit 外键随 branch_commits 一并重映射(old→new)。kb_* COW 行的 born_commit /
+                    # retired_at_commit、kb_checkpoints 的 commit_id 都指向旧 commit id;commit id 是全局
+                    # 序列,导入到他库后旧 id 极可能撞上别的存档的 commit → FK 满足却插成【孤儿】(materialize
+                    # 的祖先 CTE 按本档 commit 查,查不到孤儿行)→ count>0 又挡掉 migrate-on-load 重建
+                    # → 导入的存档加载为空。故按 old_to_new 重映射;NOT NULL 外键映射不到则跳过该行
+                    # (别插孤儿,留给 migrate-on-load 从 blob 重建);可空的 retired_at_commit 映射不到置 NULL。
+                    _orphan = False
+                    for _ck in ("born_commit", "commit_id", "retired_at_commit"):
+                        if row.get(_ck) is None:
+                            continue
+                        try:
+                            _mapped = old_to_new.get(int(row[_ck]))
+                        except (TypeError, ValueError):
+                            _mapped = None
+                        if _mapped is not None:
+                            row[_ck] = _mapped
+                        elif _ck == "retired_at_commit":
+                            row[_ck] = None
+                        else:
+                            _orphan = True
+                            break
+                    if _orphan:
+                        continue
                     try:
-                        sql, vals = _build_insert(table, row, new_save_id, allowed_cols)
-                        db.execute(sql, vals)
+                        sql, vals = _build_insert(table, row, new_save_id, allowed_cols, jsonb_cols)
+                        # 存档点:单行插入失败只回滚到此,不污染外层事务。否则(psycopg)失败语句会把整个
+                        # 事务标记 aborted → 后续任何语句(下一张表的 _table_columns)都 InFailedSqlTransaction
+                        # → 500 → with connect() 退出回滚 → 整个 save 丢失(用户报的「导入失败/只有剧本没存档」)。
+                        with db.transaction():
+                            db.execute(sql, vals)
                         count += 1
                     except Exception as exc:
-                        # 单行失败不阻断整体导入(schema 漂移容错)
+                        # 单行失败不阻断整体导入(schema 漂移容错);savepoint 已回滚,外层事务仍可用。
                         if not allow_missing:
                             warnings.append(f"{table} 单行导入失败: {type(exc).__name__}: {str(exc)[:120]}")
                         # else: 静默吞,allow_missing 表整张表都可能不存在

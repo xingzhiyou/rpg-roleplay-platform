@@ -3735,7 +3735,8 @@
       "history_label": "Chat History",
       "no_chats": "No chats yet",
       "no_chats_hint": "Click \"New Chat\" or drag in a character card",
-      "archived_label": "Archived ({{count}})"
+      "archived_label": "Archived ({{count}})",
+      "toggle_tip": "Open chat list"
     },
     "hero": {
       "heading": "Who do you want to chat with?",

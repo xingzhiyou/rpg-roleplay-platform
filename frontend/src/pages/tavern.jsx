@@ -131,6 +131,7 @@ export default function TavernPage() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [exportTarget, setExportTarget] = useState(null);  // 导出二次确认
   const [paramsOpen, setParamsOpen] = useState(false);   // 采样参数(模型参数)抽屉
+  const [sideOpen, setSideOpen] = useState(false);       // 手机模式:侧边栏展开/收起
 
   // 输入框「完全复用」游戏页 Composer 所需的状态(与 game-console.jsx 一致):
   const [gameState, setGameState] = useState(null);       // 完整 /api/state → 喂给 Composer(模型名/context 圆环/@mention)
@@ -215,6 +216,7 @@ export default function TavernPage() {
   const openChat = useCallback(async (chat) => {
     if (!chat || !chat.id) return;
     setView('chat');
+    setSideOpen(false);  // 手机模式:选中对话后收起侧栏
     if (runRef.current.sse) { try { runRef.current.sse.stop('switch'); } catch (_) {} runRef.current.sse = null; }
     setRunning(false); setHasError(false); setHistory([]);
     setActiveId(chat.id);
@@ -766,8 +768,11 @@ export default function TavernPage() {
       {/* GameToastStack 已上移到 PlatformShellCS 统一挂载(TavernPage 始终嵌在其中),
           此处移除以避免 game 总线双订阅 → 重复 toast。 */}
 
+      {/* ── 手机侧栏遮罩 ──────────────────────────────────────────── */}
+      {sideOpen && <div className="tvp-side-scrim" onClick={() => setSideOpen(false)} />}
+
       {/* ── 左:两段式子侧栏 ──────────────────────────────────────── */}
-      <aside className="tvp-side">
+      <aside className={`tvp-side${sideOpen ? ' open' : ''}`}>
         {/* 上段(固定):新建 / 角色卡 / 快捷模型 */}
         <div className="tvp-side-top">
           <CSButton variant="primary" iconName="add-plus" onClick={newChat} fullWidth>
@@ -892,6 +897,9 @@ export default function TavernPage() {
         ) : (
           <>
             <header className="tvp-chat-head">
+              <button className="tvp-side-toggle iconbtn" onClick={() => setSideOpen(true)} data-tip={t('tavern_page.sidebar.toggle_tip')} aria-label={t('tavern_page.sidebar.toggle_tip')}>
+                <Icon name="menu" size={18} />
+              </button>
               <button className="tvp-chat-title" onClick={() => setDrawerOpen(true)} data-tip={t('tavern_page.header.char_persona_tip')}>
                 <span className="tvp-chat-name">{charName}</span>
                 <Icon name="chevron_down" size={12} style={{ opacity: 0.5 }} />
@@ -1005,6 +1013,8 @@ export default function TavernPage() {
         immersive={immersive}
         onToggleImmersive={onToggleImmersive}
       />
+      {/* 手机端右侧抽屉遮罩 */}
+      {drawerOpen && <div className="tvp-drawer-scrim" onClick={() => setDrawerOpen(false)} />}
 
       {/* 采样参数(模型参数)抽屉 —— 复用 settings 的 ModelParamsSection,写同一份偏好,影响所有调用 */}
       {paramsOpen && (

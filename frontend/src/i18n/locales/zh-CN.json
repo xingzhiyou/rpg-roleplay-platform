@@ -3735,7 +3735,8 @@
       "history_label": "历史对话",
       "no_chats": "还没有对话",
       "no_chats_hint": "点「新建对话」或拖入一张角色卡",
-      "archived_label": "已归档 ({{count}})"
+      "archived_label": "已归档 ({{count}})",
+      "toggle_tip": "展开对话列表"
     },
     "hero": {
       "heading": "想和谁聊聊？",

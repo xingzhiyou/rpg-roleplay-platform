@@ -1579,16 +1579,19 @@ def confirm_password_reset(token: str, new_password: str, ip: str = "") -> dict:
     token_hash = hash_email_code(token)
     init_db()
     with connect() as db:
+        # 原子消费 token:把「检查 used_at IS NULL」与「置 used_at」合到一条 UPDATE...RETURNING,
+        # used_at IS NULL 放在 WHERE 里 → READ COMMITTED 下并发第二个请求重检谓词失败、命中 0 行,
+        # 杜绝 TOCTOU 双花(原先 SELECT→Python 判 used_at→UPDATE 三步可被并发同时通过)。
+        # 后续任一步异常 → with connect() 回滚 → used_at 还原,合法用户仍可重试。
         verif = db.execute(
-            "SELECT id, email, used_at FROM email_verifications "
-            "WHERE code_hash = %s AND purpose = 'password_reset' AND expires_at > NOW() "
-            "LIMIT 1",
+            "UPDATE email_verifications SET used_at = NOW() "
+            "WHERE code_hash = %s AND purpose = 'password_reset' "
+            "  AND expires_at > NOW() AND used_at IS NULL "
+            "RETURNING id, email",
             (token_hash,),
         ).fetchone()
         if not verif:
-            raise ValueError("重置链接无效或已过期，请重新申请")
-        if verif["used_at"]:
-            raise ValueError("该重置链接已使用过，请重新申请")
+            raise ValueError("重置链接无效、已过期或已使用，请重新申请")
 
         # 查找对应用户
         email_norm = verif["email"]
@@ -1602,8 +1605,7 @@ def confirm_password_reset(token: str, new_password: str, ip: str = "") -> dict:
         pw_hash = hash_password(new_password)
         db.execute("UPDATE users SET password_hash = %s, updated_at = NOW() WHERE id = %s",
                    (pw_hash, user["id"]))
-        db.execute("UPDATE email_verifications SET used_at = NOW() WHERE id = %s",
-                   (verif["id"],))
+        # used_at 已在上面的原子 UPDATE 消费,无需重复置
         # 安全：重置密码后废除所有旧 session
         db.execute("DELETE FROM sessions WHERE user_id = %s", (user["id"],))
 

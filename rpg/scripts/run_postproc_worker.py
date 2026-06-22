@@ -131,10 +131,17 @@ async def _process_one(conn: psycopg.Connection, row: dict[str, Any]) -> None:
     task_kind = row["task_kind"]
     attempts = row["attempts"] + 1
 
-    conn.execute(
-        "UPDATE chat_postproc_tasks SET status='running', started_at=now(), attempts=%s WHERE id=%s",
+    # 原子认领:autocommit 下 SELECT ... FOR UPDATE SKIP LOCKED 的行锁在 execute 返回即释放(no-op),
+    # 多 worker 会捞到同一行重复处理。改用条件 UPDATE...RETURNING 做 CAS:只有 status 仍是 pending/failed
+    # 才置 running,RETURNING 空 = 已被别的 worker 抢走 → 跳过。
+    claimed = conn.execute(
+        "UPDATE chat_postproc_tasks SET status='running', started_at=now(), attempts=%s "
+        "WHERE id=%s AND status IN ('pending','failed') RETURNING id",
         (attempts, task_id),
-    )
+    ).fetchone()
+    if not claimed:
+        log.debug("[postproc] task %s 已被其他 worker 认领,跳过", task_id)
+        return
 
     handler = TASK_HANDLERS.get(task_kind)
     if handler is None:
@@ -212,7 +219,16 @@ async def consume(conn: psycopg.Connection) -> None:
             raw = conn.fileno()
             readable, _, _ = select.select([raw], [], [], POLL_TIMEOUT_SEC)
             if readable:
-                conn.notifies  # consume pending notifies
+                # 真正消费已缓冲的 NOTIFY(仅作唤醒提示,内容不用)。原写法 `conn.notifies` 只引用方法
+                # 不调用 → libpq 通知积压不消费。timeout=0 = 排空当前缓冲后立即返回。
+                try:
+                    for _ in conn.notifies(timeout=0):
+                        pass
+                except TypeError:
+                    for _ in conn.notifies():
+                        break
+                except Exception:
+                    pass
             continue
 
         for row in rows:

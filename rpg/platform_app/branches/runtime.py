@@ -11,6 +11,7 @@ from psycopg.types.json import Jsonb
 from platform_app import runtime as _runtime_module
 from platform_app.branches._helpers import (
     _snapshot_quality,
+    acquire_save_advisory_lock,
     commit_state,
     load_state,
     rough_summary,
@@ -63,14 +64,8 @@ def record_runtime_turn(
     init_db()
     missing_parent = False
     with connect() as db:
-        try:
-            uid_for_lock = int(user_id or (save_id * 7919))
-            db.execute(
-                "select pg_advisory_xact_lock(hashtext(%s)::int, hashtext(%s)::int)",
-                (f"rpg_turn_{uid_for_lock}", f"save_{save_id}"),
-            )
-        except Exception:
-            pass
+        # 复用统一锁助手(失败上抛,不再静默吞掉致并发指针错乱)
+        acquire_save_advisory_lock(db, save_id, user_id)
         parent = db.execute("select * from branch_commits where id = %s and save_id = %s", (parent_id, save_id)).fetchone()
         if not parent:
             missing_parent = True

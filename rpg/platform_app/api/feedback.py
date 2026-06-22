@@ -574,7 +574,9 @@ async def delete_my_feedback(
 
         if not row:
             raise HTTPException(status_code=404, detail="反馈不存在")
-        if row["user_id"] != user["id"]:
+        # 匿名反馈 user_id 为 NULL;Python 中 None != <id> 恒 True 会让归属校验形同虚设,
+        # 任何登录用户都能删他人匿名反馈。NULL 视为无主,一律禁删。
+        if row["user_id"] is None or row["user_id"] != user["id"]:
             raise HTTPException(status_code=403, detail="无权操作此反馈")
         if row["review_decision"] == "nsfw_terminate":
             raise HTTPException(
@@ -705,6 +707,13 @@ async def admin_feedback_decision(
 
         # nsfw_terminate: 调现有 queue_account_termination
         if decision == "nsfw_terminate":
+            # 匿名反馈无关联账户(user_id=NULL):传 None 进 queue_account_termination 会
+            # SQL/格式化崩溃成 500。直接拒绝(已记 review_decision,合规证据仍留存)。
+            if row["user_id"] is None:
+                return json_response(
+                    {"ok": False, "error": "匿名反馈无关联账户,无法执行 nsfw_terminate"},
+                    status_code=409,
+                )
             from ..dmca import queue_account_termination
             terminate_reason = f"反馈审查 nsfw_terminate (feedback_id={feedback_id}): {notes}"
             queue_account_termination(db, row["user_id"], terminate_reason)

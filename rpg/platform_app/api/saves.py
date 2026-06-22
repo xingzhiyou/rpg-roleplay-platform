@@ -551,6 +551,14 @@ async def api_save_progress_rewind(save_id: int, request: Request, user=Depends(
         with _get_sync_scope_lock((user_id, save_id)), connect() as db:
             if not owns_save(db, save_id, user_id):
                 return json_response({"ok": False, "error": "无权访问该存档"}, status_code=403)
+            # 上界 clamp:不允许回退目标超过剧本真实章数
+            _cc_row = db.execute(
+                "SELECT s.chapter_count FROM game_saves gs JOIN scripts s ON s.id = gs.script_id "
+                "WHERE gs.id = %s",
+                (save_id,),
+            ).fetchone()
+            if _cc_row and _cc_row.get("chapter_count"):
+                target = min(target, int(_cc_row["chapter_count"]))
             sess = db.execute(
                 "select worldline from game_sessions where save_id=%s", (save_id,)).fetchone()
             wl = dict((sess or {}).get("worldline") or {}) if sess else {}

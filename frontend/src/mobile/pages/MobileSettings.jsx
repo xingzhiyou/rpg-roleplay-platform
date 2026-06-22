@@ -962,6 +962,11 @@ function PermissionsSection({ nav }) {
           </button>
         </div>
         {showAudit && (
+          <div style={{ fontSize: 11, color: 'var(--muted-2)', padding: '0 0 8px', lineHeight: 1.5 }}>
+            {t('mobile.settings.perm.audit_scope_note', '仅显示最近活动会话的操作记录，无活动游戏时可能为空。')}
+          </div>
+        )}
+        {showAudit && (
           <div className="pl-card" style={{ padding: 12 }}>
             <div style={{ display: 'flex', gap: 8, marginBottom: 10, alignItems: 'center' }}>
               <button className="pl-btn-ghost" style={{ height: 36, fontSize: 12, flex: 1 }}
@@ -1341,7 +1346,8 @@ function AccountSection({ nav }) {
 function DangerSection({ nav }) {
   const { t } = useTranslation();
   const { saves = [] } = usePlatformData();
-  const nSaves = saves.length;
+  const gameSaves = saves.filter(s => s.save_kind !== 'tavern');
+  const nSaves = gameSaves.length;
   const [showClearSheet, setShowClearSheet] = useState(false);
   const [confirmText, setConfirmText] = useState('');
   const [clearProgress, setClearProgress] = useState(null);
@@ -1353,7 +1359,7 @@ function DangerSection({ nav }) {
     if (nSaves === 0) { nav.toast(t('mobile.settings.danger.no_saves'), 'ok', 'info'); closeClear(); return; }
     setClearProgress({ done:0, total:nSaves });
     let done=0, fail=0;
-    for (const s of saves) {
+    for (const s of gameSaves) {
       try { await window.api.saves.remove(s.id); } catch (_) { fail++; }
       done++;
       setClearProgress({ done, total:nSaves });

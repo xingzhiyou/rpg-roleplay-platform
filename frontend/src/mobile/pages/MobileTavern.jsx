@@ -791,7 +791,7 @@ function ChatView({
 
         {history.map((m, i) => {
           if (m.role === 'assistant') {
-            const toolOps = m._toolOps;
+            const toolOps = m._toolOps || m.tool_ops;
             const isStreaming = !m.streaming_done && i === total - 1 && running;
             return (
               <React.Fragment key={`a-${i}`}>
@@ -807,7 +807,7 @@ function ChatView({
                     </span>
                     {m.ts && <span className="msg-gts">{m.ts}</span>}
                   </div>
-                  {m._thinking && <ThinkingBlock text={m._thinking} />}
+                  {(m._thinking || m.reasoning) && <ThinkingBlock text={m._thinking || m.reasoning} />}
                   <div className="msg-body">
                     <Paras text={m.content} />
                     {isStreaming && (

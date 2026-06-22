@@ -256,9 +256,15 @@ async def api_script_chapters(
     """章节列表，支持 ?q=... 标题/内容全文 ILIKE 搜索。"""
     try:
         if q:
-            # 全文搜索分支
+            # 全文搜索分支 — 权限与非搜索路径一致:owner ∪ subscriber
             with connect() as db:
-                owned = db.execute("select 1 from scripts where id=%s and owner_id=%s", (script_id, user["id"])).fetchone()
+                owned = db.execute(
+                    """select 1 from scripts s where s.id = %s and (
+                         s.owner_id = %s
+                         or s.id in (select script_id from user_script_subscriptions where user_id = %s)
+                       )""",
+                    (script_id, user["id"], user["id"]),
+                ).fetchone()
                 if not owned:
                     return json_response({"ok": False, "error": "无权访问该剧本"}, status_code=403)
                 rows = db.execute(
@@ -1443,11 +1449,14 @@ async def api_fork_public_script(script_id: int, user=Depends(require_user)):
 
 @router.get("/api/scripts/{script_id}/overrides")
 async def api_get_script_overrides(script_id: int, user=Depends(require_user)):
-    """查询剧本 overrides（能访问该 script 的用户均可读）。"""
+    """查询剧本 overrides（能访问该 script 的用户均可读:owner ∪ subscriber）。"""
     with connect() as db:
         owned = db.execute(
-            "SELECT 1 FROM scripts WHERE id = %s AND owner_id = %s",
-            (script_id, user["id"]),
+            """SELECT 1 FROM scripts s WHERE s.id = %s AND (
+                 s.owner_id = %s
+                 OR s.id IN (SELECT script_id FROM user_script_subscriptions WHERE user_id = %s)
+               )""",
+            (script_id, user["id"], user["id"]),
         ).fetchone()
     if not owned:
         return json_response({"ok": False, "error": "无权访问该剧本"}, status_code=403)

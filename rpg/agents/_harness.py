@@ -160,12 +160,17 @@ def _anthropic_tool_use(
     """
     from anthropic import Anthropic
 
+    from core.outbound import safe_httpx_client
     from platform_app.user_credentials import resolve_api_key
     result = resolve_api_key(user_id, "anthropic", env_fallback="ANTHROPIC_API_KEY")
     key = result.get("key")
     if not key:
         raise RuntimeError("找不到 Anthropic API Key for agent harness")
-    client = Anthropic(api_key=key)
+    _base_url = result.get("base_url_override") or None
+    _client_kwargs: dict = {"api_key": key, "http_client": safe_httpx_client()}
+    if _base_url:
+        _client_kwargs["base_url"] = _base_url
+    client = Anthropic(**_client_kwargs)
     tool_name = tool_schema.get("name") or "emit_payload"
     resp = client.messages.create(
         model=model,
@@ -197,12 +202,17 @@ def _anthropic_json_text(
     """
     from anthropic import Anthropic
 
+    from core.outbound import safe_httpx_client
     from platform_app.user_credentials import resolve_api_key
     result = resolve_api_key(user_id, "anthropic", env_fallback="ANTHROPIC_API_KEY")
     key = result.get("key")
     if not key:
         raise RuntimeError("找不到 Anthropic API Key for agent harness")
-    client = Anthropic(api_key=key)
+    _base_url = result.get("base_url_override") or None
+    _client_kwargs: dict = {"api_key": key, "http_client": safe_httpx_client()}
+    if _base_url:
+        _client_kwargs["base_url"] = _base_url
+    client = Anthropic(**_client_kwargs)
     resp = client.messages.create(
         model=model,
         max_tokens=max_tokens,
@@ -621,6 +631,8 @@ def call_agent_tool_loop(
         )
 
     from anthropic import Anthropic
+
+    from core.outbound import safe_httpx_client
     from platform_app.user_credentials import resolve_api_key
 
     result = resolve_api_key(user_id, "anthropic", env_fallback="ANTHROPIC_API_KEY")
@@ -628,7 +640,11 @@ def call_agent_tool_loop(
     if not key:
         raise RuntimeError("找不到 Anthropic API Key for agent tool_loop")
 
-    client = Anthropic(api_key=key)
+    _base_url = result.get("base_url_override") or None
+    _client_kwargs: dict = {"api_key": key, "http_client": safe_httpx_client()}
+    if _base_url:
+        _client_kwargs["base_url"] = _base_url
+    client = Anthropic(**_client_kwargs)
 
     messages: list[dict] = [{"role": "user", "content": user_prompt}]
     trace: list[dict] = []

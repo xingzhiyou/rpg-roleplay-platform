@@ -273,7 +273,9 @@ def create_save(
     except Exception as _seed_err:
         log.error(f"[anchor_seed] sync seed failed save={save['id']}: {type(_seed_err).__name__}: {_seed_err}")
     # 封死新存档入口:创建即 seed 进 KB + 打 kb_native 标记(新档按新实现)。
-    _seed_kb_at_creation(save["id"], script_id, snapshot)
+    # 用回写后的 save["state_snapshot"](含 identity_card_id),而非建档前的旧 snapshot 局部变量,
+    # 否则 KB seed 拿不到身份卡 id。
+    _seed_kb_at_creation(save["id"], script_id, save.get("state_snapshot") or snapshot)
     return expose(save)  # type: ignore[return-value]
 
 

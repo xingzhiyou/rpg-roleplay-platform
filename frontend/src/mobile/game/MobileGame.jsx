@@ -277,6 +277,18 @@ function SheetHost({ sheet, onClose, gc, msgActions }) {
         ))}
       </div>
     );
+  } else if (type === 'rollback_confirm') {
+    const idx = sheet.data;
+    title = t('mobile.game.sheet.msg_rollback');
+    body = (
+      <div className="sheet-list">
+        <p className="confirm-note" style={{ padding: '0 4px 12px' }}>{t('mobile.game.toast.rollback_confirm')}</p>
+        <button className="sheet-item danger" onClick={() => { onClose(); msgActions._doRollback(idx); }}>
+          <span className="sheet-ico"><Icon name="trash" size={18} /></span>
+          <span className="sheet-tx"><strong>{t('mobile.game.sheet.msg_rollback')}</strong></span>
+        </button>
+      </div>
+    );
   }
 
   return (
@@ -387,9 +399,11 @@ export function MobileGame(gc) {
         window.__apiToast?.(t('mobile.game.toast.fork_ok'), { kind: 'ok', icon: 'fork' });
       } catch (e) { window.__apiToast?.(t('mobile.game.toast.fork_fail'), { kind: 'danger', detail: e?.message }); }
     },
-    rollback: async (idx) => {
+    rollback: (idx) => {
       setPressed(null);
-      if (!confirm(t('mobile.game.toast.rollback_confirm'))) return;
+      setSheet({ type: 'rollback_confirm', data: idx });
+    },
+    _doRollback: async (idx) => {
       try {
         const sid = activeSave?.id;
         await window.api.branches.rollbackToMessage(sid, idx);

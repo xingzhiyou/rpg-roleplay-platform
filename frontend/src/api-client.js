@@ -356,6 +356,7 @@
       achievementsCatalog: () => GET(`/api/achievements`),  // 公开目录(匿名可拉)
       publicWall: (username) => GET(`/api/u/${encodeURIComponent(username)}/achievements`),  // 公开成就墙
       preferences: (body) => POST(`${API_PREFIX}/me/preference`, body),
+      getPreferences: () => GET(`${API_PREFIX}/me/profile`),
       gmStyleSchema: () => GET(`${API_PREFIX}/gm-style/schema`),
       getGmStyle: () => GET(`${API_PREFIX}/me/gm-style`),
       setGmStyle: (gm_style) => POST(`${API_PREFIX}/me/gm-style`, { gm_style }),
@@ -626,6 +627,7 @@
       rename: (sid, title) => POST(`${API_PREFIX}/saves/` + sid + "/rename", { title }),
       remove: (sid) => POST(`${API_PREFIX}/saves/` + sid + "/delete", {}),
       activate: (sid) => POST(`${API_PREFIX}/saves/` + sid + "/activate", {}),
+      updateSettings: (sid, updates, is_create) => PATCH(`${API_PREFIX}/saves/` + sid + "/settings", { updates, is_create: !!is_create }),
       exportUrl: (sid) => BASE + `${API_PREFIX}/saves/` + sid + "/export",
       importFile: (file) => {
         const fd = new FormData(); fd.append("file", file);

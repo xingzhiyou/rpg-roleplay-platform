@@ -515,8 +515,7 @@ function DialogHost() {
       confirmText: o.confirmText || t('common.confirm'),
     }));
     return () => { delete window.__confirm; delete window.__prompt; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [t]);
   if (!dlg) return null;
   const close = (val) => { try { dlg.resolve(val); } catch (_) {} setDlg(null); };
   const cancelVal = dlg.type === 'prompt' ? null : false;
@@ -672,7 +671,7 @@ function UnifiedSearch({ open, onClose, setPage }) {
   // (GPT-5.5/Claude Opus 4.7/35 条 OpenRouter 假模型名…)无条件塞进 Spotlight。
   // 仅 ?demo=1 或匿名访客(设计预览)才回退 MODELS_DATA,与 settings.jsx 的 useMock 同闸。
   const _IS_DEMO = new URLSearchParams(location.search).get('demo') === '1';
-  const _IS_ANON = !(window.RPG_AUTH && window.RPG_AUTH.authed);
+  const _IS_ANON = !(searchUser && searchUser.id);
   const _useMockModels = _IS_DEMO || _IS_ANON;
   const [modelCatalog, setModelCatalog] = useStatePL(null); // null=未加载;数组=真实 provider 目录
   useEffectPL(() => {
@@ -1669,7 +1668,7 @@ function MeUserSettings() {
     let cancelled = false;
     (async () => {
       try {
-        const r = await window.api.account.preferences();
+        const r = await window.api.account.getPreferences();
         if (cancelled) return;
         const p = r?.preferences || r || {};
         if (p.two_fa != null) setTwofa(!!p.two_fa);

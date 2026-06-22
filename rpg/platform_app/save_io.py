@@ -436,6 +436,10 @@ def import_save(user_id: int, payload: dict[str, Any]) -> dict[str, Any]:
                         # else: 静默吞,allow_missing 表整张表都可能不存在
                         break  # 同表多行同样错就别再撞了
                 state_imported[table] = count
+            # 原存档是 kb_native(新 KB 流,带完整 kb_* 状态)且确实导入了 KB 行 → 新存档也标 kb_native,
+            # 否则加载时被当旧档走 migrate-on-load 从 blob 重建,刚导入的 KB 状态白导。
+            if save_data.get("kb_native") and state_imported.get("kb_entities", 0) > 0:
+                db.execute("update game_saves set kb_native = true where id = %s", (new_save_id,))
 
     return {
         "ok": True,

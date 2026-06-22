@@ -382,7 +382,7 @@ export function startTavernRun(cfg) {
       // 工具可能中途换/建了角色或 persona → 再拉一次最新 state 确保顶部刷新。
       // (tavern-app/Mobile:仅在无 payload 时拉;pages:总是再拉一次。差异由 doneAlwaysRefetch 控制。)
       if (!payload || cfg.doneAlwaysRefetch) {
-        api.game.state().then(applyState).catch(() => {});
+        api.game.state().then((d) => { if (isCurrentRun()) applyState(d); }).catch(() => {});
       }
       // 刷新列表(更新 last_snippet / updated_at 排序);autotitle 由 onDoneExtra 负责(pages)。
       if (reloadList && !cfg.skipDoneReload) reloadList();
@@ -414,6 +414,7 @@ export function startTavernRun(cfg) {
         if (!last || last.role !== 'assistant' || !last.streaming) return h;
         return [...h.slice(0, -1), { ...last, streaming: false, streaming_done: true }];
       });
+      rc.sse = null;
     },
   });
 

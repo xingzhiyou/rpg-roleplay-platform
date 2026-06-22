@@ -534,13 +534,14 @@ function ModelsSection() {
     } catch (_) {}
   };
   const toggleModel = async (apiId, mId) => {
+    const api = apis.find(a => a.id === apiId);
+    const m = api?.models.find(m => m.id === mId);
+    const wasEnabled = m?.enabled ?? true;
     setApis(arr => arr.map(a => a.id === apiId
-      ? { ...a, models: a.models.map(m => m.id === mId ? { ...m, enabled: !m.enabled } : m) }
+      ? { ...a, models: a.models.map(m => m.id === mId ? { ...m, enabled: !wasEnabled } : m) }
       : a));
     try {
-      const api = apis.find(a => a.id === apiId);
-      const m = api?.models.find(m => m.id === mId);
-      await window.api.models.upsertModel({ api_id: apiId, real_name: mId, enabled: !m?.enabled });
+      await window.api.models.upsertModel({ api_id: apiId, real_name: mId, enabled: !wasEnabled });
     } catch (_) {}
   };
   const renameModel = async (apiId, mId, display) => {
@@ -1217,7 +1218,7 @@ function ValidateModal({ open, api, onClose, onConfirm }) {
         await window.api.models.upsertModel({
           api_id: api.id,
           real_name: m.real_name || m.id,
-          display: m.display || m.name || m.real_name,
+          display_name: m.display || m.name || m.real_name,
           enabled: true,
         });
         ok++;
@@ -1894,6 +1895,7 @@ const PROVIDERS_CONFIG = [
  */
 function ProviderConfigSection() {
   const { t } = useTranslation();
+  const isAdminUser = !!(window.RPG_AUTH && window.RPG_AUTH.authed && window.MOCK_PLATFORM?.user?.role === "admin");
   const [creds, setCreds] = useStatePL({});
   const [saving, setSaving] = useStatePL({});
   const [agentPlatformJson, setAgentPlatformJson] = useStatePL(null);
@@ -1924,9 +1926,13 @@ function ProviderConfigSection() {
         await window.api.credentials.set({ api_id: providerId, api_key: apiKey.trim() });
       }
       if (baseUrl !== undefined) {
-        const cfg = PROVIDERS_CONFIG.find((p) => p.id === providerId);
-        const kind = providerId === "AgentPlatform" ? "vertex_ai" : providerId === "anthropic" ? "anthropic" : "openai_compat";
-        await window.api.models.upsertApi({ api_id: catalogApiIdForCredential(providerId), base_url: baseUrl, kind, display_name: cfg?.name || providerId });
+        if (isAdminUser) {
+          const cfg = PROVIDERS_CONFIG.find((p) => p.id === providerId);
+          const kind = providerId === "AgentPlatform" ? "vertex_ai" : providerId === "anthropic" ? "anthropic" : "openai_compat";
+          await window.api.models.upsertApi({ api_id: catalogApiIdForCredential(providerId), base_url: baseUrl, kind, display_name: cfg?.name || providerId });
+        } else {
+          window.__apiToast?.(t('settings.providers.admin_base_url_only') || '仅管理员可修改 provider base URL', { kind: "warn", duration: 3000 });
+        }
       }
       window.__apiToast?.(t('settings.providers.save_ok'), { kind: "ok", duration: 1800 });
       setCreds(s => ({ ...s, [providerId]: { ...s[providerId], has_key: !!(apiKey?.trim() || s[providerId]?.has_key), base_url: baseUrl ?? s[providerId]?.base_url } }));

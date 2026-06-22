@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import logging
 import os
+import threading
 import time
 
 log = logging.getLogger("rpg.redis_bus")
@@ -22,6 +23,7 @@ EVENT_CHANNEL = "rpg:state_events"
 _SYNC_CLIENT = None
 _SYNC_RETRY_AT = 0.0  # time.monotonic();连接失败后下次允许重试的时间点
 _SYNC_COOLDOWN = 30.0  # 失败后冷却 30s 再重连(避免每次调用都阻塞 ping 一次)
+_INIT_LOCK = threading.Lock()  # 防止多线程(asyncio.to_thread)双初始化泄漏 ConnectionPool
 
 
 def redis_url() -> str | None:
@@ -36,36 +38,42 @@ def is_enabled() -> bool:
 def get_sync_client():
     """单例同步 redis 客户端。redis-py 连接池线程安全,可从 worker 线程调用。
     Redis 未配置 → None。连不上 → None 但**带冷却重连**:每 30s 重试一次,
-    Redis 恢复后自愈(不再像之前那样首次失败就永久降级到死)。"""
+    Redis 恢复后自愈(不再像之前那样首次失败就永久降级到死)。
+    双检锁(double-checked locking)防止多线程(asyncio.to_thread)并发初始化泄漏 ConnectionPool。"""
     global _SYNC_CLIENT, _SYNC_RETRY_AT
+    # 快速路径:已初始化时无锁直接返回(ConnectionPool 本身线程安全)
     if _SYNC_CLIENT is not None:
         return _SYNC_CLIENT
     url = redis_url()
     if not url:
         return None
-    now = time.monotonic()
-    if now < _SYNC_RETRY_AT:
-        return None  # 冷却窗口内,暂不重连,直接走进程内降级
-    try:
-        import redis  # redis-py
+    with _INIT_LOCK:
+        # 锁内二次检查:其它线程可能刚完成初始化
+        if _SYNC_CLIENT is not None:
+            return _SYNC_CLIENT
+        now = time.monotonic()
+        if now < _SYNC_RETRY_AT:
+            return None  # 冷却窗口内,暂不重连,直接走进程内降级
+        try:
+            import redis  # redis-py
 
-        client = redis.Redis.from_url(
-            url,
-            socket_timeout=2,
-            # 本机 Redis(localhost),0.5s 连接超时绰绰有余;Redis 抖动时降级路径不再阻塞
-            # 调用方线程长达 2s(限流走登录路径,2s 阻塞放大「登录风暴」卡顿)。
-            socket_connect_timeout=0.5,
-            decode_responses=True,
-            health_check_interval=30,
-        )
-        client.ping()
-        _SYNC_CLIENT = client
-        log.info("[redis] sync client connected")
-    except Exception as exc:
-        _SYNC_CLIENT = None
-        _SYNC_RETRY_AT = now + _SYNC_COOLDOWN
-        log.warning("[redis] unavailable, degrading to in-process (retry in %ds): %s",
-                    int(_SYNC_COOLDOWN), exc)
+            client = redis.Redis.from_url(
+                url,
+                socket_timeout=2,
+                # 本机 Redis(localhost),0.5s 连接超时绰绰有余;Redis 抖动时降级路径不再阻塞
+                # 调用方线程长达 2s(限流走登录路径,2s 阻塞放大「登录风暴」卡顿)。
+                socket_connect_timeout=0.5,
+                decode_responses=True,
+                health_check_interval=30,
+            )
+            client.ping()
+            _SYNC_CLIENT = client
+            log.info("[redis] sync client connected")
+        except Exception as exc:
+            _SYNC_CLIENT = None
+            _SYNC_RETRY_AT = time.monotonic() + _SYNC_COOLDOWN
+            log.warning("[redis] unavailable, degrading to in-process (retry in %ds): %s",
+                        int(_SYNC_COOLDOWN), exc)
     return _SYNC_CLIENT
 
 

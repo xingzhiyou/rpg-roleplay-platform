@@ -110,8 +110,10 @@ async def api_verify_email(request: Request):
         _c = _rb.rate_incr(f"verifyip:{_client_ip(request)}", 600)
         if _c and _c > 60:
             return json_response({"ok": False, "error": "尝试过于频繁,请稍后再试"}, status_code=429)
-    except Exception:
-        pass
+    except (ConnectionError, TimeoutError, OSError) as _redis_exc:
+        # Redis 不可达时限流降级(进程内无回退计数器);仅吞连接类异常,非连接类异常重抛。
+        import logging as _log_auth
+        _log_auth.getLogger("rpg.auth").warning("[rate-limit] Redis unavailable, skipping per-IP check: %s", _redis_exc)
     try:
         user, token = _auth.confirm_email_verification(email, code)
         workspace.ensure_default(user["id"])
@@ -131,7 +133,8 @@ async def api_resend_code(request: Request):
     if not email:
         return json_response({"ok": False, "error": "email 不能为空"}, status_code=400)
     try:
-        _auth.resend_verification_code(email, ip=ip)
+        # 内部含同步 httpx.post(Resend API),移出 event loop 防阻塞 worker。
+        await asyncio.to_thread(_auth.resend_verification_code, email, ip=ip)
         return json_response({"ok": True, "message": "验证码已重发，请查收邮件"})
     except ValueError as exc:
         return json_response({"ok": False, "error": str(exc)}, status_code=429)
@@ -170,7 +173,8 @@ async def api_login_code_request(request: Request):
     ip = _client_ip(request)
     ua = request.headers.get("user-agent", "")
     try:
-        result = _auth.request_login_code(body.get("email", ""), ip=ip, ua=ua)
+        # 内部含同步 httpx.post(Resend API),移出 event loop 防阻塞 worker。
+        result = await asyncio.to_thread(_auth.request_login_code, body.get("email", ""), ip=ip, ua=ua)
         return json_response(result)
     except _auth.RateLimited as rl:
         return json_response(
@@ -292,9 +296,10 @@ async def api_passwordless_verify(request: Request):
     code = (body.get("code") or "").strip()
     ip = _client_ip(request)
     try:
-        result = _auth.verify_passwordless_and_login(email, code, ip=ip)
+        # 含同步 DB + 可能含 httpx.post(Resend),移出 event loop 防阻塞 worker。
+        result = await asyncio.to_thread(_auth.verify_passwordless_and_login, email, code, ip=ip)
         # ensure workspace exists for new/existing user
-        workspace.ensure_default(result["user_id"])
+        await asyncio.to_thread(workspace.ensure_default, result["user_id"])
         token = result.pop("session_token", "")  # SEC(M-6): 仅经 HTTPOnly cookie 下发,不写响应体
         response = json_response({"ok": True, **result})
         _set_session_cookie(response, request, token)
@@ -327,8 +332,9 @@ async def api_forgot_password(request: Request):
     body = await request.json()
     email = (body.get("email") or "").strip()
     ip = _client_ip(request)
+    # 内部含同步 httpx.post(Resend API),移出 event loop 防阻塞 worker。
     # 即使 email 格式错误也静默返回 ok，防止枚举
-    result = _auth.request_password_reset(email, ip=ip)
+    result = await asyncio.to_thread(_auth.request_password_reset, email, ip=ip)
     return json_response(result)
 
 
@@ -342,7 +348,8 @@ async def api_reset_password(request: Request):
     if not token or not new_password:
         raise HTTPException(400, detail={"error_key": "auth.invalid_payload", "message": "参数不完整"})
     try:
-        result = _auth.confirm_password_reset(token, new_password, ip=ip)
+        # Argon2id 哈希 ~150-300ms CPU 阻塞,移出 event loop 防冻结 worker。
+        result = await asyncio.to_thread(_auth.confirm_password_reset, token, new_password, ip=ip)
         return json_response(result)
     except ValueError as exc:
         msg = str(exc)

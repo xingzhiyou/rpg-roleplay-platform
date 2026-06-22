@@ -1094,7 +1094,20 @@ export function MobileNewGame({ nav, scriptId: propScriptId, onDone }) {
         spoiler_guard: spoiler,
       };
 
-      await window.__createAndEnterSave(payload);
+      const created = await window.__createAndEnterSave(payload);
+      // 新建后写入向导收集的 4 项设置(foreknowledge_mode/npc_awareness/steering_strength/spoiler_guard)
+      // __createAndEnterSave 的 payload 不透传这些字段,需在 create 返回 save id 后单独 PATCH。
+      const newSaveId = created && (created.id || created.save?.id);
+      if (newSaveId) {
+        try {
+          await window.api.saves.updateSettings(newSaveId, {
+            foreknowledge_mode: foreknowledge,
+            npc_awareness: npcAwareness,
+            steering_strength: steering,
+            spoiler_guard: spoiler,
+          }, true);
+        } catch (_) { /* 设置写失败不阻断进入游戏 */ }
+      }
 
       // 成功后清草稿(如果 __createAndEnterSave 跳页了就不会执行到这里)
       lsRemove(DRAFT_KEY);

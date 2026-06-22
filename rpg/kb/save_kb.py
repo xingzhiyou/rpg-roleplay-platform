@@ -150,7 +150,7 @@ def materialize(db, save_id: int, commit_id: int) -> dict[str, Any]:
 
     # 历史 → messages(单一来源,不在 KB 重复;集成时还原成 state.data["history"] 供 GM 读)
     msgs = db.execute(
-        "select role, content from messages where save_id = %s order by id", (save_id,)
+        "select role, content from messages where save_id = %s order by turn, id", (save_id,)
     ).fetchall()
     state["history"] = [{"role": m["role"], "content": m["content"]} for m in msgs]
     state["_history_count"] = len(msgs)

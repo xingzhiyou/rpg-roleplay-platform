@@ -15,6 +15,7 @@ import i18n from '../../i18n';
 import { Icon } from '../icons.jsx';
 import { MobileComposer } from '../Composer.jsx';
 import { useStickToBottom } from '../../hooks/useStickToBottom.js';
+import { stripNarrativeOps } from '../../narrative-strip.js';
 import {
   useTavernChatRun, applyTavernState, abortRun,
   toolCallInline, toolResultInline,
@@ -809,7 +810,7 @@ function ChatView({
                   </div>
                   {m._thinking && <ThinkingBlock text={m._thinking} />}
                   <div className="msg-body">
-                    <Paras text={m.content} />
+                    <Paras text={stripNarrativeOps(m.content)} />
                     {isStreaming && (
                       <span className="tv-m-cursor" aria-hidden="true" />
                     )}

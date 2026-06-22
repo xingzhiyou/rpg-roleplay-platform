@@ -16,6 +16,7 @@ import { MobileComposer } from '../Composer.jsx';
 import { MobilePanel, MOBILE_PANEL_TABS } from './panels.jsx';
 import AgentModelPicker from '../../components/AgentModelPicker.jsx';
 import { useStickToBottom } from '../../hooks/useStickToBottom.js';
+import { stripNarrativeOps } from '../../narrative-strip.js';
 
 const SLASH_GROUPS = () => [
   { title: i18n.t('mobile.game.slash.group_query'), items: [
@@ -481,7 +482,7 @@ export function MobileGame(gc) {
                 onTouchStart={() => startPress(i)} onTouchEnd={cancelPress} onTouchMove={cancelPress}
                 onContextMenu={(e) => { e.preventDefault(); setPressed(i); setSheet({ type: 'msg', data: i }); }}>
                 <div className="msg-meta"><span className="msg-tag">GM</span>{m._thinking ? <span className="msg-gts mono">{t('mobile.game.chat.thinking')}</span> : null}</div>
-                <div className="msg-body serif">{paras(m.content)}</div>
+                <div className="msg-body serif">{paras(stripNarrativeOps(m.content))}</div>
               </div>
             ) : (
               <div key={i} className={`msg msg-player ${pressed === i ? 'pressed' : ''}`}

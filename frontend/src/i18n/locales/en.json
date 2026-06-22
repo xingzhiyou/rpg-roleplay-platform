@@ -3755,6 +3755,10 @@
       "settings_btn": "Settings",
       "dismiss_tip": "Dismiss"
     },
+    "onboard": {
+      "hint": "No character needed — just type below to start. Want to role-play a specific character?",
+      "cta": "Pick or import a character card"
+    },
     "params_drawer": {
       "title": "Model Parameters"
     },

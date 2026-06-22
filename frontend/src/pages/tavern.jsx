@@ -933,6 +933,19 @@ export default function TavernPage() {
               charName={charName} charInitial={charInitial} charAvatar={charAvatar} personaName={personaName}
               hasError={hasError} onRetry={onRetry}
               lastMeta={lastMeta} elapsedLabel={running ? fmtElapsed(elapsedMs) : null}
+              emptyExtra={!character ? (
+                /* #80:新对话(无人设)空态引导。不挡输入框 —— 下方 Composer 仍可直接打字开始无人设对话;
+                   这里只多一个引导按钮指向「选择/导入角色卡」(支持 SillyTavern 卡)。前端 skill 设计 + 动画。 */
+                <div className="tvp-onboard">
+                  <div className="tvp-onboard-hint">{t('tavern_page.onboard.hint')}</div>
+                  <button className="tvp-onboard-cta" onClick={() => setDrawerOpen(true)}
+                          aria-label={t('tavern_page.onboard.cta')}>
+                    <Icon name="cards" size={16} />
+                    <span>{t('tavern_page.onboard.cta')}</span>
+                    <span className="tvp-onboard-arrow" aria-hidden="true">→</span>
+                  </button>
+                </div>
+              ) : null}
             />
 
             <div className="gc-foot-wrap tvp-foot">

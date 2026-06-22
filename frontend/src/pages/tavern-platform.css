@@ -451,3 +451,42 @@
     background: rgba(0, 0, 0, .45);
   }
 }
+
+/* ── #80 新对话空态引导(不挡输入框;前端 skill 设计 + 动画)─────────────── */
+.tvp-onboard {
+  display: flex; flex-direction: column; align-items: center; gap: 14px;
+  margin-top: 18px;
+  animation: tvp-onboard-in .5s cubic-bezier(.2,.7,.2,1) both;
+}
+.tvp-onboard-hint {
+  max-width: 340px; text-align: center; font-size: 13px; line-height: 1.6;
+  color: color-mix(in srgb, var(--accent) 26%, currentColor);
+}
+.tvp-onboard-cta {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 10px 18px; border-radius: 999px;
+  border: 1px solid var(--accent-edge, var(--accent));
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent); font-size: 13.5px; font-weight: 600; cursor: pointer;
+  transition: transform .14s ease, background .14s ease, box-shadow .14s ease;
+  animation: tvp-onboard-pulse 2.8s ease-in-out infinite;
+}
+.tvp-onboard-cta:hover {
+  transform: translateY(-2px);
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
+  box-shadow: 0 6px 20px -6px color-mix(in srgb, var(--accent) 55%, transparent);
+}
+.tvp-onboard-cta:active { transform: translateY(0); }
+.tvp-onboard-arrow { transition: transform .14s ease; }
+.tvp-onboard-cta:hover .tvp-onboard-arrow { transform: translateX(3px); }
+@keyframes tvp-onboard-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes tvp-onboard-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 0%, transparent); }
+  50%      { box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 8%, transparent); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tvp-onboard, .tvp-onboard-cta { animation: none; }
+}

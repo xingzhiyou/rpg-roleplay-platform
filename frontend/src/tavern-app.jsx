@@ -352,7 +352,7 @@ export function TavernThinkingBlock({ text, thinking }) {
   );
 }
 
-export function TavernChatArea({ history, running, saveId, charName, charInitial, charAvatar, personaName, personaAvatar, hasError, errorMsg, onRetry, lastMeta, elapsedLabel }) {
+export function TavernChatArea({ history, running, saveId, charName, charInitial, charAvatar, personaName, personaAvatar, hasError, errorMsg, onRetry, lastMeta, elapsedLabel, emptyExtra }) {
   const { t } = useTranslation();
   const ref = useRef(null);
 
@@ -384,6 +384,7 @@ export function TavernChatArea({ history, running, saveId, charName, charInitial
           <div className="tv-chat-empty muted-2">
             <Icon name="message_square" size={28} style={{ opacity: 0.4, marginBottom: 8 }} />
             <div>{t('tavern_app.chat_area.empty')}</div>
+            {emptyExtra}
           </div>
         )}
         {history.map((m, i) => {

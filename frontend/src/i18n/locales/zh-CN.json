@@ -3755,6 +3755,10 @@
       "settings_btn": "去设置",
       "dismiss_tip": "忽略"
     },
+    "onboard": {
+      "hint": "无需角色也能聊 —— 直接在下方输入即可开始;想扮演某个角色?",
+      "cta": "选择 / 导入角色卡"
+    },
     "params_drawer": {
       "title": "模型参数"
     },

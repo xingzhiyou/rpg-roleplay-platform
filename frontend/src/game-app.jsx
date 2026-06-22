@@ -380,6 +380,7 @@ function MsgActions({ text, ts, msgIndex, totalMsgs, commitId, saveId, role, met
   // task 116c: 删除消息 (软回滚) — 弹窗确认 + 进度
   const [delOpen, setDelOpen] = useStateA(false);
   const [delBusy, setDelBusy] = useStateA(false);
+
   const onCopy = async () => {
     const txt = text || "";
     let ok = false;
@@ -512,6 +513,12 @@ function MsgActions({ text, ts, msgIndex, totalMsgs, commitId, saveId, role, met
       setDelBusy(false);
     }
   };
+  // 编辑消息:仅 assistant(GM) 消息可编辑 → 派发事件让 NarrativeBlock 进入内联编辑
+  const canEdit = role === "assistant" && saveId != null && msgIndex != null && msgIndex >= 0;
+  const onEdit = () => {
+    if (!canEdit) return;
+    window.dispatchEvent(new CustomEvent("rpg-edit-message", { detail: { saveId, msgIndex } }));
+  };
   return (
     <>
       <div className="gc-msg-actions">
@@ -534,6 +541,15 @@ function MsgActions({ text, ts, msgIndex, totalMsgs, commitId, saveId, role, met
           onClick={onRegenerate}>
           <Icon name="refresh" size={12} />
         </button>
+        {canEdit && (
+          <button
+            className="iconbtn gc-msg-act"
+            data-tip={t('game.app.msg.edit_tip')}
+            data-tip-pos="below"
+            onClick={onEdit}>
+            <Icon name="edit" size={12} />
+          </button>
+        )}
         <button
           className="iconbtn gc-msg-act gc-msg-act-danger"
           data-tip={canDelete ? t('game.app.msg.delete_tip') : t('game.app.msg.delete_no_ctx_tip')}
@@ -555,6 +571,7 @@ function MsgActions({ text, ts, msgIndex, totalMsgs, commitId, saveId, role, met
         onClose={() => !delBusy && setDelOpen(false)}
         onConfirm={doDelete}
       />
+
     </>
   );
 }
@@ -707,6 +724,47 @@ function renderNarrativeWithInlineTools(rawText, toolOps, renderTool, streaming,
 function NarrativeBlock({ text, streaming, ts, msgIndex, saveId, commitId, thinking, speakerName, speakerAvatar, tag, hideMeta, meta, images, toolOps, renderTool }) {
   const { t } = useTranslation();
   const displayText = stripStateOpsForDisplay(text);
+  // 内联编辑状态:点击 MsgActions 的编辑按钮时通过事件激活
+  const [editing, setEditing] = useStateA(false);
+  const [editDraft, setEditDraft] = useStateA("");
+  const [editSaving, setEditSaving] = useStateA(false);
+  const editRef = useRefA(null);
+  useEffectA(() => {
+    const handler = (e) => {
+      const d = e.detail || {};
+      if (d.saveId === saveId && d.msgIndex === msgIndex) {
+        setEditDraft(displayText || "");
+        setEditing(true);
+      }
+    };
+    window.addEventListener("rpg-edit-message", handler);
+    return () => window.removeEventListener("rpg-edit-message", handler);
+  }, [saveId, msgIndex, displayText]);
+  // 进入编辑模式后自动 focus textarea 并定位到末尾
+  useEffectA(() => {
+    if (editing && editRef.current) {
+      const el = editRef.current;
+      el.focus();
+      el.setSelectionRange(el.value.length, el.value.length);
+    }
+  }, [editing]);
+  const doEditSave = async () => {
+    if (editSaving) return;
+    setEditSaving(true);
+    try {
+      const r = await window.api.game.editMessage({ save_id: saveId, message_index: msgIndex, content: editDraft });
+      if (r && r.ok === false) throw new Error(r.error || "edit failed");
+      setEditing(false);
+      try {
+        window.dispatchEvent(new CustomEvent("rpg-state-reload", { detail: { reason: "message_edit" } }));
+      } catch (_) {}
+      window.toast?.(t('game.app.msg.edit_saved'), { kind: "ok", duration: 1800 });
+    } catch (e) {
+      window.toast?.(t('game.app.msg.edit_failed'), { kind: "danger", detail: e?.message, duration: 3000 });
+    } finally {
+      setEditSaving(false);
+    }
+  };
   // task 90: 用 RpgMarkdown.Block 渲染 markdown (** / # / list / code / link...)
   // window.RpgMarkdown 由 markdown-render.jsx 提供,加载顺序在 game-app.jsx 之前。
   const MdBlock = RpgMarkdown.Block;
@@ -749,16 +807,51 @@ function NarrativeBlock({ text, streaming, ts, msgIndex, saveId, commitId, think
         </div>
       )}
       <div className="gc-msg-body serif">
-        {(Array.isArray(toolOps) && toolOps.length > 0 && typeof renderTool === 'function')
-          ? renderNarrativeWithInlineTools(text, toolOps, renderTool, streaming, MdBlock)
-          : (MdBlock
-              ? <MdBlock text={displayText || ""} streaming={!!streaming} className="rpg-md" />
-              : (displayText || "").split(/\n\n+/).map((p, i) =>
-                  <p key={i}>{p}{streaming && i === (displayText || "").split(/\n\n+/).length - 1 && <span className="gc-cursor" />}</p>
+        {editing ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <textarea
+              ref={editRef}
+              value={editDraft}
+              onChange={e => setEditDraft(e.target.value)}
+              disabled={editSaving}
+              onKeyDown={e => {
+                if (e.key === "s" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); doEditSave(); }
+                if (e.key === "Escape") { setEditing(false); }
+              }}
+              style={{
+                width: "100%", minHeight: 180, maxHeight: "60vh", resize: "vertical",
+                fontFamily: "var(--font-serif, inherit)", fontSize: "var(--d-narrative, 16.5px)",
+                lineHeight: "var(--d-line, 1.78)", padding: "10px 12px", borderRadius: 8,
+                border: "1px solid var(--accent-edge, var(--line))",
+                background: "var(--bg-deep, #1a1816)", color: "var(--text)", outline: "none",
+                letterSpacing: "0.02em",
+              }}
+            />
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button className="btn ghost" disabled={editSaving} onClick={() => setEditing(false)}>
+                {t('common.cancel')}
+              </button>
+              <button className="btn primary" disabled={editSaving || !editDraft.trim()} onClick={doEditSave}>
+                {editSaving
+                  ? <><span className="gc-spinner spin" /> {t('game.app.edit_modal.saving')}</>
+                  : <><Icon name="check" size={12} /> {t('game.app.edit_modal.confirm')}</>}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            {(Array.isArray(toolOps) && toolOps.length > 0 && typeof renderTool === 'function')
+              ? renderNarrativeWithInlineTools(text, toolOps, renderTool, streaming, MdBlock)
+              : (MdBlock
+                  ? <MdBlock text={displayText || ""} streaming={!!streaming} className="rpg-md" />
+                  : (displayText || "").split(/\n\n+/).map((p, i) =>
+                      <p key={i}>{p}{streaming && i === (displayText || "").split(/\n\n+/).length - 1 && <span className="gc-cursor" />}</p>
+                    )
                 )
-            )
-        }
-        <ChatImageGroup images={images} />
+            }
+            <ChatImageGroup images={images} />
+          </>
+        )}
       </div>
       {!streaming && <MsgActions text={displayText} ts={ts || "—"} msgIndex={msgIndex} saveId={saveId} commitId={commitId} role="assistant" meta={meta} />}
     </div>);

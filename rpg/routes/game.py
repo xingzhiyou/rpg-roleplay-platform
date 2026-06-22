@@ -295,6 +295,18 @@ async def api_opening(
                         state_data=state.data,
                     )
                     platform_knowledge.ensure_game_session(persist_user_id, active_save_id, state.data)
+                    # 写入 messages 表:kb_native 存档 materialize() 从 messages 重建 history,
+                    # 若不写,开场白在 messages 表缺失 → materialize 丢开场 → 前端只显示后续对话。
+                    try:
+                        platform_knowledge.record_turn_messages(
+                            persist_user_id,
+                            active_save_id,
+                            state.data,
+                            "",
+                            opening_for_history,
+                        )
+                    except Exception:
+                        pass
                 else:
                     _persist_runtime_checkpoint(state, api_user)
             except Exception:
@@ -855,3 +867,59 @@ async def api_save(
         return JSONResponse({"ok": False, "error": result.error}, status_code=400)
     _persist_runtime_checkpoint(state, api_user)
     return JSONResponse({"ok": True, "state": _payload(api_user)})
+
+
+@router.post("/api/message/edit", response_model=GenericOkResponse, responses=COMMON_ERROR_RESPONSES)
+async def api_message_edit(
+    body: dict[str, Any],
+    api_user: dict[str, Any] | None = Depends(get_current_user),
+) -> JSONResponse:
+    """编辑一条历史消息的内容(messages 表 + state blob history 同步更新)。
+
+    body: {save_id: int, message_index: int, content: str}
+    message_index: history 数组索引(0-based),与 /api/state 返回的 history 顺序一致。
+    """
+    if not api_user:
+        return JSONResponse({"ok": False, "error": "auth required"}, status_code=401)
+    save_id = body.get("save_id")
+    msg_index = body.get("message_index")
+    new_content = body.get("content")
+    if save_id is None or msg_index is None or new_content is None:
+        return JSONResponse({"ok": False, "error": "save_id, message_index, content required"}, status_code=400)
+    try:
+        msg_index = int(msg_index)
+        save_id = int(save_id)
+    except (TypeError, ValueError):
+        return JSONResponse({"ok": False, "error": "invalid save_id or message_index"}, status_code=400)
+
+    from platform_app.db import connect
+    try:
+        with connect() as db:
+            # 按 turn, id 排序拿到有序消息列表,定位到目标行
+            rows = db.execute(
+                "select id from messages where save_id = %s order by turn, id",
+                (save_id,),
+            ).fetchall()
+            if msg_index < 0 or msg_index >= len(rows):
+                return JSONResponse({"ok": False, "error": f"message_index {msg_index} out of range (0-{len(rows)-1})"}, status_code=400)
+            target_id = rows[msg_index]["id"]
+            db.execute(
+                "update messages set content = %s where id = %s",
+                (str(new_content), target_id),
+            )
+            db.commit()
+        # 同步更新 state blob history(非 kb_native 存档直接读 blob;
+        # kb_native 存档 materialize 从 messages 读,上面已更新)
+        try:
+            from app import _ensure_loaded, _resolve_persist_target
+            state = _ensure_loaded(api_user)
+            hist = state.data.get("history") or []
+            if 0 <= msg_index < len(hist):
+                hist[msg_index]["content"] = str(new_content)
+                state.save()
+        except Exception:
+            pass  # blob 同步失败不影响 messages 表已更新的事实
+    except Exception as e:
+        _log.exception("[message/edit] failed")
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+    return JSONResponse({"ok": True})

@@ -924,6 +924,7 @@
       opening: (body, handlers) => sseStream(`${API_PREFIX}/opening`, body || {}, _wbHook(handlers)),
       chat: (body, handlers) => sseStream(`${API_PREFIX}/chat`, body || {}, _wbHook(handlers)),
       chatEstimate: (body) => POST(`${API_PREFIX}/chat/estimate`, body),
+      editMessage: (body) => POST(`${API_PREFIX}/message/edit`, body),
       contextBreakdown: () => GET(`${API_PREFIX}/chat/context-breakdown`),
       memoryMode: (mode) => POST(`${API_PREFIX}/memory/mode`, { mode }),
       memoryAdd: (body) => POST(`${API_PREFIX}/memory/add`, body),

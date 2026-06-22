@@ -2880,7 +2880,10 @@
         "delete_detail": "Deleted {{count}} message(s) · restored to turn {{turn}}",
         "delete_trash": "old branch saved as {{name}}",
         "deleted": "Messages deleted",
-        "delete_failed": "Delete failed"
+        "delete_failed": "Delete failed",
+        "edit_tip": "Edit this message",
+        "edit_saved": "Message updated",
+        "edit_failed": "Edit failed"
       },
       "delete_modal": {
         "eyebrow": "Danger",
@@ -2905,6 +2908,12 @@
         "title": "Fork at this node",
         "new_branch": "New Branch",
         "body": "Later messages will be kept on the original branch; the new branch continues from here."
+      },
+      "edit_modal": {
+        "eyebrow": "Edit GM Output",
+        "title": "Modify This Turn",
+        "saving": "Saving…",
+        "confirm": "Save"
       },
       "narrative": {
         "main_agent": "Main Agent",

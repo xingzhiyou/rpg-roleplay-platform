@@ -2971,7 +2971,10 @@
         "delete_detail": "已删 {{count}} 条消息 · 回到第 {{turn}} 回合",
         "delete_trash": "旧分支已存为 {{name}}",
         "deleted": "消息已删除",
-        "delete_failed": "删除失败"
+        "delete_failed": "删除失败",
+        "edit_tip": "编辑此消息",
+        "edit_saved": "消息已更新",
+        "edit_failed": "编辑失败"
       },
       "delete_modal": {
         "eyebrow": "危险操作",
@@ -2996,6 +2999,12 @@
         "title": "在此节点开新分支",
         "new_branch": "新建分支",
         "body": "当前节点之后的消息会保留在原分支，新分支从这里继续。"
+      },
+      "edit_modal": {
+        "eyebrow": "编辑 GM 输出",
+        "title": "修改本轮回复",
+        "saving": "保存中…",
+        "confirm": "保存修改"
       },
       "narrative": {
         "main_agent": "主代理",

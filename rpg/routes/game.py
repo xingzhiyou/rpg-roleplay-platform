@@ -201,6 +201,40 @@ async def api_new(
     return JSONResponse({"ok": True, "backup": backup, "state": _payload(api_user)})
 
 
+# ── 游戏流水线 · 开场策略(rail 知识只住游戏层,不进底层 GMAgent)──────────────
+# 反馈#73:开了「贴原著」开局仍脱离原著、原著开篇人物(张杰/雇佣兵等)流失。原因:开场默认
+# 提示词强制 150-250 字 + max_tokens=600,把已注入的原著开场压成极短原创、丢人物。
+# 修复边界:底层 generate_opening 通用化(只收 prompt+预算);这里——游戏这条流水线——按
+# steering_strength 决定 rail 时用"忠实重现原著开篇"的提示 + 更大预算。酒馆/编辑器不调此处,零影响。
+_RAIL_OPENING_INSTRUCTION = """\
+玩家选择了【贴原著】引导强度。请基于【本轮上下文包】中的「锚点章节原文 · 贴原著档」段,
+忠实重现原著的开场场景,作为玩家进入故事的起点。
+
+要求：
+- 严格沿用原著开场的时间、地点、**登场人物与关键对话/事件**;原著开篇出现的配角、群像也要保留,
+  不要只写主角、不要替换或省略原著开场出现的人物。
+- 保留原著关键对白的原话或原意;原著开篇的冲突/相遇/转折不得跳过或一笔带过。
+- 玩家角色按其角色卡/出生点切入这一场景(视角与切入点可由玩家身份决定),但不得让开场脱离原著走向。
+- 以注入的原著正文为准,不要凭训练记忆自由另写一个开场。
+- **只重现注入原文中【确实出现】的内容**:不要补充原文之外的剧情、结局、人物去向或晋升/封赏等
+  发展(原文写到哪就到哪);状态写回(memory.facts 等)也只记原文确有的事,不要脑补。
+
+**用户导演指令(最高优先级)**:若上下文出现 `【玩家给 GM 的高优先级引导指令】`,在原著开场框架内
+尽量贴合该意图(场景细节/切入角度),但不得删改原著开场的主要人物与关键事件。
+
+结尾留一个可行动的悬念或选择,不要替玩家做决定。
+字数:500-900字(开场需足够篇幅容纳原著登场人物与场景,不要压缩成极短)。
+"""
+
+
+def _game_opening_policy(steering_strength: str) -> tuple[str | None, int]:
+    """游戏流水线的开场策略。rail(贴原著)→(忠实重现提示, 1600);其它 →(None=底层默认开场, 600)。
+    返回 (prompt 覆盖 | None, max_tokens)。底层据此生成,但不认识 rail 本身。"""
+    if steering_strength == "rail":
+        return (_RAIL_OPENING_INSTRUCTION, 1600)
+    return (None, 600)
+
+
 @router.post("/api/opening")
 async def api_opening(
     api_user: dict[str, Any] | None = Depends(get_current_user),
@@ -257,6 +291,22 @@ async def api_opening(
 
         yield _sse("stage", {"phase": "building_context", "label": "组装上下文…"})
         bundle = await asyncio.to_thread(_retrieve_and_build)
+        # 游戏层决定开场策略:读该存档引导强度,rail→忠实重现原著开篇提示+大预算(#73)。
+        _steering = "guided"
+        try:
+            _, _sid_steer = _resolve_persist_target(api_user)
+            if _sid_steer:
+                from platform_app.db import connect as _conn_steer
+                with _conn_steer() as _db_steer:
+                    _row_steer = _db_steer.execute(
+                        "select worldline->>'steering_strength' as ss from game_sessions where save_id=%s",
+                        (_sid_steer,),
+                    ).fetchone()
+                if _row_steer and _row_steer.get("ss"):
+                    _steering = _row_steer["ss"]
+        except Exception:
+            _steering = "guided"
+        _open_prompt, _open_tokens = _game_opening_policy(_steering)
         yield _sse("status", _payload_sse(api_user))
         yield _sse("stage", {"phase": "generating", "label": "GM 构思开场中…"})
         text = ""
@@ -265,7 +315,8 @@ async def api_opening(
             # stop_event 在 SSE 断开时由 bridge finally 设置,让 sync generator 提前退出
             _opening_stop = threading.Event()
             async for chunk in _bridge_sync_generator_to_async(
-                lambda: gm.generate_opening_stream(state, retrieved_context=bundle["prompt"], stop_event=_opening_stop),
+                lambda: gm.generate_opening_stream(state, retrieved_context=bundle["prompt"], stop_event=_opening_stop,
+                                                   prompt=_open_prompt, max_tokens=_open_tokens),
                 stop_event=_opening_stop,
             ):
                 text += chunk

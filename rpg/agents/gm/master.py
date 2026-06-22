@@ -693,17 +693,22 @@ class GameMaster:
         return backend.call_structured(agent_prompt, messages, max_tokens=900)
 
     # ── 生成开场白 ────────────────────────────────────────────────
-    def generate_opening(self, state, retrieved_context: str = "") -> str:
+    # 底层保持流水线无关:只接收"开场指令(prompt 覆盖)+ token 预算"中性参数,默认用通用
+    # _OPENING_PROMPT/600。是否贴原著、用什么开场文案、给多大预算,由【调用方流水线】(游戏/酒馆/
+    # 编辑器各自)决定后传入——底层绝不认识 rail/原著/steering 这类某条流水线专属的概念。
+    def generate_opening(self, state, retrieved_context: str = "", *,
+                         prompt: str | None = None, max_tokens: int = 600) -> str:
         self._active_state = state
         system   = self._build_system()
-        messages = [{"role": "user", "content": self._turn_message(_OPENING_PROMPT, state, retrieved_context)}]
-        return self._backend.call(system, messages, max_tokens=600)
+        messages = [{"role": "user", "content": self._turn_message(prompt or _OPENING_PROMPT, state, retrieved_context)}]
+        return self._backend.call(system, messages, max_tokens=max_tokens)
 
-    def generate_opening_stream(self, state, retrieved_context: str = "", *, stop_event=None) -> Iterator[str]:
+    def generate_opening_stream(self, state, retrieved_context: str = "", *, stop_event=None,
+                                prompt: str | None = None, max_tokens: int = 600) -> Iterator[str]:
         self._active_state = state
         system   = self._build_system()
-        messages = [{"role": "user", "content": self._turn_message(_OPENING_PROMPT, state, retrieved_context)}]
-        for chunk in self._backend.stream(system, messages, max_tokens=600):
+        messages = [{"role": "user", "content": self._turn_message(prompt or _OPENING_PROMPT, state, retrieved_context)}]
+        for chunk in self._backend.stream(system, messages, max_tokens=max_tokens):
             if stop_event is not None and stop_event.is_set():
                 return  # SSE 客户端已断开,提前退出
             yield chunk

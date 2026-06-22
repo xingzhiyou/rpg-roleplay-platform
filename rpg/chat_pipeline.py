@@ -167,6 +167,20 @@ def _sync_active_entities_from_bundle(state, bundle) -> None:
         return
     layers = (bundle.get("debug") or {}).get("layers") or []
     active: list[dict] = []
+    # [#82] 「当前在场」只放【本场景真出现】的 NPC。npc_cards layer 是 RAG 检索结果
+    # (anchor 注入 + grep 命中 + 章节可见),是"潜在相关"而非"真在场";长篇剧本进度靠后时,
+    # 章节可见的 NPC 多达数百,全灌进来 → 面板「大量无关后期 NPC 卡」(反馈 #82)。
+    # 判据:NPC 名字出现在最近叙事(上一条 GM 正文 + 最近一条玩家输入)里才算在场;
+    # 否则只是上下文相关、不进在场面板。本同步在出本回合正文前跑,故"最近"=上一回合场景。
+    _recent = ""
+    _seen_r: set[str] = set()
+    for _h in reversed(state.data.get("history") or []):
+        _r = _h.get("role"); _ct = str(_h.get("content") or "")
+        if _r in ("assistant", "user") and _r not in _seen_r and _ct:
+            _recent += "\n" + _ct
+            _seen_r.add(_r)
+        if len(_seen_r) >= 2:
+            break
     # 玩家始终第一位
     p = (state.data.get("player") or {})
     if p.get("name"):
@@ -201,6 +215,9 @@ def _sync_active_entities_from_bundle(state, bundle) -> None:
         for it in (lyr.get("items") or []):
             nm = (it.get("name") or "").strip()
             if not nm or nm == p.get("name"):
+                continue
+            # [#82] 只保留本场景真出现(名字在最近叙事里命中)的 NPC,滤掉仅被检索到的潜在相关项。
+            if nm not in _recent:
                 continue
             active.append({
                 "id": f"npc:{nm}",

@@ -3867,6 +3867,9 @@
       "persona_image": "人设图",
       "tab_system": "系统提示",
       "collapse": "折叠",
+      "choose_character": "选择 / 更换角色卡",
+      "choose_persona": "从角色卡库选择我的角色",
+      "no_cards": "还没有角色卡,先在「角色」里创建或导入。",
       "char_not_found": "未找到该对话的角色卡。",
       "persona_not_set": "本对话未设置 persona 卡。",
       "saving": "保存中…",
@@ -3894,6 +3897,7 @@
       "deleted": "已删除",
       "delete_failed": "删除失败",
       "persona_saved": "persona 已保存",
+      "card_bound": "已更换角色卡",
       "save_failed": "保存失败"
     },
     "persona": {

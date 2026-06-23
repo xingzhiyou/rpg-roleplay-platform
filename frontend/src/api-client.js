@@ -760,6 +760,8 @@
       rename: (id, title) => POST(`/api/tavern/chats/${id}/rename`, { title }),
       // F#3:编辑本对话系统提示词
       setSystemPrompt: (id, sp) => POST(`/api/tavern/chats/${id}/system-prompt`, { system_prompt: sp }),
+      // 绑定/更换本对话的 AI 角色卡 / 我的角色卡(role: 'character'|'persona', cardId=null 解绑)
+      bindCard: (id, role, cardId) => POST(`/api/tavern/chats/${id}/bind-card`, { role, card_id: cardId }),
       // 沉浸式拟人模式开关(持久写 state.tavern.immersive,确定性注入 system prompt)
       setImmersive: (id, enabled) => POST(`/api/tavern/chats/${id}/immersive`, { enabled: !!enabled }),
       // AI 帮回:以玩家自己的角色/persona 生成一条符合上下文的回复(返回文本,前端填入输入框,不自动发送)

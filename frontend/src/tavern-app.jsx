@@ -521,13 +521,89 @@ function PersonaHero({ cardId, avatar }) {
   );
 }
 
+// 从统一角色卡库选卡(酒馆侧栏「选择 / 更换角色卡 / 我的角色」)。
+function CardPickerSheet({ role, onPick, onClose }) {
+  const { t } = useTranslation();
+  const [cards, setCards] = useState([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    let alive = true;
+    Promise.resolve(window.api.cards.myList())
+      .then((r) => {
+        if (!alive) return;
+        const list = Array.isArray(r) ? r : (r && (r.items || r.cards)) || [];
+        setCards(list);
+      })
+      .catch(() => {})
+      .finally(() => { if (alive) setLoading(false); });
+    return () => { alive = false; };
+  }, []);
+  const title = role === 'character'
+    ? (t('tavern_app.drawer.choose_character') || '选择 / 更换角色卡')
+    : (t('tavern_app.drawer.choose_persona') || '从角色卡库选择我的角色');
+  return (
+    <div onClick={onClose}
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 9998,
+               display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+      <div onClick={(e) => e.stopPropagation()}
+        style={{ background: 'var(--bg, #1a1817)', borderTop: '1px solid var(--line)',
+                 borderRadius: '16px 16px 0 0', width: '100%', maxWidth: 520, maxHeight: '72vh',
+                 display: 'flex', flexDirection: 'column' }}>
+        <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--line)',
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <strong style={{ fontSize: 14 }}>{title}</strong>
+          <button className="iconbtn" onClick={onClose} aria-label={t('common.close') || '关闭'}>
+            <Icon name="close" size={15} />
+          </button>
+        </div>
+        <div style={{ overflowY: 'auto', padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {loading ? (
+            <div className="muted-2" style={{ padding: 24, textAlign: 'center' }}>…</div>
+          ) : cards.length === 0 ? (
+            <div className="muted-2" style={{ padding: 24, textAlign: 'center' }}>
+              {t('tavern_app.drawer.no_cards') || '还没有角色卡,先在「角色」里创建或导入。'}
+            </div>
+          ) : (
+            cards.map((c) => (
+              <button key={c.id} onClick={() => onPick(c.id)}
+                style={{ display: 'flex', gap: 12, alignItems: 'center', padding: '10px 12px',
+                         background: 'var(--panel)', border: '1px solid var(--line)', borderRadius: 12,
+                         cursor: 'pointer', textAlign: 'left' }}>
+                {c.avatar_path ? (
+                  <img src={c.avatar_path} alt=""
+                    style={{ width: 44, height: 44, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }} />
+                ) : (
+                  <div style={{ width: 44, height: 44, borderRadius: 8, background: 'var(--panel-2, #282623)',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                flexShrink: 0, fontFamily: 'serif', fontSize: 18, color: 'var(--accent)' }}>
+                    {(c.name || '?').slice(0, 1)}
+                  </div>
+                )}
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{c.name || '未命名'}</div>
+                  {(c.identity || c.summary) && (
+                    <div className="muted-2" style={{ fontSize: 12, overflow: 'hidden',
+                         textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.identity || c.summary}</div>
+                  )}
+                </div>
+              </button>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function TwoCardDrawer({ open, character, persona, onClose, onSavePersona,
                                 inline = false, systemPrompt = '', onSaveSystemPrompt,
+                                chatId = null, onBindCard,
                                 immersive = false, onToggleImmersive }) {
   const { t } = useTranslation();
   const [form, setForm] = useState(() => cardFormInit(persona));
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [pickRole, setPickRole] = useState(null); // null | 'character' | 'persona' —— 选卡器
   const [tab, setTab] = useState('character'); // 'character' | 'persona' | 'system'
   const [spVal, setSpVal] = useState(systemPrompt || '');
   const [spEditing, setSpEditing] = useState(false);
@@ -606,6 +682,11 @@ export function TwoCardDrawer({ open, character, persona, onClose, onSavePersona
               </button>
             </div>
           )}
+          {onBindCard && chatId != null && (
+            <button className="btn ghost" style={{ width: '100%', marginBottom: 12 }} onClick={() => setPickRole('character')}>
+              <Icon name="cards" size={12} /> {t('tavern_app.drawer.choose_character') || '选择 / 更换角色卡'}
+            </button>
+          )}
           {character
             ? <><PersonaHero cardId={character.id} avatar={character.avatar_path} /><CardSheet card={character} kind="user" /></>
             : <div className="muted-2" style={{ padding: 24, textAlign: 'center' }}>{t('tavern_app.drawer.char_not_found')}</div>}
@@ -614,12 +695,18 @@ export function TwoCardDrawer({ open, character, persona, onClose, onSavePersona
       {tab === 'persona' && (
         !editing ? (
           <>
+            {onBindCard && chatId != null && (
+              <button className="btn ghost" style={{ width: '100%', marginBottom: 12 }} onClick={() => setPickRole('persona')}>
+                <Icon name="cards" size={12} /> {t('tavern_app.drawer.choose_persona') || '从角色卡库选择我的角色'}
+              </button>
+            )}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
               <strong style={{ fontSize: 14 }}>{personaName}</strong>
               {persona && (
                 <button className="btn ghost" onClick={() => setEditing(true)}><Icon name="edit" size={12} /> {t('common.edit')}</button>
               )}
             </div>
+            {persona && persona.id ? <PersonaHero cardId={persona.id} avatar={persona.avatar_path} /> : null}
             {persona
               ? <CardSheet card={persona} kind="persona" />
               : <div className="muted-2" style={{ padding: 24, textAlign: 'center' }}>{t('tavern_app.drawer.persona_not_set')}</div>}
@@ -664,6 +751,13 @@ export function TwoCardDrawer({ open, character, persona, onClose, onSavePersona
             </>
           )}
         </div>
+      )}
+      {pickRole && (
+        <CardPickerSheet
+          role={pickRole}
+          onClose={() => setPickRole(null)}
+          onPick={(cid) => { const r = pickRole; setPickRole(null); if (onBindCard) onBindCard(r, cid); }}
+        />
       )}
     </div>
   );
@@ -901,6 +995,18 @@ export default function TavernApp() {
     }
   }, [applyState, t]);
 
+  /* ── 绑定/更换 AI 角色卡 / 我的角色卡(role: 'character'|'persona')── */
+  const onBindCard = useCallback(async (role, cardId) => {
+    if (activeId == null) return;
+    try {
+      await window.api.tavern.bindCard(activeId, role, cardId);
+      window.__apiToast?.(t('tavern_app.toast.card_bound') || '已更换角色卡', { kind: 'ok', duration: 1500 });
+      try { const d = await window.api.game.state(); applyState(d); } catch (_) {}
+    } catch (e) {
+      window.__apiToast?.(t('tavern_app.toast.save_failed'), { kind: 'danger', detail: e?.message });
+    }
+  }, [activeId, applyState, t]);
+
   /* ── 沉浸式拟人模式开关(持久写后端 state.tavern.immersive)── */
   const onToggleImmersive = useCallback(async (enabled) => {
     if (!activeId) return;
@@ -1029,6 +1135,7 @@ export default function TavernApp() {
         open={drawerOpen} character={character} persona={persona}
         onClose={() => setDrawerOpen(false)}
         onSavePersona={onSavePersona}
+        chatId={activeId} onBindCard={onBindCard}
         immersive={immersive}
         onToggleImmersive={onToggleImmersive}
       />

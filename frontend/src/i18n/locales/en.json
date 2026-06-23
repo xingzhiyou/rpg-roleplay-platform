@@ -3864,6 +3864,9 @@
       "persona_image": "Persona Image",
       "tab_system": "System Prompt",
       "collapse": "Collapse",
+      "choose_character": "Choose / change character card",
+      "choose_persona": "Pick my persona from the card library",
+      "no_cards": "No character cards yet — create or import one in the Characters tab first.",
       "char_not_found": "No character card found for this chat.",
       "persona_not_set": "No persona card is set for this chat.",
       "saving": "Saving…",
@@ -3894,6 +3897,7 @@
       "deleted": "Deleted",
       "delete_failed": "Delete failed",
       "persona_saved": "Persona saved",
+      "card_bound": "Character card changed",
       "save_failed": "Save failed"
     },
     "persona": {

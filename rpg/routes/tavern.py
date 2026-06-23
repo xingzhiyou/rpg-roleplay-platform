@@ -375,6 +375,45 @@ async def api_tavern_rename(
     return _json({"ok": True, "title": title[:200]})
 
 
+@router.post("/api/tavern/chats/{chat_id}/bind-card")
+async def api_tavern_bind_card(
+    chat_id: int,
+    request: Request,
+    api_user: dict[str, Any] = Depends(get_current_user),
+) -> JSONResponse:
+    """body {"role": "character"|"persona", "card_id": int|null} → 绑定/更换本对话的
+    AI 角色卡 / 我的角色卡(card_id=null 解绑)。更新 game_saves.tavern_<role>_card_id;
+    下次 /api/state 的 _payload 会按 FK 从统一卡库 character_cards 刷新快照(即时生效)。"""
+    from platform_app.db import connect, init_db
+
+    user_id = _uid(api_user)
+    body = await request.json()
+    role = str(body.get("role") or "")
+    if role not in ("character", "persona"):
+        return _bad("role 必须是 character 或 persona")
+    col = "tavern_character_card_id" if role == "character" else "tavern_persona_card_id"
+    raw = body.get("card_id")
+    cid: int | None = None
+    init_db()
+    with connect() as db:
+        if not _require_tavern_save(db, chat_id, user_id):
+            return _bad("无权操作该对话", 403)
+        if raw is not None:
+            cid = int(raw)
+            if not db.execute(
+                "select 1 from character_cards where id = %s and user_id = %s", (cid, user_id),
+            ).fetchone():
+                return _bad("无权使用该角色卡", 403)
+        # col 取自白名单(role 已校验),无注入风险。
+        db.execute(
+            f"update game_saves set {col} = %s, updated_at = now() "
+            "where id = %s and user_id = %s and save_kind = 'tavern'",
+            (cid, chat_id, user_id),
+        )
+    _invalidate_cache(api_user)
+    return _json({"ok": True, "role": role, "card_id": cid})
+
+
 @router.post("/api/tavern/chats/{chat_id}/system-prompt")
 async def api_tavern_set_system_prompt(
     chat_id: int,

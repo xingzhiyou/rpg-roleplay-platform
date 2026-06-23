@@ -281,8 +281,10 @@ def import_persona_skill(
     #    metadata.skill_content=完整原文(扮演时经 tavern provider priority 96 逐字注入)。
     payload: dict[str, Any] = {
         "name": name,
-        "identity": (description or name)[:_DISPLAY_CAP],
-        "background": content[:_DISPLAY_CAP],
+        "identity": (description or name)[:600],   # 简短简介(人类可见);完整 skill 不塞展示字段
+        # background 不再塞 30k 原文(每次 /api/state 下发 + 侧栏内联渲染 → 内存爆)。
+        # 完整原文只存 metadata.skill_content,扮演时服务端注入、查看时前端按需拉。
+        "background": "",
         "tags": ["人格skill"],
         "metadata": {
             "persona_skill": True,

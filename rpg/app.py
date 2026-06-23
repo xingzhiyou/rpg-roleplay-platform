@@ -1167,6 +1167,20 @@ def _payload(api_user: dict[str, Any] | None = None, *, include_catalog: bool = 
                         _refresh_tavern_cards_from_library(_db, _uid, _sv, {"tavern": _tav})
                         # 沉浸式开关从持久列回填(state_snapshot 会被 activate 擦掉,列才是真相源)。
                         _tav["immersive"] = bool(_sv.get("tavern_immersive"))
+                        # 人格 skill:不把 30k 原文塞进每次 /api/state(前端内联渲染会内存爆)。
+                        # 剥离 metadata.skill_content + 截断异常大的 background;完整 skill 前端按需拉
+                        # (GET /api/me/character-cards/{id});服务端注入读的是内存态 state.data,不受影响。
+                        for _ck in ("character", "persona"):
+                            _c = _tav.get(_ck)
+                            if not isinstance(_c, dict):
+                                continue
+                            _md = _c.get("metadata")
+                            if isinstance(_md, dict) and _md.get("skill_content"):
+                                _md2 = dict(_md); _md2.pop("skill_content", None)
+                                _md2["has_skill_content"] = True
+                                _c["metadata"] = _md2
+                            if isinstance(_c.get("background"), str) and len(_c["background"]) > 2000:
+                                _c["background"] = _c["background"][:2000]
             except Exception:
                 pass
     # 当前模型的 context window（tokens），由 platform_app.usage.context_window_for

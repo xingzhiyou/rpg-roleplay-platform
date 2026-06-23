@@ -239,6 +239,48 @@ function cardSnippet(c, n = 160) {
 }
 
 /* 只读角色档展示(设定 tab / 详情用)。纯展示 DTO 结构化字段,不做任何文本解析。 */
+// 人格 skill 完整定义:折叠 + 按需拉取(GET 单卡)+ 高度封顶滚动 + 渲染长度封顶。
+// 关键:不把 30k 原文常驻 DOM(默认折叠)、不随 /api/state 下发(按需拉),避免长 skill 内存爆。
+function SkillContentSection({ cardId }) {
+  const [open, setOpen] = useStatePL(false);
+  const [text, setText] = useStatePL('');
+  const [loading, setLoading] = useStatePL(false);
+  const [err, setErr] = useStatePL('');
+  const toggle = useCallbackPL(async () => {
+    if (text) { setOpen((o) => !o); return; }
+    if (loading || cardId == null) return;
+    setLoading(true); setErr('');
+    try {
+      const r = await window.api.cards.myGet(cardId);
+      const c = (r && (r.card || r)) || {};
+      const sc = (c.metadata && c.metadata.skill_content) || c.background || '';
+      setText(sc || '（无内容）'); setOpen(true);
+    } catch (e) { setErr(e?.message || '加载失败'); } finally { setLoading(false); }
+  }, [cardId, text, loading]);
+  const MAX = 60000;
+  const shown = text.length > MAX ? (text.slice(0, MAX) + '\n…（过长已截断，完整内容服务端使用）') : text;
+  return (
+    <div style={{ background: 'var(--panel-2, #282623)', border: '1px solid var(--line-soft, #2a2724)', borderRadius: 10, padding: '12px 16px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+        <div style={{ fontSize: 11, letterSpacing: '.08em', color: 'var(--accent, #c96442)', fontWeight: 600, textTransform: 'uppercase' }}>人格 skill 定义</div>
+        <button
+          onClick={toggle}
+          style={{ fontSize: 12, color: 'var(--accent, #c96442)', background: 'transparent', border: '1px solid var(--line, #3a352f)', borderRadius: 8, padding: '4px 12px', cursor: 'pointer' }}
+        >
+          {loading ? '加载中…' : (open ? '收起' : '查看完整 skill')}
+        </button>
+      </div>
+      {err && <div style={{ color: 'var(--danger, #c8675d)', fontSize: 12, marginTop: 6 }}>{err}</div>}
+      {open && text && (
+        <div style={{ marginTop: 10, maxHeight: 360, overflow: 'auto', whiteSpace: 'pre-wrap', lineHeight: 1.7, fontSize: 12.5, color: 'var(--text-quiet, #c8c2b7)', fontFamily: 'ui-monospace, monospace', wordBreak: 'break-word' }}>
+          {shown}
+        </div>
+      )}
+      {!open && <div style={{ marginTop: 6, fontSize: 11.5, color: 'var(--muted-2, #8a847b)' }}>整包 skill 原文作为角色定义,扮演时服务端逐字注入;点上方查看。</div>}
+    </div>
+  );
+}
+
 function CardSheet({ card, kind = 'user' }) {
   const { t } = useTranslation();
   const raw = (card && card._raw) || card || {};
@@ -319,8 +361,15 @@ function CardSheet({ card, kind = 'user' }) {
         <CSKeyValuePairs columns={4} items={attrs} />
       </div>
 
-      {/* 档案正文:各字段独立面板 */}
-      {hasBody ? (
+      {/* 人格 skill 卡:不内联 30k 原文,改折叠按需拉(防内存爆);其余字段照常 */}
+      {(raw.metadata && raw.metadata.persona_skill) || tags.includes('人格skill') ? (
+        <CSSpaceBetween size="s">
+          <SkillContentSection cardId={raw.id} />
+          {block(t('cards.detail.appearance'), raw.appearance)}
+          {block(t('cards.detail.personality'), raw.personality)}
+          {block(t('cards.detail.speech_style'), raw.speech_style)}
+        </CSSpaceBetween>
+      ) : hasBody ? (
         <CSSpaceBetween size="s">
           {block(t('cards.detail.background'), raw.background)}
           {block(t('cards.detail.appearance'), raw.appearance)}

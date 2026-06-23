@@ -247,10 +247,12 @@ def import_persona_skill(
     repo_url: str = "",
     model_api_id: str | None = None,
     model: str | None = None,
-    generate_image: bool = True,
+    generate_image: bool = False,
     use_llm: bool = False,
 ) -> dict[str, Any]:
-    """导入一个人格 skill → 直接映射成 character_cards(pc) + (可选)入队人设图 + 登记 user_persona_skills。
+    """导入一个人格 skill → 直接映射成 character_cards(pc) + (仅当显式 generate_image=True 才)入队人设图 + 登记 user_persona_skills。
+
+    **默认不自动生成人设图**(导入只建卡;人设图由用户在角色卡上手动触发,避免每次导入都烧生图额度)。
 
     默认**确定性直接映射**(skill 原文逐字进卡,扮演时模型直接读 skill 本身,不调 LLM、不有损、零成本)。
     use_llm=True 时再在映射结果上叠一层 LLM 归类整理(可选、要 BYOK)。返回 {ok, skill_id, card_id, card, image_status}。

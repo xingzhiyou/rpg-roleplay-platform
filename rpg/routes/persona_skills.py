@@ -59,7 +59,7 @@ async def api_persona_skill_import(
             repo_url=repo_url,
             model_api_id=(body.get("model_api_id") or None),
             model=(body.get("model") or None),
-            generate_image=bool(body.get("generate_image", True)),
+            generate_image=bool(body.get("generate_image", False)),
             use_llm=bool(body.get("use_llm", False)),
         )
         return JSONResponse(result)

@@ -476,7 +476,7 @@ export function TavernChatArea({ history, running, saveId, charName, charInitial
  * inline=true(Platform 内嵌 tavern.jsx):页内可折叠右侧栏,不盖顶栏(open=false → collapsed)。
  * 新增「系统提示」tab —— 编辑本对话 system_prompt(onSaveSystemPrompt 持久化)。 */
 // 人设图海报(侧栏顶部):拉 persona-images,当前图做大图 + 缩略条。修「侧栏不显示人设图」。
-function PersonaHero({ cardId }) {
+function PersonaHero({ cardId, avatar }) {
   const { t } = useTranslation();
   const [imgs, setImgs] = useState([]);
   const [zoom, setZoom] = useState(null);
@@ -488,8 +488,9 @@ function PersonaHero({ cardId }) {
       .catch(() => {});
     return () => { alive = false; };
   }, [cardId]);
-  if (!imgs.length) return null;
-  const cur = imgs.find((i) => i.is_current) || imgs[0];
+  // 无人设图时回退展示头像(始终给一张大图),都没有才不渲染。
+  const cur = imgs.find((i) => i.is_current) || imgs[0] || (avatar ? { id: '_av', image_url: avatar } : null);
+  if (!cur || !cur.image_url) return null;
   return (
     <div style={{ marginBottom: 14 }}>
       <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: 1.2, color: 'var(--accent)', marginBottom: 8 }}>
@@ -606,7 +607,7 @@ export function TwoCardDrawer({ open, character, persona, onClose, onSavePersona
             </div>
           )}
           {character
-            ? <><PersonaHero cardId={character.id} /><CardSheet card={character} kind="user" /></>
+            ? <><PersonaHero cardId={character.id} avatar={character.avatar_path} /><CardSheet card={character} kind="user" /></>
             : <div className="muted-2" style={{ padding: 24, textAlign: 'center' }}>{t('tavern_app.drawer.char_not_found')}</div>}
         </>
       )}

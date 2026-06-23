@@ -1147,6 +1147,24 @@ def _payload(api_user: dict[str, Any] | None = None, *, include_catalog: bool = 
     model = _resolve_effective_model_view(api_user, model_catalog) or selected_model(model_catalog)
     is_admin = bool(api_user and api_user.get("role") == "admin")
     payload = state.status_payload()
+    # 酒馆:每次 /api/state 都用统一卡库 character_cards 最新值刷新 tavern.character/persona,
+    # 这样在卡库编辑设定 / 换人设图后【无需重开聊天】即生效(activate-only 刷新不够,见用户反馈)。
+    _tav = payload.get("tavern")
+    if isinstance(_tav, dict) and _uid:
+        _sid = state.data.get("_active_save_id")
+        if _sid:
+            try:
+                from platform_app.branches.activation import _refresh_tavern_cards_from_library
+                from platform_app.db import connect as _connect
+                with _connect() as _db:
+                    _sv = _db.execute(
+                        "select tavern_character_card_id, tavern_persona_card_id, save_kind "
+                        "from game_saves where id = %s and user_id = %s", (int(_sid), _uid),
+                    ).fetchone()
+                    if _sv and _sv.get("save_kind") == "tavern":
+                        _refresh_tavern_cards_from_library(_db, _uid, _sv, {"tavern": _tav})
+            except Exception:
+                pass
     # 当前模型的 context window（tokens），由 platform_app.usage.context_window_for
     # 按 api_id+real_name 查映射表。FE Composer 里 ContextUsage 圆环需要这个值
     # 作为分母，从悬空 hard-coded 1.05M 变成真实当前模型上限。

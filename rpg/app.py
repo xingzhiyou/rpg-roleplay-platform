@@ -462,6 +462,7 @@ from routes.models import router as models_router
 from routes.rules import router as rules_router
 from routes.sidebar import router as sidebar_router
 from routes.skills import router as skills_router
+from routes.persona_skills import router as persona_skills_router
 from routes.tavern import router as tavern_router
 from routes.timeline import router as timeline_router
 from routes.worldline import router as worldline_router
@@ -470,6 +471,7 @@ app.include_router(game_router)
 app.include_router(models_router)
 app.include_router(mcp_router)
 app.include_router(skills_router)
+app.include_router(persona_skills_router)
 app.include_router(worldline_router)
 app.include_router(rules_router)
 app.include_router(timeline_router)

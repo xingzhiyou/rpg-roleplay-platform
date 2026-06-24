@@ -2048,6 +2048,11 @@ MIGRATIONS: list[tuple[int, str, list[str]]] = [
         # /api/state 从列回填 tavern.immersive、回合管线读列 → 跨激活/重开持久。默认 false。
         "alter table game_saves add column if not exists tavern_immersive boolean not null default false",
     ]),
+    (82, "users_apple_sub", [
+        # Sign in with Apple:用 Apple 稳定用户标识(token.sub)关联账号,免密登录。
+        "alter table users add column if not exists apple_sub text",
+        "create unique index if not exists idx_users_apple_sub on users(apple_sub) where apple_sub is not null",
+    ]),
 ]
 
 

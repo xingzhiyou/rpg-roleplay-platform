@@ -813,6 +813,125 @@ def _issue_session(db, user_id: int) -> str:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
+# Sign in with Apple(原生 iOS/iPadOS)
+#   客户端拿到 Apple 签名的 identity_token(JWT/RS256)→ 本端用 Apple 公钥(JWKS)校验
+#   签名 + iss/aud/exp + nonce → 取 sub(稳定用户标识)+ email → 查/建账号 → 发 session。
+#   JWKS URL 是 Apple 固定常量(非用户可控)→ 直连安全,无 SSRF 风险。
+# ──────────────────────────────────────────────────────────────────────────────
+APPLE_ISSUER = "https://appleid.apple.com"
+APPLE_JWKS_URL = "https://appleid.apple.com/auth/keys"
+# 原生 App 的 audience = iOS bundle id;可经环境覆盖(改包名 / 加 Services ID)。
+APPLE_AUDIENCE = os.environ.get("APPLE_BUNDLE_ID", "icu.stellatrix.chat")
+
+_apple_jwk_client = None
+_apple_jwk_lock = threading.Lock()
+
+
+def _get_apple_jwk_client():
+    global _apple_jwk_client
+    if _apple_jwk_client is None:
+        with _apple_jwk_lock:
+            if _apple_jwk_client is None:
+                from jwt import PyJWKClient
+                _apple_jwk_client = PyJWKClient(APPLE_JWKS_URL, cache_keys=True, lifespan=3600)
+    return _apple_jwk_client
+
+
+def verify_apple_identity_token(identity_token: str, raw_nonce: str = "") -> dict[str, Any]:
+    """校验 Apple identity_token,成功返回 {sub, email, email_verified};任何不合法都抛 ValueError。"""
+    import jwt
+
+    token = (identity_token or "").strip()
+    if not token:
+        raise ValueError("缺 identity_token")
+    try:
+        signing_key = _get_apple_jwk_client().get_signing_key_from_jwt(token)
+        claims = jwt.decode(
+            token,
+            signing_key.key,
+            algorithms=["RS256"],          # 只接受 Apple 的 RS256,杜绝 alg=none / HS 混淆
+            audience=APPLE_AUDIENCE,
+            issuer=APPLE_ISSUER,
+            options={"require": ["exp", "iat", "iss", "aud", "sub"]},
+        )
+    except Exception:
+        raise ValueError("Apple 身份令牌校验失败")
+    if raw_nonce:
+        expected = hashlib.sha256(raw_nonce.encode("utf-8")).hexdigest()
+        if not secrets.compare_digest(str(claims.get("nonce") or ""), expected):
+            raise ValueError("nonce 不匹配,登录被拒绝")
+    sub = str(claims.get("sub") or "").strip()
+    if not sub:
+        raise ValueError("Apple 令牌缺 sub")
+    email = str(claims.get("email") or "").strip().lower()
+    return {"sub": sub, "email": email, "email_verified": claims.get("email_verified") in (True, "true", "1")}
+
+
+def _assert_registration_allowed(db, email_norm: str) -> None:
+    """allowlist/invite 模式下,新账号邮箱必须在白名单(与密码注册同 gate);open/dev 不拦。"""
+    try:
+        row = db.execute("select value from app_config where key = 'admin.registration_config' limit 1").fetchone()
+        cfg = (row.get("value") if row else None) or {}
+        mode = (cfg.get("mode") or "").lower()
+    except Exception:
+        mode = ""
+    if mode in ("allowlist", "invite"):
+        wl = db.execute("select 1 from registration_allowlist where email_norm = %s", (email_norm,)).fetchone() if email_norm else None
+        if not wl:
+            raise ValueError("该邮箱不在内测白名单。本批次仅向早期预约者开放。")
+
+
+def _apple_unique_username(db, email_norm: str, apple_sub: str) -> str:
+    base = normalize_username((email_norm.split("@")[0] if email_norm else "") or ("apple_" + apple_sub[:8])) or "apple_user"
+    uname = base
+    for i in range(2, 80):
+        if not db.execute("select 1 from users where username = %s", (uname,)).fetchone():
+            return uname
+        uname = f"{base}{i}"
+    return f"{base}_{secrets.token_hex(3)}"
+
+
+def login_or_create_apple_user(apple_sub: str, email: str = "", name: str = "") -> tuple[dict[str, Any], str]:
+    """按 Apple sub 查/建账号并发 session。返回 (user, session_token)。"""
+    apple_sub = (apple_sub or "").strip()
+    if not apple_sub:
+        raise ValueError("缺 apple_sub")
+    email_norm = (email or "").strip().lower()
+    with connect() as db:
+        row = db.execute("select * from users where apple_sub = %s", (apple_sub,)).fetchone()
+        if row:
+            user = dict(row)
+            # Apple 仅首次回带 email → 已有账号但缺邮箱时回填
+            if email_norm and not str(user.get("email") or "").strip():
+                db.execute("update users set email = %s, email_verified = true where id = %s", (email_norm, user["id"]))
+                user["email"] = email_norm
+        else:
+            row = db.execute(
+                "select * from users where lower(email) = %s order by id asc limit 1", (email_norm,)
+            ).fetchone() if email_norm else None
+            if row:
+                # 同邮箱已有账号 → 关联 Apple(已有邮箱用户也能改用 Apple 登录)
+                user = dict(row)
+                db.execute("update users set apple_sub = %s where id = %s", (apple_sub, user["id"]))
+                user["apple_sub"] = apple_sub
+            else:
+                _assert_registration_allowed(db, email_norm)
+                disp = (name or "").strip() or (email_norm.split("@")[0] if email_norm else "Apple 用户")
+                uname = _apple_unique_username(db, email_norm, apple_sub)
+                user = dict(db.execute(
+                    """
+                    insert into users(username, password_hash, display_name, role, email,
+                                      email_verified, age_confirmed, terms_accepted_at, apple_sub)
+                    values (%s, null, %s, 'user', %s, %s, true, now(), %s)
+                    returning *
+                    """,
+                    (uname, disp, email_norm, bool(email_norm), apple_sub),
+                ).fetchone())
+        token = _issue_session(db, user["id"])
+        return user, token
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 # 桌面/本地部署:默认账户 + 账户管理 + 一次性「免登录魔法链接」
 # ──────────────────────────────────────────────────────────────────────────────
 DESKTOP_LOGIN_TTL_MIN = 10  # 魔法链接有效期(分钟),单次使用

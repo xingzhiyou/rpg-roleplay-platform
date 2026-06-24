@@ -226,6 +226,35 @@ async def api_login_code_verify(request: Request):
         return json_response({"ok": False, "error": str(exc)}, status_code=400)
 
 
+@router.post("/api/auth/apple")
+async def api_apple_signin(request: Request):
+    """Sign in with Apple(原生 iOS/iPadOS):校验 Apple 签名身份令牌 → 查/建账号 → 发 session cookie。
+    body: {identity_token, raw_nonce?, name?}（email 从令牌取;name 仅 Apple 首次授权时有值)。"""
+    body = await request.json()
+    identity_token = (body.get("identity_token") or "").strip()
+    raw_nonce = (body.get("raw_nonce") or "").strip()
+    name = (body.get("name") or "").strip()
+    if not identity_token:
+        return json_response({"ok": False, "error": "缺 identity_token"}, status_code=400)
+    ip = _client_ip(request)
+    try:
+        _auth._check_rate_limit(ip, "apple")
+    except _auth.RateLimited:
+        return json_response({"ok": False, "error": "尝试过于频繁,请稍后再试"}, status_code=429)
+    try:
+        claims = await asyncio.to_thread(_auth.verify_apple_identity_token, identity_token, raw_nonce)
+        user, token = await asyncio.to_thread(
+            _auth.login_or_create_apple_user, claims["sub"], claims.get("email", ""), name
+        )
+        await asyncio.to_thread(workspace.ensure_default, user["id"])
+        response = json_response({"ok": True, "user": public_user(user), "platform": platform_for(user)})
+        _set_session_cookie(response, request, token)
+        return response
+    except ValueError as exc:
+        _auth._record_login_fail(ip, "apple")
+        return json_response({"ok": False, "error": str(exc)}, status_code=401)
+
+
 # 保留 request：logout 需要读 cookies 并设置 delete_cookie
 @router.post("/api/auth/logout")
 async def api_logout(request: Request):

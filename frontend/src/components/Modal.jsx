@@ -26,6 +26,7 @@ export default function Modal({
   closeDisabled = false,
   showClose = true,
   footer = null,
+  footerStyle,
   className = '',
   panelStyle,
   children,
@@ -65,7 +66,7 @@ export default function Modal({
           </header>
         )}
         {children}
-        {footer != null && <footer className="pl-modal-foot">{footer}</footer>}
+        {footer != null && <footer className="pl-modal-foot" style={footerStyle}>{footer}</footer>}
       </div>
     </div>
   );

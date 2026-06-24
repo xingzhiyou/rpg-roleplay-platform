@@ -1856,37 +1856,17 @@ function OverridesModal({ script, onClose }) {
   try { JSON.parse(raw); } catch (_) { jsonValid = false; }
 
   return (
-    <div className="pl-modal-backdrop" onClick={onClose}>
-      <div className="pl-modal" onClick={(e) => e.stopPropagation()} style={{width: "min(700px, 96vw)", maxHeight: "90vh", display: "flex", flexDirection: "column"}}>
-        <header className="pl-modal-head">
-          <div>
-            <div className="pl-modal-eyebrow">{t('scripts.editor.overrides_eyebrow')} · {script.title}</div>
-            <h2 className="pl-modal-title">{loading ? t('common.loading') : "script_overrides JSONB"}</h2>
-          </div>
-          <button className="iconbtn" onClick={onClose} data-tip={t('common.close')}><Icon name="close" size={14} /></button>
-        </header>
-        {err && <div style={{padding: "8px 16px", color: "var(--danger)", fontSize: 13}}>{err}</div>}
-        {!loading && (
-          <div style={{flex: 1, minHeight: 0, display: "flex", flexDirection: "column", padding: "0 16px 0"}}>
-            <div style={{fontSize: 11.5, color: "var(--muted-2)", marginBottom: 6, paddingTop: 12}}>
-              {t('scripts.editor.overrides_hint')}
-              {!jsonValid && <span style={{color: "var(--danger)", marginLeft: 8}}>{t('scripts.editor.json_invalid')}</span>}
-            </div>
-            <textarea
-              value={raw}
-              onChange={(e) => { setRaw(e.target.value); setDirty(true); }}
-              spellCheck={false}
-              style={{
-                flex: 1, minHeight: 320, fontFamily: "var(--font-mono, monospace)", fontSize: 12.5,
-                lineHeight: 1.55, resize: "vertical", background: "var(--surface-2)",
-                border: "1px solid " + (jsonValid ? "var(--line-soft)" : "var(--danger)"),
-                borderRadius: "var(--r-2)", padding: "10px 12px", color: "var(--text)",
-                outline: "none",
-              }}
-            />
-          </div>
-        )}
-        <footer className="pl-modal-foot" style={{marginTop: 12}}>
+    // 收口到共享 <Modal>(产同构 DOM,零视觉变化):panelStyle 保 width/maxHeight/flex,
+    // footerStyle 保原 marginTop:12,eyebrow/title/close 与原手写一致。
+    <Modal
+      open
+      onClose={onClose}
+      eyebrow={<>{t('scripts.editor.overrides_eyebrow')} · {script.title}</>}
+      title={loading ? t('common.loading') : "script_overrides JSONB"}
+      panelStyle={{ width: "min(700px, 96vw)", maxHeight: "90vh", display: "flex", flexDirection: "column" }}
+      footerStyle={{ marginTop: 12 }}
+      footer={(
+        <>
           <span className="muted-2" style={{fontSize: 11.5}}>
             GET/POST /api/v1/scripts/{script.id}/overrides
           </span>
@@ -1896,9 +1876,31 @@ function OverridesModal({ script, onClose }) {
               {saving ? <><Icon name="spinner" size={12} className="spin" /> {t('scripts.editor.saving')}</> : <><Icon name="check" size={12} /> {t('common.save')}</>}
             </button>
           </div>
-        </footer>
-      </div>
-    </div>
+        </>
+      )}
+    >
+      {err && <div style={{padding: "8px 16px", color: "var(--danger)", fontSize: 13}}>{err}</div>}
+      {!loading && (
+        <div style={{flex: 1, minHeight: 0, display: "flex", flexDirection: "column", padding: "0 16px 0"}}>
+          <div style={{fontSize: 11.5, color: "var(--muted-2)", marginBottom: 6, paddingTop: 12}}>
+            {t('scripts.editor.overrides_hint')}
+            {!jsonValid && <span style={{color: "var(--danger)", marginLeft: 8}}>{t('scripts.editor.json_invalid')}</span>}
+          </div>
+          <textarea
+            value={raw}
+            onChange={(e) => { setRaw(e.target.value); setDirty(true); }}
+            spellCheck={false}
+            style={{
+              flex: 1, minHeight: 320, fontFamily: "var(--font-mono, monospace)", fontSize: 12.5,
+              lineHeight: 1.55, resize: "vertical", background: "var(--surface-2)",
+              border: "1px solid " + (jsonValid ? "var(--line-soft)" : "var(--danger)"),
+              borderRadius: "var(--r-2)", padding: "10px 12px", color: "var(--text)",
+              outline: "none",
+            }}
+          />
+        </div>
+      )}
+    </Modal>
   );
 }
 
@@ -2016,9 +2018,17 @@ function ChaptersModal({ script, onClose, onChanged }) {
     } catch (e) { window.__apiToast?.(t('scripts.toast.resplit_fail'), { kind: "danger", detail: e?.message }); }
   };
   return (
-    <div className="pl-modal-backdrop" onClick={onClose}>
-      <div className="pl-modal" onClick={(e) => e.stopPropagation()} style={{width: "min(960px, 96vw)", maxHeight: "90vh", display: "flex", flexDirection: "column"}}>
-        <header className="pl-modal-head">
+   <>
+    {/* 收口到共享 <Modal>(产同构 DOM,零视觉变化):头部有额外「重切」按钮 → 用 header 自定义整头 +
+        showClose=false 复刻原「标题区 | 重切+关闭」布局;panelStyle 保 width/maxHeight/flex。
+        原本嵌在 backdrop 内的 resplit PromptModal 改成 <Modal> 的兄弟节点(自身独立浮层,视觉/行为不变)。 */}
+    <Modal
+      open
+      onClose={onClose}
+      showClose={false}
+      panelStyle={{ width: "min(960px, 96vw)", maxHeight: "90vh", display: "flex", flexDirection: "column" }}
+      header={(
+        <>
           <div>
             <div className="pl-modal-eyebrow">{t('scripts.editor.chapters_eyebrow')} · {script.title}</div>
             <h2 className="pl-modal-title">{loading ? t('common.loading') : t('scripts.editor.chapters_title', { total: chapters.length, cur: activeIdx + 1 })}</h2>
@@ -2027,7 +2037,17 @@ function ChaptersModal({ script, onClose, onChanged }) {
             <button className="btn ghost" onClick={() => setResplitOpen(true)} title={t('scripts.editor.resplit_tip')}><Icon name="refresh" size={12} /> {t('scripts.editor.resplit_btn')}</button>
             <button className="iconbtn" onClick={onClose} data-tip={t('common.close')}><Icon name="close" size={14} /></button>
           </div>
-        </header>
+        </>
+      )}
+      footer={(
+        <>
+          <span className="muted-2" style={{fontSize: 11.5}}>
+            <Icon name="info" size={11} /> GET /api/scripts/{script.id}/chapters · POST /chapters/{`{idx}`} / merge / split / resplit
+          </span>
+          <button className="btn ghost" onClick={onClose}>{t('common.close')}</button>
+        </>
+      )}
+    >
         {err && <div className="pl-model-empty" style={{padding: "16px"}}><span className="danger">{t('scripts.editor.load_fail_detail', { err })}</span></div>}
         {!err && chapters.length === 0 && !loading && (
           <div className="pl-model-empty" style={{padding: "24px"}}>{t('scripts.editor.chapters_empty')}</div>
@@ -2081,13 +2101,7 @@ function ChaptersModal({ script, onClose, onChanged }) {
             </div>
           </div>
         )}
-        <footer className="pl-modal-foot">
-          <span className="muted-2" style={{fontSize: 11.5}}>
-            <Icon name="info" size={11} /> GET /api/scripts/{script.id}/chapters · POST /chapters/{`{idx}`} / merge / split / resplit
-          </span>
-          <button className="btn ghost" onClick={onClose}>{t('common.close')}</button>
-        </footer>
-      </div>
+    </Modal>
       <PromptModal
         open={resplitOpen}
         eyebrow={t('scripts.editor.resplit_btn')}
@@ -2105,7 +2119,7 @@ function ChaptersModal({ script, onClose, onChanged }) {
         onClose={() => setResplitOpen(false)}
         onConfirm={onResplit}
       />
-    </div>
+   </>
   );
 }
 

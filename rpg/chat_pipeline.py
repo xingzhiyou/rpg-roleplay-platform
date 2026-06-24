@@ -933,7 +933,6 @@ def _apply_gm_json_ops(
     api_user: dict[str, Any] | None,
     active_script_id: Callable[[dict[str, Any] | None], int | None],
     ctx: "PipelineContext",
-    extractor_active: bool,
 ) -> list[str]:
     """把 GM 的 JSON op(set/append/overwrite/question/hypothesis/...)经 ChatWriteContext
     确定性 apply 回内存 state,返回 update 文案列表(已含 directive_updates 前缀)。
@@ -960,10 +959,9 @@ def _apply_gm_json_ops(
     )
     _ctx_token = _set_write_ctx(_json_op_ctx)
     try:
-        # task 69:extractor 开启时让 state.py 跳过 regex 兜底
-        return ctx.directive_updates + state.apply_structured_updates(
-            response_with_ops, skip_regex_fallback=extractor_active,
-        )
+        # 能力/资源只走结构化标签 + JSON op/extractor 写入；旧的「正文关键词 regex 兜底」
+        # 已彻底移除（曾误把《无限恐怖》特定能力注入任意剧本）。
+        return ctx.directive_updates + state.apply_structured_updates(response_with_ops)
     finally:
         _clear_write_ctx(_ctx_token)
 
@@ -1396,7 +1394,7 @@ async def run_gm_phase(
                 })
 
             # Q Phase 2 史官三合一(flag on):一次 recorder LLM 调用同时产 ops + 锚点判定,
-            # 替代「extractor-skip(regex 兜底)+ 独立 anchor_reconcile LLM」。off 时走原路径。
+            # 替代「独立 extractor + 独立 anchor_reconcile LLM」两次调用。off 时走原路径。
             # 酒馆豁免:tavern_gm 的 GM 已用自己的工具写状态(slim 已豁免、工具齐全),史官三合一对酒馆
             # 实测不增 KB(关系/事实同结果)却多一次 LLM,且酒馆无锚点 → 走原 apply_gm_json_ops 即可。
             if _recorder_unified(api_user) and _gm_mode != "tavern_gm":
@@ -1413,15 +1411,14 @@ async def run_gm_phase(
                     log.warning(f"[chat] 史官三合一失败,退回原 async 后处理: {_ru_err}")
                     _ru = None
                 if _ru is not None:
-                    # recorder 给出 ops → 当权威提取(extractor_active=True 关 regex 兜底);
-                    # recorder 空(弱模型偶发漏提)→ extractor_active=False 保留 regex 兜底,
-                    # 确保不劣于原 async 路径(避免「史官空 + 无 regex = 本回合零写入」回归)。
+                    # recorder(史官)给出的 ops 作为权威提取,拼回 response 走 JSON op 确定性 apply;
+                    # 空 ops 也只是本回合无结构化写入(GM 本就没标),不再有「正文关键词 regex 兜底」。
                     _ru_ops = _ru.get("ops") or []
                     _resp_ops = response + ("\n\n```json\n" + json.dumps(_ru_ops, ensure_ascii=False) + "\n```" if _ru_ops else "")
                     try:
                         ctx._updates = _apply_gm_json_ops(
                             state=state, response_with_ops=_resp_ops, api_user=api_user,
-                            active_script_id=active_script_id, ctx=ctx, extractor_active=bool(_ru_ops),
+                            active_script_id=active_script_id, ctx=ctx,
                         )
                     except Exception as _apply_err:
                         log.warning(f"[chat] 史官 ops apply 失败,退回 directive_updates: {_apply_err}")
@@ -1434,8 +1431,8 @@ async def run_gm_phase(
                             "status": "done", "elapsed_ms": 0, "marked": _rec_marked,
                         })
                     return
-            # 关键修复:GM JSON op 确定性写回(async 不跑 extractor → extractor_active=False
-            # → apply_structured_updates 保留 regex 兜底,把 GM 漏标的也尽量捞回)。
+            # 关键修复:GM JSON op 确定性写回(async 早退路径也必须 apply,否则 GM 经
+            # JSON op 写的 location/time/resources/quest/relationships/选项 全部丢失)。
             try:
                 ctx._updates = _apply_gm_json_ops(
                     state=state,
@@ -1443,7 +1440,6 @@ async def run_gm_phase(
                     api_user=api_user,
                     active_script_id=active_script_id,
                     ctx=ctx,
-                    extractor_active=False,
                 )
             except Exception as _apply_err:
                 log.warning(f"[chat] async apply_structured_updates 失败,退回 directive_updates: {_apply_err}")
@@ -1501,7 +1497,6 @@ async def run_gm_phase(
         })
 
     response_with_ops = _post_results.get("response_with_ops") or response
-    extractor_active = bool(_post_results.get("extractor_active"))
 
     # task 87 Phase 6: 经 ChatWriteContext 把 GM JSON op 确定性 apply 回内存 state
     # (apply_state_write_typed 拿到 user/save/trace → dispatcher 工具调用)。
@@ -1512,7 +1507,6 @@ async def run_gm_phase(
         api_user=api_user,
         active_script_id=active_script_id,
         ctx=ctx,
-        extractor_active=extractor_active,
     )
 
     # task 81 / 84 / iter#3: acceptance 自动验证 + retry once (硬 gate 化)
@@ -1581,9 +1575,7 @@ async def run_gm_phase(
                         )
                         _retry_token = _set_write_ctx(_retry_ctx)
                         try:
-                            retry_updates = state.apply_structured_updates(
-                                _retry_response, skip_regex_fallback=extractor_active,
-                            )
+                            retry_updates = state.apply_structured_updates(_retry_response)
                         finally:
                             _clear_write_ctx(_retry_token)
                         # 用第二稿替换主 response / updates

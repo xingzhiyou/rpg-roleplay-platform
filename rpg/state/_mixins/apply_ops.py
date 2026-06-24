@@ -46,7 +46,7 @@ from timeline_state import detect_time_directives, is_time_key
 class ApplyOpsMixin:
     """apply_* 系列方法 — GM/玩家/RulesEngine 对 state 的写入入口。"""
 
-    def apply_structured_updates(self, gm_response: str, *, skip_regex_fallback: bool = False) -> list[str]:
+    def apply_structured_updates(self, gm_response: str) -> list[str]:
         updates: list[str] = []
         memory = self.data["memory"]
         # task 55：双协议。先剥离 ```json state-ops``` 代码块（更可靠的协议）
@@ -220,17 +220,14 @@ class ApplyOpsMixin:
             # task 54：走 gate（之前直接 update_time 绕过 read_only 权限）
             _gm_write_via_gate("world.time", value, label_for_update=f"时间线锁定：{value}")
 
-        # 兼容 GM 没有按结构化标签输出、但文本里出现明确状态变化的情况。
-        # task 69：extractor 开启时（task 62 的两步式 GM），第二步会从叙事完整
-        # 抽 JSON ops，这里的「作者写死 regex 兜底」会和 extractor 双写同一字段。
-        # extractor enabled → 跳过 regex；关闭时保留兜底向后兼容（单步 GM 走旧路径）。
-        if not skip_regex_fallback:
-            if re.search(r"重力控制|肉身飞行|双脚.*离开|悬浮", gm_response or ""):
-                if self.add_memory("abilities", "重力控制/肉身飞行（初步掌握）"):
-                    updates.append("能力：重力控制/肉身飞行（初步掌握）")
-            if "特殊小队" in (gm_response or ""):
-                if self.add_memory("resources", "特殊小队建制"):
-                    updates.append("资源：特殊小队建制")
+        # 历史遗留（已彻底移除，不再回退此路径）：此处曾有「作者写死 regex 兜底」——
+        # 只要 GM 叙事正文里出现「重力控制/肉身飞行/悬浮/特殊小队」等关键词，就无条件给
+        # 玩家注入《无限恐怖》某具体存档的能力/资源（"重力控制/肉身飞行（初步掌握）"、
+        # "特殊小队建制"）。这对任何其它剧本都是错误注入：玩家反馈「开新档突然提示掌握了
+        # 重力控制」即源于此，且「悬浮」这类通用词极易误触发；连 GM 只是在正文里『提及/
+        # 伏笔』该能力（并未授予）也会被当成已掌握。能力/资源的授予只能由 GM 显式结构化
+        # 标签（「能力：X」分支，见上）、JSON op 或 extractor 抽取写入——绝不靠对正文做
+        # 关键词匹配。故整块删除。
 
         # task 55：JSON 协议处理。op = "set"/"append"/"overwrite"/"question"
         def _log_op_parse_error(reason: str, op_dump):

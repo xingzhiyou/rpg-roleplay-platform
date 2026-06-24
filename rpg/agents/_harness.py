@@ -513,12 +513,19 @@ def _openai_function_call(
         # 没拿到 tool_call → 降级到文本内容(让调用方 parse)
         return msg.get("content") or "{}", usage
     except urllib.error.HTTPError as exc:
-        # 仅对 400(endpoint 不支持 tools)降级到 response_format json_object;
-        # 401/429/5xx/超时一律向上抛,让 provider_errors 正确分类(凭据/限流/上游故障),
-        # 不要误当「tools 不支持」而静默降级 + 重复计费 POST。
-        if exc.code != 400:
+        # provider 以「请求形态不接受」拒绝 forced function-call 时,降级到 response_format=
+        # json_object 兼容模式重发(同渠道 GM 发纯对话能成,正是因为它不带 tools/tool_choice)。
+        # 群反馈实锤:大量中转(op/xf/…)对子代理的强制工具调用回 403/不支持,而 GM 正常 ——
+        # 根因就是请求形态,不是凭据。判为「形态拒绝」的码:
+        #   400 不支持 tools · 403 网关/WAF 禁掉带 tools 的请求 · 404/405 该 model 无
+        #   function-calling 路由 · 422 参数校验拒 tool_choice。
+        # 401(凭据)/429(限流)/5xx(上游故障)/超时 一律向上抛,交 provider_errors 正确分类,
+        # 不当「tools 不支持」静默降级(避免凭据/限流被掩盖)。降级只多发一次兼容请求:
+        # 真凭据问题时 json_object 仍会同码失败并向上抛,代价仅一次被拒(未计费)的请求。
+        _TOOLS_SHAPE_REJECT = {400, 403, 404, 405, 422}
+        if exc.code not in _TOOLS_SHAPE_REJECT:
             raise
-        log.warning(f"[_harness] {api_id} tools 不支持(HTTP 400),降级到 json_object")
+        log.warning(f"[_harness] {api_id} 拒绝 tools 请求(HTTP {exc.code}),降级到 json_object 兼容模式")
         return _openai_compat_json_mode(
             api_id, model, system_prompt, user_prompt,
             user_id, timeout_sec, max_tokens,

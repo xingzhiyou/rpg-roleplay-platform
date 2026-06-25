@@ -2755,16 +2755,23 @@ def _run_module_rebuild(
             except (TypeError, ValueError):
                 cmax = None
             if source == "llm":
+                # 进度只有 0/100 的根因:此前只有 arc_extract 阶段写 overall_progress,seed/
+                # per_chapter/resolve/embed 只写 stage_progress,而前端浮窗读的是 overall_*。给每个
+                # 阶段分配一段 overall 进度带,段内按 done/total 线性插值 → 全程平滑推进。
+                _BANDS = {"seed": (0, 5), "per_chapter": (5, 60), "arc_extract": (60, 85),
+                          "resolve": (85, 95), "embed": (95, 100)}
+
                 def _cards_progress(stage: str, info: dict) -> None:
                     try:
                         total = int(info.get("total") or 0)
                         done = int(info.get("done") or 0)
-                        if stage == "arc_extract" and total:
-                            ctl.update(stage="arc_extract", stage_progress=done,
-                                       stage_total=total, overall_progress=done,
-                                       overall_total=max(total, 1))
-                        elif stage in ("seed", "per_chapter", "resolve", "embed"):
-                            ctl.update(stage=stage, stage_progress=done, stage_total=max(total, 1))
+                        band = _BANDS.get(stage)
+                        if band:
+                            lo, hi = band
+                            frac = (done / total) if total > 0 else 0.0
+                            overall = int(lo + (hi - lo) * max(0.0, min(1.0, frac)))
+                            ctl.update(stage=stage, stage_progress=done, stage_total=max(total, 1),
+                                       overall_progress=overall, overall_total=100)
                     except Exception:
                         pass
                 result = rebuild_cards_with_llm(

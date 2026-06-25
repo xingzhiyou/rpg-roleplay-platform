@@ -375,6 +375,15 @@ class ApplyOpsMixin:
         task 87 Phase 6: 如果 source 以 "gm" 开头且 chat write context 在场,
         尝试通过 dispatcher 路由 (path → tool 映射)。成功就走 dispatcher,
         获得统一审计 + destructive 检查;无对应工具就 fall through 老路径。"""
+        # 玩家身份保护(确定性):GM/史官 绝不能改写玩家姓名。原著正文里出现角色名(如 郑吒/林有德)
+        # 时,史官可能误把它当成 player.name 写回 → 把玩家自己的主角改成原著男主(群反馈实锤)。
+        # 玩家姓名只由玩家本人(/set,source=player*)或建档时设定。已有非空姓名时,gm 来源的不同值一律拒,
+        # 不指望史官提示词自觉(确定性铁律)。
+        if path == "player.name" and str(source or "").startswith("gm"):
+            _cur_name = str(((self.data.get("player") or {}).get("name") or "")).strip()
+            _new_name = str(value or "").strip()
+            if _cur_name and _new_name and _cur_name != _new_name:
+                return f"状态写入拒绝:玩家姓名「{_cur_name}」受保护,不可被 GM/史官 改写为「{_new_name}」"
         # task 87 Phase 6: dispatcher 路由
         if str(source or "").startswith("gm") and not force:
             try:

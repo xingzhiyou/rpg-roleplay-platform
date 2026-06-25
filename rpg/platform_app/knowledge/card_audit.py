@@ -58,7 +58,7 @@ def _roster(cards: list[dict]) -> str:
     for c in cards:
         al = _as_list(c.get("aliases"))
         al_s = "、".join(al[:6]) if al else "-"
-        idt = (c.get("identity") or "").strip().replace("\n", " ")[:50] or "-"
+        idt = (c.get("identity") or "").strip().replace("\n", " ")[:150] or "-"
         lines.append(
             f"[id={c['id']}] {c['name']} | 别名:{al_s} | 身份:{idt} | 出场频次:{int(c.get('importance') or 0)}"
         )
@@ -72,7 +72,9 @@ def _build_user_prompt(title: str, cards: list[dict]) -> str:
         "1) merges:哪些卡其实是【同一个人】的不同称呼(本名/小名/昵称/敬称,如『金玉/玉儿/小玉』、"
         "『红姑/红姑娘』),应合并成一张。每组:keep=保留哪张卡的 id,merge_ids=被并入的 id 列表。"
         "不同人即使共享一字也【绝不可】合并。\n"
-        "2) protagonist_id:这部小说的【主角】是哪张卡的 id(叙事中心、贯穿全书的那个人);拿不准填 null。\n"
+        "2) protagonist_id:这部小说的【主角】是哪张卡的 id(叙事中心、贯穿全书、读者代入的那个人;"
+        "常是身份/简介里写明『主角/主人公/穿越者/重生者』或第一视角的那张,**不一定是出场频次最高的**——"
+        "反派/势力名往往频次更高但不是主角);全部看完再判,拿不准填 null。\n"
         "3) non_person_ids:哪些卡其实【不是具体人物】(官职/头衔/泛称/地名,如『将军/单于/众人/无忧宫』),应删除。\n\n"
         "【角色卡】\n" + _roster(cards) + "\n\n"
         "只输出这个 JSON(id 必须用上面给的数字 id,不要编造):\n"
@@ -108,7 +110,7 @@ def _resolve_audit_model(user_id: int, api_id: str, model: str) -> tuple[str, st
 
 
 def audit_character_cards(user_id: int, script_id: int, api_id: str = "", model: str = "",
-                          *, max_cards: int = 80) -> dict[str, Any]:
+                          *, max_cards: int = 600) -> dict[str, Any]:
     """对某剧本全部 NPC 卡做一次 AI 复核裁决并应用。**仅 owner**。返回变更摘要。
 
     凭证缺失 → 抛 MissingUserCredentialError(端点转 credentials_required)。

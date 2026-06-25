@@ -61,7 +61,8 @@ _SYSTEM_OPS = """\
 - "question": GM 在叙事里向玩家提问（玩家需要选择）
 
 可写字段（严格）：
-- player.name / player.role / player.background / player.current_location
+- player.role / player.background / player.current_location（注意：**绝不写 player.name**——
+  玩家姓名是玩家自己选的身份,原著里出现别的角色名也不要改成它,后端会硬拒）
 - world.time / world.weather / world.timeline.current_phase / world.known_events
 - memory.main_quest / memory.current_objective / memory.mode
 - memory.resources / memory.abilities / memory.facts / memory.pinned / memory.notes
@@ -69,7 +70,7 @@ _SYSTEM_OPS = """\
 - worldline.user_variables.<变量名>
 - ui.<自定义键>
 
-禁止写入：permissions.* / history.* / schema_version / created_at
+禁止写入：player.name(玩家身份) / permissions.* / history.* / schema_version / created_at
 
 如果某个字段在叙事里真的发生了变化才输出 op；没变就不要编。
 如果叙事里完全没有状态变化，ops 输出 []。

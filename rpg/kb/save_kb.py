@@ -196,6 +196,10 @@ def maintain_structured_kb(db, save_id: int, script_id: int, commit_id: int,
         if not any(n in prose for n in names):
             continue
         lk = c["logical_key"]
+        # 玩家身份保护:canon 实体绝不能覆盖存档的 _player(玩家自己的主角)。若某剧本把原著男主
+        # 映射到了 _player 槽,prose 一提及就会把玩家改成原著男主(群反馈)。硬跳过。
+        if lk == "_player":
+            continue
         if lk in seen_keys:
             continue
         seen_keys.add(lk)

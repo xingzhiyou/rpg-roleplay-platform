@@ -690,7 +690,22 @@
       exportTavern: (id) => BASE + `${API_PREFIX}/me/character-cards/` + id + "/export-tavern",
       exportPng: (id) => BASE + `${API_PREFIX}/me/character-cards/` + id + "/export-png",
       // Script-scoped (NPCs/world cards)
-      scriptList: (sid) => GET(`${API_PREFIX}/scripts/` + sid + "/character-cards"),
+      // 取全部 NPC 卡(分页拉完):此前不传 limit → 后端默认 50 → 编辑器只显示 50 张(应有数百)。
+      // 按 page.next_cursor 翻页累积,上限 30 页(=6000 张)足够。
+      scriptList: async (sid) => {
+        const all = [];
+        let cursor = null;
+        for (let i = 0; i < 30; i++) {
+          const q = { limit: 200 };
+          if (cursor) q.cursor = cursor;
+          const r = await GET(`${API_PREFIX}/scripts/` + sid + "/character-cards", q);
+          const items = (r && Array.isArray(r.items)) ? r.items : (Array.isArray(r) ? r : []);
+          all.push(...items);
+          cursor = (r && r.page) ? (r.page.next_cursor || null) : null;
+          if (!cursor || !items.length) break;
+        }
+        return { items: all };
+      },
       scriptGet: (sid, cid) => GET(`${API_PREFIX}/scripts/` + sid + "/character-cards/" + cid),
       scriptUpsert: (sid, body) => POST(`${API_PREFIX}/scripts/` + sid + "/character-cards", body),
       scriptDelete: (sid, cid) => POST(`${API_PREFIX}/scripts/` + sid + "/character-cards/" + cid + "/delete", {}),

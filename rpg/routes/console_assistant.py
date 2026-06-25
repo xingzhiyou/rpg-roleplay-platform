@@ -38,6 +38,36 @@ async def api_console_assistant_conversations(
     return JSONResponse({"items": items})
 
 
+@router.get("/api/console_assistant/conversations/{conversation_id}/messages")
+async def api_console_assistant_conversation_messages(
+    conversation_id: str,
+    api_user: dict[str, Any] | None = Depends(get_current_user),
+) -> JSONResponse:
+    """取某对话的可渲染历史(用于刷新后还原侧栏 agent 会话)。
+
+    conv['messages'] 是 LLM 格式 [{role,content}],其中工具结果以 assistant 消息 `[tool …]`
+    的形式夹在中间(给模型看的)。这里还原成前端可渲染的简洁会话:只保留用户消息 + 每轮最终回答,
+    跳过工具结果中间态(避免一堆裸 tool 文本)。Redis 兜底,跨 worker / 重启(6h 内)可还原。"""
+    user_id = int((api_user or {}).get("id") or 0)
+    if not user_id:
+        return JSONResponse({"ok": False, "error": "需要登录"}, status_code=401)
+    cid = str(conversation_id or "").strip()
+    if not cid:
+        return JSONResponse({"ok": False, "error": "conversation_id 必填"}, status_code=400)
+    from console_assistant.conversations import _get_or_create_conversation
+    _cid, conv = _get_or_create_conversation(user_id, cid)
+    out = []
+    for m in (conv.get("messages") or []):
+        role = m.get("role")
+        content = str(m.get("content") or "")
+        if role == "assistant" and content.startswith("[tool "):
+            continue  # 工具结果中间态,不回灌
+        if not content.strip():
+            continue
+        out.append({"role": role, "text": content})
+    return JSONResponse({"ok": True, "conversation_id": _cid, "messages": out})
+
+
 @router.post("/api/console_assistant/new_conversation", response_model=GenericOkResponse, responses=COMMON_ERROR_RESPONSES)
 async def api_console_assistant_new_conversation(
     api_user: dict[str, Any] | None = Depends(get_current_user),

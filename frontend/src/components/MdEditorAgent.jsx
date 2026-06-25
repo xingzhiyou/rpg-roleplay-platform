@@ -200,8 +200,29 @@ const MdEditorAgent = forwardRef(function MdEditorAgent({ scriptId, activeTab, o
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages]);
 
-  // 新剧本 → 重置会话。
-  useEffect(() => { convIdRef.current = null; setMessages([]); }, [scriptId]);
+  // 切剧本 / 刷新 → 先清空,再尝试从 localStorage 取回本剧本上次的对话 id 并拉回历史(刷新不丢)。
+  const scriptIdRef = useRef(scriptId);
+  scriptIdRef.current = scriptId;
+  useEffect(() => {
+    let cancelled = false;
+    convIdRef.current = null;
+    setMessages([]);
+    if (!scriptId) return undefined;
+    let cid = null;
+    try { cid = localStorage.getItem(`mde.conv.${scriptId}`); } catch (_) {}
+    if (!cid) return undefined;
+    convIdRef.current = cid;
+    (async () => {
+      try {
+        const res = await fetch(`/api/console_assistant/conversations/${encodeURIComponent(cid)}/messages`, { credentials: 'include' });
+        if (cancelled || !res.ok) return;
+        const j = await res.json();
+        if (cancelled || !j?.ok || !Array.isArray(j.messages) || !j.messages.length) return;
+        setMessages(j.messages.map((m) => ({ role: m.role, text: m.text, tools: [] })));
+      } catch (_) { /* 还原失败静默,照常新会话 */ }
+    })();
+    return () => { cancelled = true; };
+  }, [scriptId]);
 
   const pageContext = useCallback(() => {
     const open_file = activeTab
@@ -216,7 +237,14 @@ const MdEditorAgent = forwardRef(function MdEditorAgent({ scriptId, activeTab, o
 
   // 统一 SSE 事件处理(chat 与 confirm 共用)。assistantIdx = 当前 assistant 消息下标。
   const makeHandler = useCallback((assistantIdx) => (event, data) => {
-    if (event === 'meta') { if (data.conversation_id) convIdRef.current = data.conversation_id; return; }
+    if (event === 'meta') {
+      if (data.conversation_id) {
+        convIdRef.current = data.conversation_id;
+        // 记住本剧本的对话 id,刷新后据此拉回历史。
+        try { if (scriptIdRef.current) localStorage.setItem(`mde.conv.${scriptIdRef.current}`, data.conversation_id); } catch (_) {}
+      }
+      return;
+    }
     if (event === 'token') {
       setMessages((m) => m.map((msg, i) => i === assistantIdx ? { ...msg, text: (msg.text || '') + (data.text || '') } : msg));
       return;

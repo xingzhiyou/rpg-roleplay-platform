@@ -44,6 +44,8 @@ def stream_chat(
 
     conv["messages"].append({"role": "user", "content": message.strip()})
     conv["last_user_message"] = message.strip()
+    # UI 历史:落用户轮(供刷新还原,与 llm_loop 落的 assistant 轮配套)。
+    conv.setdefault("ui_turns", []).append({"role": "user", "text": message.strip(), "tools": []})
     _trim_messages(conv)
 
     disconnected = False

@@ -56,6 +56,21 @@ async def api_console_assistant_conversation_messages(
         return JSONResponse({"ok": False, "error": "conversation_id 必填"}, status_code=400)
     from console_assistant.conversations import _get_or_create_conversation
     _cid, conv = _get_or_create_conversation(user_id, cid)
+    # 优先用 ui_turns(含每轮工具调用:名/参数/状态/结果)→ 刷新后工具历史不丢、可还原折叠块。
+    ui_turns = conv.get("ui_turns")
+    if isinstance(ui_turns, list) and ui_turns:
+        out = []
+        for tnu in ui_turns:
+            if not isinstance(tnu, dict):
+                continue
+            role = tnu.get("role") or "assistant"
+            text = str(tnu.get("text") or "")
+            tools = tnu.get("tools") if isinstance(tnu.get("tools"), list) else []
+            if not text.strip() and not tools:
+                continue
+            out.append({"role": role, "text": text, "tools": tools})
+        return JSONResponse({"ok": True, "conversation_id": _cid, "messages": out})
+    # 兜底(旧对话无 ui_turns):仅文本还原。
     out = []
     for m in (conv.get("messages") or []):
         role = m.get("role")
@@ -64,7 +79,7 @@ async def api_console_assistant_conversation_messages(
             continue  # 工具结果中间态,不回灌
         if not content.strip():
             continue
-        out.append({"role": role, "text": content})
+        out.append({"role": role, "text": content, "tools": []})
     return JSONResponse({"ok": True, "conversation_id": _cid, "messages": out})
 
 

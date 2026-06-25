@@ -6929,6 +6929,12 @@
         "drop_here": "松手上传 · txt / md 文档",
         "uploading": "上传中…",
         "chars_suffix": "字"
+      },
+      "tool_args": "参数",
+      "tool_result": "结果",
+      "subagent": {
+        "title": "子代理写作",
+        "output": "子模型产出"
       }
     },
     "generate_image_modal": {

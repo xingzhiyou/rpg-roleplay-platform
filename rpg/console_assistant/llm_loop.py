@@ -311,6 +311,25 @@ def _run_llm_loop(
             {"role": m["role"], "content": m["content"]} for m in extra_pending_note
         ]
         assistant_text_acc = ""
+        # UI 历史:记录本回合每个工具调用(名/参数/状态/结果),持久化进 conv["ui_turns"] →
+        # 刷新/超时后侧栏能还原工具折叠块(此前只存最终文本,工具调用全丢)。tool_call/result 无 call_id,
+        # 与前端同款 FIFO 配对。
+        ui_tools: list[dict[str, Any]] = []
+
+        def _mark_tool(ok: bool, result: Any, error: Any) -> None:
+            for _tc in ui_tools:
+                if _tc.get("status") == "running":
+                    _tc["status"] = "done" if ok else "error"
+                    _r = result
+                    if isinstance(_r, dict):
+                        try:
+                            _r = json.dumps(_r, ensure_ascii=False)
+                        except Exception:
+                            _r = str(_r)
+                    _tc["result"] = (str(_r)[:4000] if _r is not None else "")
+                    _tc["error"] = str(error or "")[:500]
+                    return
+
         for ev in backend.stream_with_mcp_loop(
             system=system_prompt,
             messages=messages_for_backend,
@@ -326,6 +345,7 @@ def _run_llm_loop(
                     assistant_text_acc += txt
                     yield _sse_event("token", {"text": txt})
             elif etype == "tool_call":
+                ui_tools.append({"tool": ev.get("tool"), "args": ev.get("arguments") or {}, "status": "running"})
                 yield _sse_event("tool_call", {
                     "tool": ev.get("tool"),
                     "args": ev.get("arguments") or {},
@@ -396,12 +416,14 @@ def _run_llm_loop(
                         "value": _raw.get("value"),
                         "action_label": _raw.get("action_label"),
                     })
+                    _mark_tool(True, _raw.get("ack") or "ui action 已转发前端", None)
                     yield _sse_event("tool_result", {
                         "call_id": ev.get("_call_id") or _new_call_id(),
                         "ok": True,
                         "result": _raw.get("ack") or "ui action 已转发前端",
                     })
                     continue
+                _mark_tool(bool(ev.get("ok")), ev.get("result"), ev.get("error"))
                 yield _sse_event("tool_result", {
                     "call_id": ev.get("_call_id") or _new_call_id(),
                     "ok": bool(ev.get("ok")),
@@ -413,6 +435,12 @@ def _run_llm_loop(
         if assistant_text_acc:
             conv["messages"].append({"role": "assistant", "content": assistant_text_acc})
             _trim_messages(conv)
+        # UI 历史:落本回合 assistant 轮(文本 + 工具),供刷新还原。限长防膨胀。
+        if assistant_text_acc or ui_tools:
+            _ut = conv.setdefault("ui_turns", [])
+            _ut.append({"role": "assistant", "text": assistant_text_acc, "tools": ui_tools})
+            if len(_ut) > 120:
+                del _ut[: len(_ut) - 120]
         try:
             usage = getattr(backend, "last_usage", None) or {}
             in_tk = int(usage.get("input_tokens", 0) or 0)

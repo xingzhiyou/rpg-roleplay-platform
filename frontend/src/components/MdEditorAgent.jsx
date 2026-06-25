@@ -164,6 +164,77 @@ function MdeAgentPanel({ tc, t }) {
   );
 }
 
+// 工具调用参数的紧凑展示(隐去内部/冗长键)。
+function prettyArgs(args) {
+  if (!args || typeof args !== 'object') return '';
+  const skip = new Set(['script_id', 'save_id']);
+  const lines = [];
+  for (const [k, v] of Object.entries(args)) {
+    if (skip.has(k)) continue;
+    let s = typeof v === 'string' ? v : JSON.stringify(v);
+    if (s == null) s = '';
+    if (s.length > 600) s = s.slice(0, 600) + '…';
+    lines.push(`${k}: ${s}`);
+  }
+  return lines.join('\n');
+}
+
+// Claude-Code 风工具块:一行 header(状态指示 + 标签 + 状态文字 + 展开),点开看参数 / 结果。
+// delegate_writing_task = 子代理块(独立样式 + 运行动画 + 展开看子模型产出)。
+function MdeToolBlock({ tc, t, busy, onUndo, canUndo }) {
+  const [open, setOpen] = useState(false);
+  const isSub = tc.tool === 'delegate_writing_task';
+  const status = tc.status || 'done';
+  const statusText = status === 'running'
+    ? t('components.md_editor_agent.tool_status.running')
+    : status === 'error' ? t('components.md_editor_agent.tool_status.error')
+      : t('components.md_editor_agent.tool_status.done');
+  const argStr = prettyArgs(tc.args);
+  const resStr = tc.result != null ? stripEmoji(String(tc.result)) : '';
+  const hasDetail = !!(argStr || resStr || tc.error);
+  const subModel = isSub ? (tc.args?.model || tc.args?.api_id || '') : '';
+  return (
+    <div className={'mde-tool ' + status + (isSub ? ' subagent' : '')}>
+      <button type="button" className="mde-tool-head" disabled={!hasDetail}
+        onClick={() => hasDetail && setOpen((o) => !o)} aria-expanded={open}>
+        <span className={'mde-tool-ind ' + status} aria-hidden="true" />
+        <span className="mde-tool-title">
+          {isSub ? t('components.md_editor_agent.subagent.title', { defaultValue: '子代理写作' }) : toolLabel(tc.tool)}
+          {subModel ? <span className="mde-tool-model">{subModel}</span> : null}
+        </span>
+        <span className="mde-tool-state">{statusText}</span>
+        {hasDetail ? <span className={'mde-tool-chev' + (open ? ' open' : '')} aria-hidden="true" /> : null}
+      </button>
+      {open && hasDetail && (
+        <div className="mde-tool-body">
+          {argStr ? (
+            <div className="mde-tool-sec">
+              <div className="mde-tool-seclabel">{t('components.md_editor_agent.tool_args', { defaultValue: '参数' })}</div>
+              <pre className="mde-tool-pre">{argStr}</pre>
+            </div>
+          ) : null}
+          {resStr ? (
+            <div className="mde-tool-sec">
+              <div className="mde-tool-seclabel">{isSub
+                ? t('components.md_editor_agent.subagent.output', { defaultValue: '子模型产出' })
+                : t('components.md_editor_agent.tool_result', { defaultValue: '结果' })}</div>
+              <pre className="mde-tool-pre">{resStr}</pre>
+            </div>
+          ) : null}
+          {tc.error ? <div className="mde-tool-errline">{stripEmoji(String(tc.error))}</div> : null}
+        </div>
+      )}
+      {canUndo && (
+        tc.undone
+          ? <span className="mde-agent-undone">{t('components.md_editor_agent.undone', { defaultValue: '已撤销' })}</span>
+          : <button type="button" className="mde-agent-undo" disabled={busy} onClick={onUndo}>
+              {t('components.md_editor_agent.undo_btn', { defaultValue: '撤销此次改动' })}
+            </button>
+      )}
+    </div>
+  );
+}
+
 // 选区改写预设(写作引擎 rewrite 模式;onContinue 会对当前选区跑 runContinue)。
 const REWRITE_PRESETS = [
   { key: 'tighten', labelKey: 'components.md_editor_agent.rewrite.tighten', instruction: '把选中这段改写得更紧凑有力:删去冗余与重复,保留全部信息、人称、时态与语气,不要扩写。' },
@@ -298,7 +369,8 @@ const MdEditorAgent = forwardRef(function MdEditorAgent({ scriptId, activeTab, o
         if (cancelled || !res.ok) return;
         const j = await res.json();
         if (cancelled || !j?.ok || !Array.isArray(j.messages) || !j.messages.length) return;
-        setMessages(j.messages.map((m) => ({ role: m.role, text: m.text, tools: [] })));
+        // 恢复工具调用历史(后端 ui_turns 现带 tools:名/参数/状态/结果)→ 折叠块可还原。
+        setMessages(j.messages.map((m) => ({ role: m.role, text: m.text, tools: Array.isArray(m.tools) ? m.tools : [] })));
       } catch (_) { /* 还原失败静默,照常新会话 */ }
     })();
     return () => { cancelled = true; };
@@ -550,48 +622,42 @@ const MdEditorAgent = forwardRef(function MdEditorAgent({ scriptId, activeTab, o
           </div>
         )}
         {messages.map((m, i) => (
-          <div key={i} className={'mde-agent-msg ' + m.role}>
-            <div className="mde-agent-avatar" aria-hidden="true">{m.role === 'user' ? '你' : 'AI'}</div>
-            <div className="mde-agent-body">
-            {/* 工具调用在前(agent 先读后写,这些是「思考/取数」过程),最终答复在后,符合流的时序 */}
-            {(m.tools || []).map((tc, j) => (
-              (tc.tool === 'set_writing_plan' || tc.tool === 'report_writing_issues') ? (
-                <MdeAgentPanel key={j} tc={tc} t={t} />
-              ) : (
-              <div key={j} className={'mde-agent-tool ' + tc.status}>
-                <span className="mde-agent-tool-dot" aria-hidden="true" />
-                <span className="mde-agent-tool-name">{toolLabel(tc.tool)}</span>
-                <span className="mde-agent-tool-status">{tc.status === 'running' ? t('components.md_editor_agent.tool_status.running') : tc.status === 'error' ? t('components.md_editor_agent.tool_status.error') : t('components.md_editor_agent.tool_status.done')}</span>
-                {tc.tool === 'update_script_chapter' && tc.status === 'done' && tc.args?.chapter_index != null && (
-                  tc.undone
-                    ? <span className="mde-agent-undone">{t('components.md_editor_agent.undone', { defaultValue: '已撤销' })}</span>
-                    : <button type="button" className="mde-agent-undo" disabled={busy}
-                        onClick={() => undoChapterEdit(i, j, tc.args.chapter_index)}>
-                        {t('components.md_editor_agent.undo_btn', { defaultValue: '撤销此次改动' })}
-                      </button>
-                )}
-                {tc.error && <div className="mde-agent-tool-err">{tc.error}</div>}
-              </div>
-              )
-            ))}
-            {m.text && (m.role === 'assistant'
-              ? <div className="mde-agent-text"><RpgMarkdown.Block text={stripEmoji(m.text)} streaming={busy && i === messages.length - 1} /></div>
-              : <div className="mde-agent-text">{stripEmoji(m.text)}</div>)}
-            {m.pendingConfirm && (
-              <div className="mde-agent-confirm">
-                <div className="mde-agent-confirm-q">
-                  {t('components.md_editor_agent.confirm_prompt', { tool: toolLabel(m.pendingConfirm.tool) })}{m.pendingConfirm.description ? `:${m.pendingConfirm.description}` : ''}
-                </div>
-                {m.pendingConfirm.preview && <MdeWritePreview pv={m.pendingConfirm.preview} t={t} />}
-                <div className="mde-agent-confirm-btns">
-                  <button className="ok" disabled={busy} onClick={() => resolveConfirm(i, 'approve')}>{t('components.md_editor_agent.confirm_approve')}</button>
-                  <button className="no" disabled={busy} onClick={() => resolveConfirm(i, 'reject')}>{t('common.cancel')}</button>
-                </div>
-              </div>
-            )}
-            {m.error && <div className="mde-agent-tool-err">{m.error}</div>}
+          m.role === 'user' ? (
+            <div key={i} className="mde-msg user">
+              <div className="mde-msg-user">{stripEmoji(m.text)}</div>
             </div>
-          </div>
+          ) : (
+            <div key={i} className="mde-msg asst">
+              {/* 工具调用在前(读/取/写过程),最终答复在后,与流的时序一致 */}
+              {(m.tools || []).map((tc, j) => (
+                (tc.tool === 'set_writing_plan' || tc.tool === 'report_writing_issues')
+                  ? <MdeAgentPanel key={j} tc={tc} t={t} />
+                  : <MdeToolBlock
+                      key={j} tc={tc} t={t} busy={busy}
+                      canUndo={tc.tool === 'update_script_chapter' && tc.status === 'done' && tc.args?.chapter_index != null}
+                      onUndo={() => undoChapterEdit(i, j, tc.args?.chapter_index)}
+                    />
+              ))}
+              {m.text ? (
+                <div className="mde-msg-prose">
+                  <RpgMarkdown.Block text={stripEmoji(m.text)} streaming={busy && i === messages.length - 1} />
+                </div>
+              ) : null}
+              {m.pendingConfirm && (
+                <div className="mde-agent-confirm">
+                  <div className="mde-agent-confirm-q">
+                    {t('components.md_editor_agent.confirm_prompt', { tool: toolLabel(m.pendingConfirm.tool) })}{m.pendingConfirm.description ? `:${m.pendingConfirm.description}` : ''}
+                  </div>
+                  {m.pendingConfirm.preview && <MdeWritePreview pv={m.pendingConfirm.preview} t={t} />}
+                  <div className="mde-agent-confirm-btns">
+                    <button className="ok" disabled={busy} onClick={() => resolveConfirm(i, 'approve')}>{t('components.md_editor_agent.confirm_approve')}</button>
+                    <button className="no" disabled={busy} onClick={() => resolveConfirm(i, 'reject')}>{t('common.cancel')}</button>
+                  </div>
+                </div>
+              )}
+              {m.error && <div className="mde-tool-errline">{stripEmoji(m.error)}</div>}
+            </div>
+          )
         ))}
       </div>
       {scriptId && activeTab && activeTab.kind === 'chapter' && (

@@ -6932,6 +6932,12 @@
         "drop_here": "Drop to upload · txt / md",
         "uploading": "Uploading…",
         "chars_suffix": " chars"
+      },
+      "tool_args": "Args",
+      "tool_result": "Result",
+      "subagent": {
+        "title": "Sub-agent writing",
+        "output": "Sub-model output"
       }
     },
     "generate_image_modal": {

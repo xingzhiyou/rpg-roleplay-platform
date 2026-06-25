@@ -655,7 +655,8 @@ function ScriptDetailPanel({ script: s, savesCount, scriptSaves = [], embedStatu
             return;
           }
         } catch (_) { /* 轮询失败:继续重试,浮窗仍独立跟踪 */ }
-        if (Date.now() - startedAt < 120000) setTimeout(poll, 1600);
+        // 大花名册分批复核可达数分钟;放宽到 6 分钟再兜底(浮窗始终独立显示真状态)。
+        if (Date.now() - startedAt < 360000) setTimeout(poll, 2500);
         else setNpc(null); // 超时兜底:刷新一次,浮窗继续显示真状态
       };
       setTimeout(poll, 1600);

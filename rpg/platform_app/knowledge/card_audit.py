@@ -109,9 +109,24 @@ def _resolve_audit_model(user_id: int, api_id: str, model: str) -> tuple[str, st
     return normalize_api_id(api_id) if api_id else "", model
 
 
+_AUDIT_CHUNK = 80  # 每批送审的卡数:80 张的 prompt+verdict 单次 LLM 调用 ≈ 30-60s,稳在 CF 524(~100s)之下
+
+
+def _cid(v: Any) -> int | None:
+    try:
+        return int(v)
+    except (TypeError, ValueError):
+        return None
+
+
 def audit_character_cards(user_id: int, script_id: int, api_id: str = "", model: str = "",
-                          *, max_cards: int = 600) -> dict[str, Any]:
-    """对某剧本全部 NPC 卡做一次 AI 复核裁决并应用。**仅 owner**。返回变更摘要。
+                          *, max_cards: int = 600, progress_cb=None) -> dict[str, Any]:
+    """对某剧本全部 NPC 卡做 AI 复核裁决并应用。**仅 owner**。返回变更摘要。
+
+    **分批送审**:几百张卡一次性塞给 LLM 会让单次请求 >100s → CF 524(中转站边缘超时),且 verdict
+    JSON 过长易截断。改成每批 80 张分多次调用(每次稳在 524 之下),逐批应用 merges/non_persons;
+    主角(全局唯一)只采纳第 0 批(importance 最高,主角必在其中)的判定。progress_cb(done, total)
+    用于把分批进度写进后台任务浮窗(终于有真实中间进度,不再只有 0/100%)。
 
     凭证缺失 → 抛 MissingUserCredentialError(端点转 credentials_required)。
     """
@@ -146,26 +161,58 @@ def audit_character_cards(user_id: int, script_id: int, api_id: str = "", model:
                 credential_api_id=import_pipeline._credential_api_id_for(api_id))
 
     from agents._harness import call_agent_json
-    # 限额随卡数自适应:大花名册(几百张)的 prompt 很大、verdict JSON(多组 merges + non_person_ids)
-    # 也长 —— 固定 60s/1500tok 会 read-timeout 或截断 JSON 解析失败。按卡数线性放大并封顶。
-    n = len(cards)
-    _timeout = min(240, max(60, n // 3 + 40))      # 419 卡 ≈ 180s
-    _max_tokens = min(8000, max(1500, n * 12))     # 419 卡 ≈ 5000tok
-    text, _usage = call_agent_json(
-        api_id, model, _AUDIT_SYSTEM, _build_user_prompt(title, cards), user_id,
-        max_tokens=_max_tokens, timeout_sec=_timeout, agent_kind="card_audit",
-        metadata_extra={"script_id": script_id, "cards": n},
-    )
-    verdict = _parse_json_obj(text)
-    if not verdict:
+    chunks = [cards[i:i + _AUDIT_CHUNK] for i in range(0, len(cards), _AUDIT_CHUNK)]
+    total = len(chunks)
+    cards_by_id = {int(c["id"]): c for c in cards}
+    agg: dict[str, Any] = {"merged": [], "protagonist": None, "dropped": []}
+    protagonist_id: int | None = None
+    parse_failures = 0
+
+    for idx, chunk in enumerate(chunks):
+        n = len(chunk)
+        _timeout = min(90, max(45, n + 10))         # 80 卡 ≈ 90s 上限,稳在 CF 524 之下
+        _max_tokens = min(4000, max(1200, n * 20))
+        try:
+            text, _usage = call_agent_json(
+                api_id, model, _AUDIT_SYSTEM, _build_user_prompt(title, chunk), user_id,
+                max_tokens=_max_tokens, timeout_sec=_timeout, agent_kind="card_audit",
+                metadata_extra={"script_id": script_id, "cards": n, "chunk": idx, "chunks": total},
+            )
+            verdict = _parse_json_obj(text)
+        except Exception:  # noqa: BLE001 — 单批失败不该让整次复核全废(其余批仍处理)
+            verdict = {}
+        if not verdict:
+            parse_failures += 1
+        else:
+            # 第 0 批 importance 最高 → 主角必在此;仅此批的 protagonist_id 采纳,其余批只做合并/删除。
+            if idx == 0:
+                protagonist_id = _cid(verdict.get("protagonist_id"))
+            chunk_by_id = {int(c["id"]): c for c in chunk}
+            with connect() as db:
+                _require_script_owner(db, user_id, script_id)
+                part = _apply_verdicts(db, script_id, chunk_by_id, verdict, apply_protagonist=False)
+            agg["merged"].extend(part["merged"])
+            agg["dropped"].extend(part["dropped"])
+        if progress_cb:
+            try:
+                progress_cb(idx + 1, total)
+            except Exception:  # noqa: BLE001
+                pass
+
+    if total and parse_failures == total:
         raise ValueError("AI 复核返回无法解析,请重试或换一个模型")
 
-    cards_by_id = {int(c["id"]): c for c in cards}
-    with connect() as db:
-        _require_script_owner(db, user_id, script_id)
-        summary = _apply_verdicts(db, script_id, cards_by_id, verdict)
-    summary["cards_reviewed"] = len(cards)
-    return {"summary": summary, "model": f"{api_id}/{model}"}
+    # 全局主角:取自第 0 批(若该卡已在某批被并走则跳过,保守)。
+    if protagonist_id and protagonist_id in cards_by_id:
+        with connect() as db:
+            _require_script_owner(db, user_id, script_id)
+            row = _db_set_protagonist(db, script_id, protagonist_id)
+            if row:
+                agg["protagonist"] = cards_by_id[protagonist_id]["name"]
+
+    agg["cards_reviewed"] = len(cards)
+    return {"summary": agg, "model": f"{api_id}/{model}", "chunks": total,
+            "parse_failures": parse_failures}
 
 
 def schedule_card_audit(user_id: int, script_id: int, api_id: str = "", model: str = "") -> dict[str, Any]:
@@ -226,12 +273,19 @@ def _run_card_audit(job_id: str, user_id: int, script_id: int, api_id: str, mode
     """复核 worker:统一 import_jobs 状态机。done 时把摘要写进 budget_estimate.result(前端读回)。"""
     from platform_app.import_pipeline import JobController
     ctl = JobController(job_id)
-    ctl.update(status="running", stage="audit", overall_progress=0, overall_total=1,
+    ctl.update(status="running", stage="audit", overall_progress=0, overall_total=100,
                stages=[{"id": "audit", "label": "AI 复核角色卡", "status": "running"}])
     with connect() as db:
         db.execute("update import_jobs set started_at=now() where job_id=%s", (job_id,))
     try:
-        result = audit_character_cards(user_id, script_id, api_id, model)
+        def _prog(done: int, total: int) -> None:
+            try:
+                pct = int(done * 100 / max(total, 1))
+                ctl.update(stage="audit", stage_progress=done, stage_total=max(total, 1),
+                           overall_progress=pct, overall_total=100)
+            except Exception:  # noqa: BLE001
+                pass
+        result = audit_character_cards(user_id, script_id, api_id, model, progress_cb=_prog)
         with connect() as db:
             # 合并进 budget_estimate(保留 insert 时写入的 api_id/model),供 get_job_status 暴露给前端。
             db.execute(
@@ -249,17 +303,15 @@ def _run_card_audit(job_id: str, user_id: int, script_id: int, api_id: str, mode
             db.execute("update import_jobs set finished_at=now() where job_id=%s", (job_id,))
 
 
-def _apply_verdicts(db, script_id: int, cards_by_id: dict, verdict: dict) -> dict:
-    """确定性应用 LLM 裁决。保守:id 必须真实存在;被并/删的不再二次处理;主角被并走则用保留卡。"""
+def _apply_verdicts(db, script_id: int, cards_by_id: dict, verdict: dict,
+                    *, apply_protagonist: bool = True) -> dict:
+    """确定性应用 LLM 裁决。保守:id 必须真实存在;被并/删的不再二次处理;主角被并走则用保留卡。
+
+    apply_protagonist=False:分批送审时由调用方在全局只采纳第 0 批的主角并统一应用,这里跳过主角锁定。
+    """
     out: dict[str, Any] = {"merged": [], "protagonist": None, "dropped": []}
     deleted: set[int] = set()
     merged_into: dict[int, int] = {}
-
-    def _cid(v):
-        try:
-            return int(v)
-        except (TypeError, ValueError):
-            return None
 
     # 1) 合并同一人
     for grp in (verdict.get("merges") or []):
@@ -303,11 +355,12 @@ def _apply_verdicts(db, script_id: int, cards_by_id: dict, verdict: dict) -> dic
             deleted.add(nid)
             out["dropped"].append(cards_by_id[nid]["name"])
 
-    # 3) 锁定主角(若主角卡被并走 → 用保留卡)
-    pid = _cid(verdict.get("protagonist_id"))
-    pid = merged_into.get(pid, pid)
-    if pid and pid in cards_by_id and pid not in deleted:
-        row = _db_set_protagonist(db, script_id, pid)
-        if row:
-            out["protagonist"] = cards_by_id[pid]["name"]
+    # 3) 锁定主角(若主角卡被并走 → 用保留卡)。分批模式由调用方统一处理 → 跳过。
+    if apply_protagonist:
+        pid = _cid(verdict.get("protagonist_id"))
+        pid = merged_into.get(pid, pid)
+        if pid and pid in cards_by_id and pid not in deleted:
+            row = _db_set_protagonist(db, script_id, pid)
+            if row:
+                out["protagonist"] = cards_by_id[pid]["name"]
     return out

@@ -2053,6 +2053,21 @@ MIGRATIONS: list[tuple[int, str, list[str]]] = [
         "alter table users add column if not exists apple_sub text",
         "create unique index if not exists idx_users_apple_sub on users(apple_sub) where apple_sub is not null",
     ]),
+    (83, "kb_events_embedding_vec", [
+        # 永恒记忆 · 情景召回:给存档域 COW 事件表 kb_events 加向量列,让"玩家自己的游戏历史"
+        # 可被语义召回(此前 RAG 只检索原著)。分支安全天然:检索沿 born_commit 谱系 CTE 过滤,
+        # 一个分支只召回自己血缘的事件。维度 = _EMBED_DIM(默认 768,与其它向量列一致)。
+        # pgvector 不可用时整块跳过(降级到近因检索,不报错)。
+        f"""
+        do $$
+        begin
+          if exists (select 1 from pg_extension where extname = 'vector') then
+            execute 'alter table kb_events add column if not exists embedding_vec vector({_EMBED_DIM})';
+            execute 'create index if not exists idx_kb_events_embedding_hnsw on kb_events using hnsw (embedding_vec vector_cosine_ops)';
+          end if;
+        end $$;
+        """,
+    ]),
 ]
 
 

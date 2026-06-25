@@ -776,6 +776,32 @@ def retrieve_context(user_input: str, verbose: bool = False, state=None, user_id
                         "(改 NPC 关系/势力立场,或改写原著锚点) 时,调 record_history_anchor 留档,"
                         "下次 GM 就能查 list_recent_history 看自己创造了什么。"
                     )
+                # 永恒记忆·情景召回(episodic_recall flag 默认关):按当前情境从【全程】游戏历史
+                # 语义召回最相关的往事,补足"近因 6 条"覆盖不到的远期记忆。分支安全(谱系 CTE)、
+                # 无 embedder/pgvector 静默返空。写在玩家创造的历史块,绝不碰 script 域。
+                try:
+                    from core.feature_flags import feature_enabled
+                    if feature_enabled("episodic_recall", user_id):
+                        from platform_app.db import connect as _epi_connect
+                        with _epi_connect() as _edb:
+                            _cm = _edb.execute(
+                                "select active_commit_id from game_saves where id=%s", (_sid_for_hist,),
+                            ).fetchone()
+                        _commit = int((_cm or {}).get("active_commit_id") or 0)
+                        if _commit:
+                            from kb.episodic import retrieve_episodic
+                            _epi = retrieve_episodic(_sid_for_hist, _commit, user_id, user_input, k=5)
+                            if _epi:
+                                _el = ["=== 相关往事·语义召回 (玩家亲历的过去,与本回合最相关) ==="]
+                                for _i, _e in enumerate(_epi, 1):
+                                    _meta = " · ".join(x for x in [
+                                        (_e.get("story_time") or "").strip(),
+                                        (_e.get("location") or "").strip()] if x)
+                                    _el.append(f"{_i}. {_e.get('summary') or ''}" + (f"  ({_meta})" if _meta else ""))
+                                _el.append("以上按当前情境从全程历史召回,当作【已发生事实】参考,勿复述成新发生。")
+                                parts.append("\n".join(_el))
+                except Exception as _epi_err:
+                    log.warning(f"[retrieval] episodic recall 注入失败 (非致命): {_epi_err}")
         except Exception as _hist_err:
             log.warning(f"[retrieval] history_anchors 注入失败 (非致命): {_hist_err}")
 

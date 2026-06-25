@@ -131,6 +131,16 @@ def record_runtime_turn(
         row["id"], snapshot_path, ref_id=ref_id, user_id=effective_user_id,
     )
     schedule_llm_summary(int(row["id"]), player_input, gm_response)
+    # 永恒记忆·情景召回(episodic_recall flag 默认关):本回合写入的 kb_events 异步补嵌入
+    # (廉价 embedder,fire-and-forget daemon,绝不进回合关键路径;无 embedder/pgvector 内部静默)。
+    try:
+        from core.feature_flags import feature_enabled as _feat
+        if _feat("episodic_recall", effective_user_id):
+            import threading as _th
+            from kb.episodic import embed_pending_events as _emb
+            _th.Thread(target=_emb, args=(int(save_id), effective_user_id), daemon=True).start()
+    except Exception:
+        pass
     return {"ok": True, "node": expose(row), "runtime": runtime_info}
 
 

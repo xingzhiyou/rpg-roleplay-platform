@@ -223,6 +223,21 @@ def persist_runtime_state(
             (int(save["user_id"]), save_id, ref_id, commit_id, str(state_path), Jsonb(state_data),
              snap_hash, turn, turn),
         )
+        # Q kb_state(默认开):out-of-turn 编辑(固定记忆增删 / 其它 UI 直改 state 的 autosave,
+        # 不创建新回合)也要把 blob 同步进 KB。否则 record_runtime_turn 才 import、此路径不 import →
+        # 下次从 KB materialize(冷 worker / 缓存失效)读到旧 KB,把本次编辑回退(用户反馈:固定上下文
+        # 「解除后还在、加不了新的」根因)。import_state 有 no-op 守卫(逐键 byte 比对,只写变了的子树),
+        # 在现 commit 上重导=幂等、不新建回合。同事务;失败只告警不破存档。
+        from core.feature_flags import feature_enabled as _feat
+        if bool(save.get("kb_native")) or _feat(
+            "kb_state", int(save["user_id"]) if save.get("user_id") is not None else None
+        ):
+            try:
+                from kb.save_kb import import_state as _kb_import
+                _kb_import(db, save_id, int(commit_id), state_data)
+            except Exception as _kbe:
+                import logging as _lg
+                _lg.getLogger("kb_state").warning("[kb_state] persist_runtime_state import skip: %s", _kbe)
     runtime_info = _runtime_module.write_runtime(int(save["user_id"]), save_id, commit_id, str(state_path), ref_id=ref_id)
     runtime_info["commit_id"] = commit_id
     runtime_info["dirty"] = False

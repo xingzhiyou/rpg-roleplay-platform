@@ -564,7 +564,20 @@ def _wb_upsert_one(db: Any, sid: int, user_id: int, args: dict) -> dict:
     # ── 创建新条目 ──
     t = str(title).strip()
     book = db.execute("select id from books where script_id = %s", (sid,)).fetchone()
-    book_id = int(book["id"]) if book else None
+    if book:
+        book_id = int(book["id"])
+    else:
+        # 剧本无 books 行 → worldbook_entries.book_id NOT NULL 会崩;懒建(幂等)与编辑器手建同款。
+        from platform_app.knowledge._sync import _ensure_book
+        srow = db.execute("select owner_id, title from scripts where id = %s", (sid,)).fetchone()
+        ensured = _ensure_book(db, {
+            "id": sid,
+            "owner_id": int(srow["owner_id"]) if srow else user_id,
+            "title": (srow["title"] if srow else "") or "",
+            "description": "",
+            "source_path": "",
+        })
+        book_id = int(ensured["id"])
     new_row = db.execute(
         """
         insert into worldbook_entries

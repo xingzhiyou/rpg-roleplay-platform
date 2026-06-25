@@ -1012,14 +1012,6 @@ def create_blank_script(user_id: int, title: str = "") -> dict[str, Any]:
             (int(user_id), t),
         ).fetchone()
         sid = int(row["id"])
-        # 必须建 books 行:worldbook_entries / character_cards 等的 book_id 是 NOT NULL,
-        # 靠 books.script_id 子查询拿。空白剧本此前漏建 → 用户手建世界书 500(NotNullViolation)。
-        from platform_app.knowledge._sync import _ensure_book
-        try:
-            _ensure_book(db, {"id": sid, "owner_id": int(user_id), "title": t,
-                              "description": "", "source_path": ""})
-        except Exception:
-            pass
         db.execute(
             "insert into script_chapters(script_id, chapter_index, title, content, word_count, "
             "volume_title, source_marker, confidence) values (%s, 1, %s, '', 0, '', 'manual', 1.0)",

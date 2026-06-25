@@ -2079,6 +2079,12 @@ MIGRATIONS: list[tuple[int, str, list[str]]] = [
         " primary key (user_id, conversation_id))",
         "create index if not exists idx_console_conv_user_updated on console_conversations(user_id, updated_at desc)",
     ]),
+    (85, "worldbook_book_id_nullable", [
+        # book_id 是遗留列(归属现以 script_id 为准,所有读路径都按 script_id 取,无一按 book_id)。
+        # NOT NULL 逼得每条 worldbook 插入路径都要先 ensure books 行,否则编辑器手建世界书 500
+        # (NotNullViolation)。character_cards.book_id 早已是 nullable,这里对齐 → 去约束、删散落的拦截。
+        "alter table worldbook_entries alter column book_id drop not null",
+    ]),
 ]
 
 

@@ -675,26 +675,11 @@ async def api_worldbook_add(
         except ValueError as exc:
             return json_response({"ok": False, "error": str(exc)}, status_code=403)
 
+        # book_id 是遗留列、可空(migration 85);有 books 行就带上,没有就 NULL,归属看 script_id。
         book_row = db.execute(
             "SELECT id FROM books WHERE script_id = %s", (script_id,)
         ).fetchone()
-        if book_row:
-            book_id = int(book_row["id"])
-        else:
-            # 该剧本还没有 books 行(部分创建路径未建)→ worldbook_entries.book_id NOT NULL 会 500。
-            # 懒建一行(幂等 upsert,与 import/script_pack 同款 _ensure_book),用户手建世界书不再崩。
-            from platform_app.knowledge._sync import _ensure_book
-            srow = db.execute(
-                "SELECT owner_id, title FROM scripts WHERE id = %s", (script_id,)
-            ).fetchone()
-            ensured = _ensure_book(db, {
-                "id": script_id,
-                "owner_id": int(srow["owner_id"]) if srow else user["id"],
-                "title": (srow["title"] if srow else "") or "",
-                "description": "",
-                "source_path": "",
-            })
-            book_id = int(ensured["id"])
+        book_id = int(book_row["id"]) if book_row else None
 
         tags = body.get("tags") if isinstance(body.get("tags"), list) else []
         # source='editor':标记为「用户/编辑器手写」,与 AI 工具 upsert_worldbook_entry 一致,

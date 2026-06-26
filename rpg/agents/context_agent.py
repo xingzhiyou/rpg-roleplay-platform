@@ -31,7 +31,7 @@ from context_providers import (
 from retrieval import retrieve_context  # noqa: F401 (retrieve_fn_compat 内部委托;保留以兼容)
 from kb.recall import retrieve_fn_compat  # P5:统一召回 flag 门控包装(默认 off=委托 retrieve_context)
 from timeline_index import timeline_filter_for_label
-from timeline_state import detect_time_directives
+from timeline_state import detect_time_directives, is_recall_framing, looks_like_time_value
 
 log = logging.getLogger(__name__)
 
@@ -210,7 +210,10 @@ def run_context_agent(
             return
         curator_plan = _parse_curator_json(llm_text)
         target = _normalize_timeline_target(curator_plan.get("timeline_target", ""))
-        if target and not directives and not is_set:
+        # LLM 子代理(便宜直连模型)也可能把回忆/闪回误判成跳跃(行者无疆实测)。门控:输入是回忆叙述
+        # 或 target 不像时点(含人称从句)→ 不发起跳跃,与确定性 detect_time_directives 同口径。
+        if (target and not directives and not is_set
+                and not is_recall_framing(user_input) and looks_like_time_value(target)):
             state.request_time_jump(target, user_input)
         yield step(
             "llm_curator",

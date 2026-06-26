@@ -194,9 +194,12 @@ async def lifespan(app: FastAPI):
     #     current_user 的本地回退取不到用户 → 首个业务接口 401,app 开箱即不可用。
     try:
         # 修:原调未定义的 _deployment_mode() → NameError → bootstrap_local_account 从不跑 →
-        # 全新桌面库无默认账户 → 首个业务接口 401。改用 core.config.is_local_mode(读 RPG_DEPLOYMENT_MODE)。
-        from core.config import is_local_mode as _is_local_mode
-        if _is_local_mode():
+        # 全新桌面库无默认账户 → 首个业务接口 401。自包含读 RPG_DEPLOYMENT_MODE(不依赖 config.is_local_mode
+        # —— 生产 deploy 仓 config.py 与 OSS 分叉、那边无此函数,import 会抛 ImportError 让 server 启动期误报
+        # bootstrap failed ERROR;自包含两仓都干净)。
+        import os as _os
+        _dm = _os.getenv("RPG_DEPLOYMENT_MODE", "local").strip().lower()
+        if _dm in ("local", "desktop", "self_hosted", "self-hosted"):
             from platform_app import auth as _auth
             acct = _auth.bootstrap_local_account()
             log.info("[startup] 本地默认账户 ready: id=%s username=%s", acct.get("id"), acct.get("username"))

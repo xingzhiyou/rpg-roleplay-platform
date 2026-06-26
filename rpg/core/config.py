@@ -158,6 +158,39 @@ def migration_lock_timeout_ms() -> int:
 def skip_auto_migrate() -> bool:
     return os.getenv("RPG_SKIP_AUTO_MIGRATE") == "1"
 
+# ── LLM 请求超时 ─────────────────────────────────────────────────────────
+def llm_timeout_seconds(user_id: int | None = None) -> float:
+    """LLM 请求读超时(秒)。单一来源,供 GM 各后端 + 子代理 harness 共用。
+
+    本地大模型(如桌面自托管跑千问/Qwen,纯 CPU/内存硬跑)首 token 常要几分钟,
+    300s 会被中途切断。故:
+      优先链 = 用户 settings.request_timeout(UI 可调) > env RPG_GM_TIMEOUT > 部署默认。
+      部署默认 = 本地/桌面 1800s,服务器 300s。
+      上下限 = 本地 [30, 7200],服务器 [30, 900](多用户下不让单请求把 worker 占死)。
+    """
+    local = is_local_mode()
+    lo, hi = 30.0, (7200.0 if local else 900.0)
+    if user_id:
+        try:
+            from platform_app.db import connect
+            with connect() as db:
+                row = db.execute(
+                    "select preferences->>'settings.request_timeout' as v "
+                    "from user_preferences where user_id = %s",
+                    (int(user_id),),
+                ).fetchone()
+            if row and row.get("v") not in (None, ""):
+                return max(lo, min(hi, float(row["v"])))
+        except Exception:
+            pass
+    env = os.getenv("RPG_GM_TIMEOUT")
+    if env:
+        try:
+            return max(lo, min(hi, float(env)))
+        except (TypeError, ValueError):
+            pass
+    return 1800.0 if local else 300.0
+
 # ── Auth / 速率限制 ──────────────────────────────────────────────────────
 def min_password_length() -> int:
     return int(os.getenv("RPG_MIN_PASSWORD_LENGTH", "8"))

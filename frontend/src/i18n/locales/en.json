@@ -281,7 +281,10 @@
       "mirostat_mode_desc": "0 = off · 1 = v1 · 2 = v2.",
       "mirostat_off_btn": "Off",
       "preview_json": "Preview JSON",
-      "preview_json_desc": "Actual sampling parameters sent to the API."
+      "preview_json_desc": "Actual sampling parameters sent to the API.",
+      "request_timeout": "Request timeout (s)",
+      "request_timeout_desc": "A big local model (e.g. Qwen on your own PC, CPU/RAM only — very slow) can get cut off if the wait is too short. Leave blank = auto (desktop 1800s / online 300s); set a bigger number like 3600 if you need longer.",
+      "request_timeout_auto": "Auto"
     },
     "modules": {
       "title": "Per-Module Model Assignment",

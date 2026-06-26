@@ -117,9 +117,13 @@ class _OpenAICompatBackend:
         # 用户覆盖了 base_url 的话优先用用户的
         effective_base = result.get("base_url_override") or base_url
         import os as _os
-        # 读超时原 120s 太紧:长回合(deepseek-v4-pro 等)常被中途切断浪费 token。
-        # 提到 300s,可用 RPG_GM_TIMEOUT 调。
-        _read_to = float(_os.environ.get("RPG_GM_TIMEOUT", "300"))
+        # 读超时:单一来源 config.llm_timeout_seconds —— 用户 settings.request_timeout(UI 可调)
+        # > env RPG_GM_TIMEOUT > 部署默认(本地/桌面 1800s 给慢的本地大模型留足首 token 时间;服务器 300s)。
+        try:
+            from core.config import llm_timeout_seconds as _llm_to
+            _read_to = _llm_to(user_id)
+        except Exception:
+            _read_to = float(_os.environ.get("RPG_GM_TIMEOUT", "300"))
         # 出站代理:用户在凭据里配的 proxy URL。**仅本地模式(非 require_auth)才真正使用** ——
         # 托管多用户后端永不使用用户 proxy(防 SSRF:代理合法地可指向 127.0.0.1,无法用「禁私网」
         # 校验拦截;故把使用面收窄到自托管单用户场景)。本地梯子用户选「HTTP 代理」即生效。

@@ -372,7 +372,10 @@
       "mirostat_mode_desc": "0 = 关闭 · 1 = v1 · 2 = v2。",
       "mirostat_off_btn": "关闭",
       "preview_json": "预览 JSON",
-      "preview_json_desc": "发送给 API 的实际采样参数。"
+      "preview_json_desc": "发送给 API 的实际采样参数。",
+      "request_timeout": "请求超时(秒)",
+      "request_timeout_desc": "本地大模型(如自己电脑跑千问/Qwen,纯内存/CPU 很慢)等待时间不够会被切断。留空=自动(桌面 1800 秒 / 在线 300 秒);需要更久就填大一点,如 3600。",
+      "request_timeout_auto": "自动"
     },
     "modules": {
       "title": "按模块分配模型",

@@ -74,9 +74,13 @@ class _AnthropicBackend:
                 "Anthropic API key 未配置。请在「设置 → API 设置」添加你自己的 Anthropic API Key。"
                 "(测试服 LLM 调用必须 BYOK,平台不提供共享 key)"
             )
-        # 读超时原 120s 太紧:GM 带 reasoning 的长回合常被中途切断 → 整轮 token 白烧。
-        # 提到 300s,可用 RPG_GM_TIMEOUT 调。
-        _read_to = float(os.environ.get("RPG_GM_TIMEOUT", "300"))
+        # 读超时:单一来源 config.llm_timeout_seconds(用户 settings.request_timeout > env RPG_GM_TIMEOUT
+        # > 部署默认:本地/桌面 1800s 给慢的本地大模型,服务器 300s)。
+        try:
+            from core.config import llm_timeout_seconds as _llm_to
+            _read_to = _llm_to(user_id)
+        except Exception:
+            _read_to = float(os.environ.get("RPG_GM_TIMEOUT", "300"))
         # HTTP/2:一个 run 内多个流式调用(推理+工具轮)多路复用同一连接,省掉 ×N TCP+TLS 握手
         # (SDK 流式到 [DONE] 即停不 drain → HTTP/1.1 下 httpx 无法归还 socket;h2 关 stream≠关连接,
         # 故仍复用)。api.anthropic.com 支持 h2;safe_httpx_client 缺 h2 包时自动回退 1.1。

@@ -2165,6 +2165,8 @@ function ModelParamsSection() {
     extra_prompt: "",
   });
   const [reasoningEffort, setReasoningEffort] = useStatePL("medium");
+  // 请求超时(秒):settings.request_timeout。空=自动(本地/桌面 1800s 给慢的本地大模型,服务器 300s)。
+  const [reqTimeout, setReqTimeout] = useStatePL("");
   // 从 catalog 获取当前选中模型的 capabilities,用于条件展示 reasoning_effort
   const [selectedModelCaps, setSelectedModelCaps] = useStatePL([]);
   useEffectPL(() => {
@@ -2219,6 +2221,7 @@ function ModelParamsSection() {
 
         const effort = String(readScopedPref(prefs, "reasoning_effort", "medium") || "medium");
         if (["low", "medium", "high"].includes(effort)) setReasoningEffort(effort);
+        setReqTimeout(String(readScopedPref(prefs, "request_timeout", "") ?? ""));
       } catch (_) {}
     })();
     return () => { cancelled = true; };
@@ -2295,6 +2298,12 @@ function ModelParamsSection() {
       <SetRow label={t('settings.modelparams.max_tokens')} description={t('settings.modelparams.max_tokens_desc')}>
         <CSInput type="number" value={String(params.max_tokens)}
           onChange={({ detail }) => { setPreset("custom"); u("max_tokens", Number(detail.value)); }} />
+      </SetRow>
+
+      <SetRow label={t('settings.modelparams.request_timeout', { defaultValue: '请求超时(秒)' })}
+        description={t('settings.modelparams.request_timeout_desc', { defaultValue: '本地大模型(如自己电脑跑千问/Qwen,纯内存/CPU 很慢)等待时间不够会被切断。留空=自动(桌面 1800 秒 / 在线 300 秒);需要更久就填大一点,如 3600。' })}>
+        <CSInput type="number" value={reqTimeout} placeholder={t('settings.modelparams.request_timeout_auto', { defaultValue: '自动' })}
+          onChange={({ detail }) => { const v = detail.value; setReqTimeout(v); save("request_timeout", v === "" ? "" : Number(v)); }} />
       </SetRow>
 
       <SetRow label={t('settings.modelparams.context_size')} description={t('settings.modelparams.context_size_desc')}>

@@ -1022,11 +1022,8 @@ def create_desktop_login_token(user_id: int) -> str:
     token = secrets.token_urlsafe(32)
     expires_at = datetime.now(timezone.utc) + timedelta(minutes=DESKTOP_LOGIN_TTL_MIN)
     with connect() as db:
-        # 同账户旧的未用 token 作废(始终最多一个有效魔法链接)。
-        db.execute(
-            "update desktop_login_tokens set used_at = now() where user_id = %s and used_at is null",
-            (int(user_id),),
-        )
+        # 允许同账户多枚有效 token 并存:自部署常把「登录链接」+「二维码」分别发给不同设备
+        # (手机/平板),各自单次消费。每枚仍单次 + 10 分钟 TTL,过期自然失效,无需互相作废。
         db.execute(
             "insert into desktop_login_tokens(token_hash, user_id, expires_at) values (%s, %s, %s)",
             (_hash_token(token), int(user_id), expires_at),

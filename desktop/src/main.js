@@ -506,34 +506,44 @@ function wireIpc() {
     return { ip, port, url, firewallCmd };
   });
 
-  // 局域网地址二维码(供手机扫码);qrcode 在主进程生成 data URL。
-  ipcMain.handle('lan:qr', async () => {
-    if (!cfg.load().lanEnabled) return { ok: false };
+  // 局域网「登录链接」:默认 = 一次性免登录魔法链接(手机扫码/点链接即登录默认账户)。
+  // 本地自部署、私网 IP、单用户 —— 局域网内分享给自己的设备是常态,不再按「是否设密码」设卡。
+  // 仅 magicLink 开关(默认开)+ 服务在跑 时生效;关了/铸不出/异常 → 退回裸地址,绝不报错。
+  // token 单次、10 分钟有效;后端已允许多枚并存(create_desktop_login_token 不再作废旧的),
+  // 所以「复制链接」和「二维码」可以分别发给不同设备、各自有效。
+  async function _lanLoginUrl() {
     const ip = _lanIp();
     const port = supervisor.backendPort || cfg.load().backendPort || 0;
     if (!ip || !port) return { ok: false };
-    // 二维码默认编「免登录魔法链接」→ 手机扫码即登录默认账户(token 走回环铸,单次、10 分钟有效)。
-    // 仅当「magicLink 开 + 服务在跑 + 默认账户未设密码」时如此。设了密码 = 用户明确要求局域网设备
-    // 登录,保持裸地址让手机走密码登录,尊重该意图(对齐控制台「设密码后局域网需登录」)。
-    // 与「在浏览器中打开」复用同一 magic-token 端点。铸不出/任何异常 → 退回裸地址,绝不报错。
     let url = `http://${ip}:${port}/`;
     let magic = false;
     if (cfg.load().magicLink !== false && supervisor.state === 'running') {
       try {
-        const acct = await _netJson('GET', `http://127.0.0.1:${port}/api/local/account`);
-        if (acct && acct.ok && !acct.has_password) {
-          const r = await _netJson('POST', `http://127.0.0.1:${port}/api/local/account/magic-token`);
-          if (r && r.ok && r.token) {
-            url = `http://${ip}:${port}/api/auth/desktop-login?token=${encodeURIComponent(r.token)}&next=${encodeURIComponent('/Platform.html')}`;
-            magic = true;
-          }
+        const r = await _netJson('POST', `http://127.0.0.1:${port}/api/local/account/magic-token`);
+        if (r && r.ok && r.token) {
+          url = `http://${ip}:${port}/api/auth/desktop-login?token=${encodeURIComponent(r.token)}&next=${encodeURIComponent('/Platform.html')}`;
+          magic = true;
         }
       } catch (_) { /* 退回裸地址 */ }
     }
+    return { ok: true, url, magic, ip, port };
+  }
+
+  // 纯链接(供「复制登录链接」用,不生成二维码)。
+  ipcMain.handle('lan:loginUrl', async () => {
+    if (!cfg.load().lanEnabled) return { ok: false };
+    return _lanLoginUrl();
+  });
+
+  // 登录链接二维码(供手机扫码);qrcode 在主进程生成 data URL。
+  ipcMain.handle('lan:qr', async () => {
+    if (!cfg.load().lanEnabled) return { ok: false };
+    const r = await _lanLoginUrl();
+    if (!r.ok) return { ok: false };
     try {
       const QR = require('qrcode');
-      const dataUrl = await QR.toDataURL(url, { margin: 1, width: 240, color: { dark: '#1a1817', light: '#f4efe6' } });
-      return { ok: true, url, dataUrl, magic };
+      const dataUrl = await QR.toDataURL(r.url, { margin: 1, width: 240, color: { dark: '#1a1817', light: '#f4efe6' } });
+      return { ok: true, url: r.url, dataUrl, magic: r.magic };
     } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
   });
 

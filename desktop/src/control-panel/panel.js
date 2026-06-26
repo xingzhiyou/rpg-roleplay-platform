@@ -417,7 +417,7 @@ async function init() {
   $('openExtBtn').addEventListener('click', () => sv.openAppExternal());
   $('sideOpenBrowser').addEventListener('click', () => sv.openAppExternal());
   $('rememberMode').addEventListener('change', async () => { cfg = await sv.setConfig({ rememberMode: $('rememberMode').checked }); });
-  $('copyLanBtn').addEventListener('click', async () => { const r = await sv.lanInfo(); const ok = await copy((r && r.url) || ''); flash($('copyLanBtn'), ok ? '已复制地址' : '复制失败'); });
+  $('copyLanBtn').addEventListener('click', async () => { const r = await sv.lanLoginUrl(); const ok = r && r.ok && await copy(r.url || ''); flash($('copyLanBtn'), ok ? (r.magic ? '已复制登录链接' : '已复制地址') : '复制失败'); });
   // 二维码:hover 右侧 QR 区弹出供手机扫码(延时关闭跨越间隙)
   let _qrT;
   const _showQr = async () => {

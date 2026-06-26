@@ -161,7 +161,10 @@ DEFAULT_MODEL_CATALOG: dict[str, Any] = {
             "id": "google_ai_studio",
             "display_name": "Google AI Studio (Gemini)",
             "kind": "openai_compat",
-            "enabled": False,
+            # enabled=True:策展必备 provider。选择器还有 credApiIds 凭据闸,故只有配了 Google key 的
+            # 用户才看得到它 —— 之前 seed 成 False 时,用户配了 key 也被 a.enabled 闸隐藏、选不到自己同步的
+            # 56 个 Gemini 模型(反馈 #86「model 被强制选预设第一个、不能选」)。
+            "enabled": True,
             "credential_env": "GOOGLE_API_KEY",
             # Gemini 的 OpenAI 兼容端点在 /v1beta/openai —— base_url 只到
             # generativelanguage.googleapis.com 时,SDK 拼成 .../chat/completions 会 404
@@ -212,11 +215,18 @@ def _ensure_curated_apis(catalog: dict[str, Any]) -> dict[str, Any]:
     只补 _CURATED_REQUIRED_APIS 白名单,避免复活管理员有意删除的其它 provider。
     """
     try:
-        have = {normalize_api_id(a.get("id")) for a in catalog.get("apis", [])}
+        by_id = {normalize_api_id(a.get("id")): a for a in catalog.get("apis", [])}
         for d in DEFAULT_MODEL_CATALOG["apis"]:
             nid = normalize_api_id(d.get("id"))
-            if nid in _CURATED_REQUIRED_APIS and nid not in have:
+            if nid not in _CURATED_REQUIRED_APIS:
+                continue
+            if nid not in by_id:
                 catalog.setdefault("apis", []).append(copy.deepcopy(d))
+            else:
+                # 自愈:历史持久化 catalog(DB)可能把策展必备 provider 存成 enabled=False(google_ai_studio
+                # 旧 seed)→ 用户配了 key 也被选择器 a.enabled 闸隐藏、选不到自己的模型(反馈 #86)。
+                # 策展必备 provider 在 serve 时强制可见(凭据闸仍只让 key-havers 看到),不落库。
+                by_id[nid]["enabled"] = True
     except Exception:
         pass
     return catalog

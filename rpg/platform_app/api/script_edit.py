@@ -248,8 +248,12 @@ async def api_fork_script(request: Request, script_id: int, user=Depends(require
                        personality, speech_style, current_status, secrets,
                        sample_dialogue, token_budget, priority, enabled, metadata
                 FROM character_cards WHERE script_id = %s
-                ON CONFLICT (script_id, name) DO NOTHING
+                ON CONFLICT DO NOTHING
                 """,
+                # 修:character_cards 无 (script_id,name) 唯一约束 → 原 ON CONFLICT (script_id,name)
+                # 在 plan 期就 InvalidColumnReference 报错 → fork 含角色卡的剧本必 500(生产日志实证)。
+                # fork 目标是全新 script_id、无既有行可冲突,用裸 ON CONFLICT DO NOTHING(同 phase_digests/
+                # worldlines 那几条),忠实全量复制。
                 (int(new_book["id"]), new_id, script_id),
             )
 

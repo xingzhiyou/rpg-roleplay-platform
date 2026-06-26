@@ -482,6 +482,10 @@
       // 作者写作规范(.cursorrules 风,注入编辑器 agent)。
       writingRules: (sid) => GET(`${API_PREFIX}/scripts/${sid}/writing-rules`),
       saveWritingRules: (sid, rules) => PUT(`${API_PREFIX}/scripts/${sid}/writing-rules`, { rules }),
+      // 审稿问题(VSCode Problems 风):编辑器 agent report_writing_issues 持久化;owner-scoped。
+      issues: (sid) => GET(`${API_PREFIX}/scripts/${sid}/issues`),
+      dismissIssue: (sid, iid) => DEL(`${API_PREFIX}/scripts/${sid}/issues/${iid}`),
+      clearIssues: (sid) => DEL(`${API_PREFIX}/scripts/${sid}/issues`),
       mergeChapter: (sid, body) => POST(`${API_PREFIX}/scripts/${sid}/chapters/merge`, body),
       // 批量删除章节(一次删整批再重排,避免逐章删 index 漂移)。indexes:number[]。
       deleteChapters: (sid, indexes) => POST(`${API_PREFIX}/scripts/${sid}/chapters/delete`, { indexes }),

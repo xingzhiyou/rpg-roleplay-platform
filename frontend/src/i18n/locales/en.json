@@ -4073,6 +4073,15 @@
       "placeholder": "e.g. Third-person limited (follow protagonist only); no omniscient spoilers; place names always use “Yunxu City”; no modern slang in dialogue.",
       "saved": "Writing rules saved; effective from next chat",
       "fail": "Save failed"
+    },
+    "problems": {
+      "btn": "Problems",
+      "tip": "Issues the AI found while proofreading (jump to chapter)",
+      "title": "Writing issues",
+      "clear": "Clear all",
+      "empty": "No issues yet. After the AI does a read-through / consistency / foreshadow-payoff check, they'll be listed here.",
+      "chapter": "Ch. {{n}} ↗",
+      "dismiss": "Dismiss"
     }
   },
   "tavern_page": {

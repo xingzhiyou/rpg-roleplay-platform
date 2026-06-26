@@ -1419,6 +1419,48 @@ async def api_put_writing_rules(request: Request, script_id: int, user=Depends(r
     return json_response({"ok": True, "rules": rules})
 
 
+@router.get("/api/scripts/{script_id}/issues")
+async def api_list_writing_issues(script_id: int, user=Depends(require_user)):
+    """读编辑器 agent 持久化的审稿问题(VSCode Problems 风)。仅 owner(云端隔离)。"""
+    with connect() as db:
+        if not script_owned(db, script_id, int(user["id"])):
+            return json_response({"ok": False, "error": "无权访问该剧本"}, status_code=403)
+        rows = db.execute(
+            "select id, chapter, severity, issue_type, detail, created_at "
+            "from script_writing_issues where script_id=%s order by "
+            "case lower(coalesce(severity,'')) when '高' then 0 when 'high' then 0 "
+            "when '中' then 1 when 'medium' then 1 else 2 end, chapter nulls last, id",
+            (script_id,),
+        ).fetchall()
+    issues = [{
+        "id": r.get("id"), "chapter": r.get("chapter"), "severity": r.get("severity"),
+        "type": r.get("issue_type"), "detail": r.get("detail"),
+    } for r in (rows or [])]
+    return json_response({"ok": True, "issues": issues})
+
+
+@router.delete("/api/scripts/{script_id}/issues/{issue_id}")
+async def api_dismiss_writing_issue(script_id: int, issue_id: int, user=Depends(require_user)):
+    """消除单条审稿问题(作者已处理/忽略)。仅 owner;按 script_id 联检防 IDOR。"""
+    with connect() as db:
+        if not script_owned(db, script_id, int(user["id"])):
+            return json_response({"ok": False, "error": "无权访问该剧本"}, status_code=403)
+        db.execute("delete from script_writing_issues where id=%s and script_id=%s", (issue_id, script_id))
+        db.commit()
+    return json_response({"ok": True})
+
+
+@router.delete("/api/scripts/{script_id}/issues")
+async def api_clear_writing_issues(script_id: int, user=Depends(require_user)):
+    """清空该剧本全部审稿问题。仅 owner。"""
+    with connect() as db:
+        if not script_owned(db, script_id, int(user["id"])):
+            return json_response({"ok": False, "error": "无权访问该剧本"}, status_code=403)
+        db.execute("delete from script_writing_issues where script_id=%s", (script_id,))
+        db.commit()
+    return json_response({"ok": True})
+
+
 @router.get("/api/scripts/{script_id}/chapters/{chapter_index}/history")
 async def api_chapter_history(script_id: int, chapter_index: int, user=Depends(require_user)):
     """某章的 AI 改动历史(版本列表):每条 = commit_id + 时间 + 摘要 + 是否含改前快照(可恢复)。

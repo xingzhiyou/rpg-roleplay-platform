@@ -2102,6 +2102,19 @@ MIGRATIONS: list[tuple[int, str, list[str]]] = [
         # 作者写作规范(.cursorrules 风):per-script 风格/连贯/禁忌规则,注入编辑器 agent 上下文最高优先层。
         "alter table scripts add column if not exists writing_rules text not null default ''",
     ]),
+    (88, "script_writing_issues", [
+        # 审稿问题持久化(VSCode Problems 风):编辑器 agent 调 report_writing_issues 时落库,
+        # 作者刷新仍在;owner-scoped(按 script_id,REST 端点走 script_owned 校验);每次汇报=最新快照(替换)。
+        "create table if not exists script_writing_issues ("
+        " id bigserial primary key,"
+        " script_id bigint not null references scripts(id) on delete cascade,"
+        " chapter integer,"
+        " severity text,"
+        " issue_type text,"
+        " detail text not null,"
+        " created_at timestamptz not null default now())",
+        "create index if not exists idx_swi_script on script_writing_issues(script_id, id)",
+    ]),
 ]
 
 

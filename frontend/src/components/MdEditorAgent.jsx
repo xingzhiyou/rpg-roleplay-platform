@@ -266,7 +266,7 @@ const WRITING_SKILLS = [
     prompt: '请用 get_chapter_text 读【当前章节】(必要时 get_script_chapters 跨章回看),梳理本章埋下或呼应的伏笔/线索:哪些已回收、哪些悬而未决、哪些可能与既有设定冲突。只输出清单与建议,不改库。' },
 ];
 
-const MdEditorAgent = forwardRef(function MdEditorAgent({ scriptId, activeTab, onWriteComplete, onContinue, onProposeChapterEdit, selLen = 0, getSelectionContext }, ref) {
+const MdEditorAgent = forwardRef(function MdEditorAgent({ scriptId, activeTab, onWriteComplete, onContinue, onProposeChapterEdit, selLen = 0, getSelectionContext, onIssuesReported }, ref) {
   const { t } = useTranslation();
   const [messages, setMessages] = useState([]);   // [{role, text, tools:[{call_id,tool,args,status,result}]}]
   const [input, setInput] = useState('');
@@ -495,6 +495,7 @@ const MdEditorAgent = forwardRef(function MdEditorAgent({ scriptId, activeTab, o
       return;
     }
     if (event === 'tool_call') {
+      if (data.tool === 'report_writing_issues') issuesReportedRef.current = true;  // done 时通知父级重载问题面板
       setMessages((m) => m.map((msg, i) => i === assistantIdx
         ? { ...msg, tools: [...(msg.tools || []), { call_id: data.call_id, tool: data.tool, args: data.args, status: 'running' }] }
         : msg));
@@ -525,6 +526,8 @@ const MdEditorAgent = forwardRef(function MdEditorAgent({ scriptId, activeTab, o
       setMessages((m) => m.map((msg, i) => i === assistantIdx
         ? { ...msg, tools: (msg.tools || []).map((tc) => tc.status === 'running' ? { ...tc, status: 'done' } : tc) }
         : msg));
+      // 本次 run 有审稿问题落库 → 通知父级重载「问题」面板 + 顶栏徽标(此刻 executor 已 commit)。
+      if (issuesReportedRef.current) { issuesReportedRef.current = false; try { onIssuesReportedRef.current?.(); } catch (_) {} }
       return;
     }
     if (event === 'confirmation_required') {
@@ -682,6 +685,9 @@ const MdEditorAgent = forwardRef(function MdEditorAgent({ scriptId, activeTab, o
   // makeHandler deps=[] → 用 ref 取最新 onProposeChapterEdit / confirmCall(避免过期闭包)。
   const onProposeChapterEditRef = useRef(null);
   onProposeChapterEditRef.current = onProposeChapterEdit;
+  const onIssuesReportedRef = useRef(null);
+  onIssuesReportedRef.current = onIssuesReported;
+  const issuesReportedRef = useRef(false);  // 本次 run 内见到 report_writing_issues → done 时通知父级重载
   const confirmCallRef = useRef(null);
   confirmCallRef.current = confirmCall;
 

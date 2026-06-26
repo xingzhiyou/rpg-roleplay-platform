@@ -719,6 +719,69 @@ function WritingRules({ scriptId, onClose }) {
   );
 }
 
+// 审稿问题面板(VSCode Problems 风):编辑器 agent 调 report_writing_issues 持久化的问题清单,
+// 按严重度排序,可逐条「跳转章节」/「消除」,或一键清空。owner-scoped(后端 script_owned 校验)。
+function ProblemsPanel({ scriptId, reloadKey, onJump, onClose, onCountChange }) {
+  const { t } = useTranslation();
+  const [issues, setIssues] = useState(null);
+  const load = useCallback(async () => {
+    try { const r = await api().scripts.issues(scriptId); const arr = (r && r.ok) ? (r.issues || []) : []; setIssues(arr); onCountChange && onCountChange(arr.length); }
+    catch (_) { setIssues([]); }
+  }, [scriptId]);  // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setIssues(null); load(); }, [scriptId, reloadKey, load]);
+  const dismiss = async (iid) => {
+    try { await api().scripts.dismissIssue(scriptId, iid); } catch (_) {}
+    setIssues((cur) => { const next = (cur || []).filter((x) => x.id !== iid); onCountChange && onCountChange(next.length); return next; });
+  };
+  const clearAll = async () => {
+    try { await api().scripts.clearIssues(scriptId); } catch (_) {}
+    setIssues([]); onCountChange && onCountChange(0);
+  };
+  const sevClass = (sev) => {
+    const s = String(sev || '').toLowerCase();
+    if (s === '高' || s === 'high') return 'high';
+    if (s === '中' || s === 'medium') return 'mid';
+    if (s === '低' || s === 'low') return 'low';
+    return '';
+  };
+  return (
+    <div className="mde-qopen-scrim" onMouseDown={onClose}>
+      <div className="mde-problems" onMouseDown={(e) => e.stopPropagation()}>
+        <div className="mde-problems-head">
+          <span className="mde-problems-title">{t('md_editor.problems.title', { defaultValue: '审稿问题' })}{Array.isArray(issues) ? ` · ${issues.length}` : ''}</span>
+          {Array.isArray(issues) && issues.length > 0 && (
+            <button type="button" className="mde-problems-clear" onClick={clearAll}>{t('md_editor.problems.clear', { defaultValue: '全部清空' })}</button>
+          )}
+          <button type="button" className="mde-problems-x" title={t('common.close')} onClick={onClose}>×</button>
+        </div>
+        {issues === null ? <div className="mde-qopen-empty">{t('common.loading')}</div>
+          : issues.length === 0 ? (
+            <div className="mde-problems-empty">{t('md_editor.problems.empty', { defaultValue: '暂无审稿问题。让 AI 通读/查矛盾/查伏笔回收后会在这里列出。' })}</div>
+          ) : (
+            <ul className="mde-problems-list">
+              {issues.map((it) => (
+                <li key={it.id} className="mde-problem">
+                  <div className="mde-problem-meta">
+                    {it.severity && <span className={'mde-problem-sev ' + sevClass(it.severity)}>{String(it.severity)}</span>}
+                    {it.type && <span className="mde-problem-type">{String(it.type)}</span>}
+                    {it.chapter != null && (
+                      <button type="button" className="mde-problem-jump" onClick={() => onJump(it.chapter)}>
+                        {t('md_editor.problems.chapter', { n: it.chapter, defaultValue: '第{{n}}章 ↗' })}
+                      </button>
+                    )}
+                    <span className="mde-problem-spacer" />
+                    <button type="button" className="mde-problem-dismiss" title={t('md_editor.problems.dismiss', { defaultValue: '消除' })} onClick={() => dismiss(it.id)}>×</button>
+                  </div>
+                  <div className="mde-problem-detail">{String(it.detail || '')}</div>
+                </li>
+              ))}
+            </ul>
+          )}
+      </div>
+    </div>
+  );
+}
+
 // ── 主页面 ───────────────────────────────────────────────────────────
 export default function MdEditorPage() {
   const { t } = useTranslation();
@@ -739,6 +802,9 @@ export default function MdEditorPage() {
   const [searchOpen, setSearchOpen] = useState(false);     // Mod+Shift+F 全书检索
   const [historyFor, setHistoryFor] = useState(null);      // 章节版本历史(chapter_index | null)
   const [rulesOpen, setRulesOpen] = useState(false);       // 写作规范(.cursorrules)编辑弹窗
+  const [issuesOpen, setIssuesOpen] = useState(false);     // 审稿问题面板(VSCode Problems 风)
+  const [issueCount, setIssueCount] = useState(0);         // 顶栏「问题」徽标计数
+  const [issuesReloadKey, setIssuesReloadKey] = useState(0); // 编辑器 agent 汇报问题后 bump → 重载
   // 选区/光标上报(对象):右栏要 selLen(数字),状态栏要 line/col/total。
   const onSel = useCallback((info) => {
     if (info && typeof info === 'object') {
@@ -902,6 +968,17 @@ export default function MdEditorPage() {
   const onEdit = useCallback((key, val) => {
     setTabs((cur) => cur.map((t) => t.key === key ? { ...t, content: val, dirty: val !== t.original } : t));
   }, []);
+
+  // 顶栏「问题」徽标:载入剧本/agent 汇报后拉一次计数(面板未开也显示数量)。
+  useEffect(() => {
+    if (!scriptId) { setIssueCount(0); return; }
+    let cancelled = false;
+    (async () => {
+      try { const r = await api().scripts.issues(scriptId); if (!cancelled) setIssueCount(r && r.ok ? (r.issues || []).length : 0); }
+      catch (_) {}
+    })();
+    return () => { cancelled = true; };
+  }, [scriptId, issuesReloadKey]);
 
   // 刷新 / 切换工作区:恢复该剧本上次打开的标签页 + 激活标签(用户缓存,刷新不丢上下文)。
   useEffect(() => {
@@ -1152,6 +1229,7 @@ export default function MdEditorPage() {
         </div>
 
         <div className="mde-tb-spacer" />
+        {scriptId && <button className={'mde-tb-txt' + (issueCount > 0 ? ' has-badge' : '')} data-tip={t('md_editor.problems.tip', { defaultValue: 'AI 审稿发现的问题(可跳转章节)' })} title={t('md_editor.problems.btn', { defaultValue: '问题' })} onClick={() => setIssuesOpen(true)}>{t('md_editor.problems.btn', { defaultValue: '问题' })}{issueCount > 0 ? <span className="mde-tb-badge">{issueCount}</span> : null}</button>}
         {scriptId && <button className="mde-tb-txt" data-tip={t('md_editor.rules.tip', { defaultValue: '给 AI 立写作规范(注入上下文)' })} title={t('md_editor.rules.btn', { defaultValue: '写作规范' })} onClick={() => setRulesOpen(true)}>{t('md_editor.rules.btn', { defaultValue: '写作规范' })}</button>}
         {active && active.dirty && <button className="mde-save" onClick={() => saveTab(active.key)} disabled={active.saving}>{active.saving ? t('md_editor.save_btn.saving') : t('md_editor.save_btn.save')}</button>}
         <button className={'mde-tb-ic' + (rightOpen ? ' on' : '')} data-tip={rightOpen ? t('md_editor.panel.hide_ai') : t('md_editor.panel.show_ai')} title={rightOpen ? t('md_editor.panel.hide_ai') : t('md_editor.panel.show_ai')} onClick={toggleRight}><TbIcon name="panelRight" /></button>
@@ -1241,7 +1319,7 @@ export default function MdEditorPage() {
         {/* 右:agent 直写面板(console_assistant SSE)+ 续写到正文 */}
         <aside className="mde-right">
           {scriptId
-            ? <MdEditorAgent ref={agentRef} scriptId={scriptId} activeTab={active} onWriteComplete={refreshTab} onContinue={onContinue} onProposeChapterEdit={proposeChapterDiff} selLen={selLen} getSelectionContext={getSelectionContext} />
+            ? <MdEditorAgent ref={agentRef} scriptId={scriptId} activeTab={active} onWriteComplete={refreshTab} onContinue={onContinue} onProposeChapterEdit={proposeChapterDiff} selLen={selLen} getSelectionContext={getSelectionContext} onIssuesReported={() => setIssuesReloadKey((x) => x + 1)} />
             : <div className="mde-tree-hint">{t('md_editor.ws.select_first')}</div>}
         </aside>
       </div>
@@ -1249,6 +1327,9 @@ export default function MdEditorPage() {
       {searchOpen && scriptId && <GlobalSearch scriptId={scriptId} openNode={openNode} onClose={() => setSearchOpen(false)} />}
       {historyFor != null && scriptId && <ChapterHistory scriptId={scriptId} chapterIndex={historyFor} onClose={() => setHistoryFor(null)} onRestored={() => { try { refreshTab('chapter', historyFor); } catch (_) {} setHistoryFor(null); }} />}
       {rulesOpen && scriptId && <WritingRules scriptId={scriptId} onClose={() => setRulesOpen(false)} />}
+      {issuesOpen && scriptId && <ProblemsPanel scriptId={scriptId} reloadKey={issuesReloadKey} onCountChange={setIssueCount}
+        onJump={(ch) => { if (ch != null) openNode({ kind: 'chapter', id: ch, label: t('md_editor.chapter_prefix', { index: ch }) }); setIssuesOpen(false); }}
+        onClose={() => setIssuesOpen(false)} />}
     </div>
   );
 }

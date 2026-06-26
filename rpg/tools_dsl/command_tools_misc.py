@@ -732,18 +732,50 @@ def register_misc_tools() -> None:
     if not registry.has(plan_spec.name):
         registry.register(plan_spec)
 
-    def _t_report_writing_issues(user_id: int, args: dict) -> str:
-        issues = args.get("issues")
-        if not isinstance(issues, list) or not issues:
+    def _t_report_writing_issues(user_id: int, script_id: int | None, args: dict, state: Any) -> str:
+        # 持久化(VSCode Problems 风):每次汇报=该剧本最新审稿快照 → 先清空旧问题再插入本批,
+        # 作者刷新仍在。scope=script,script_id 已被 dispatcher owner 校验+无条件覆盖(云端隔离)。
+        raw = args.get("issues")
+        if not isinstance(raw, list) or not raw:
             return "失败: issues 为空(给一个问题对象数组)"
-        return f"已在右栏向作者列出 {len(issues)} 条问题供逐条处理。"
+        rows = []
+        for it in raw:
+            if not isinstance(it, dict):
+                continue
+            detail = str(it.get("detail") or "").strip()
+            if not detail:
+                continue
+            ch = it.get("chapter")
+            try:
+                ch = int(ch) if ch is not None and str(ch).strip() != "" else None
+            except Exception:
+                ch = None
+            sev = (str(it.get("severity") or "").strip()[:8]) or None
+            ty = (str(it.get("type") or "").strip()[:40]) or None
+            rows.append((ch, sev, ty, detail[:2000]))
+        if not rows:
+            return "失败: issues 均无 detail(每条至少要有 detail)"
+        if script_id is None:
+            return "失败: 缺少剧本绑定(script_id),无法持久化问题清单。"
+        from platform_app.db import connect, init_db
+        init_db()
+        with connect() as db:
+            db.execute("delete from script_writing_issues where script_id=%s", (script_id,))
+            for ch, sev, ty, detail in rows:
+                db.execute(
+                    "insert into script_writing_issues(script_id, chapter, severity, issue_type, detail) "
+                    "values (%s,%s,%s,%s,%s)",
+                    (script_id, ch, sev, ty, detail),
+                )
+        return f"已在右栏「问题」面板列出 {len(rows)} 条问题(已持久化,作者刷新仍在,可逐条处理或跳转章节)。"
 
     issues_spec = ToolSpec(
         name="report_writing_issues",
         description=(
-            "把你审稿/通读发现的问题结构化列给作者(右栏渲染成可逐条处理的清单,带章号可跳转)。"
-            "审稿、查矛盾/重复/连贯/伏笔回收后调它汇总,而不是只在回复里散文罗列。每条 issue:"
-            "chapter(可空,章号)/ severity(可空 高/中/低)/ type(类别)/ detail(具体描述与建议)。"
+            "把你审稿/通读发现的问题结构化列给作者(右栏「问题」面板,带章号可跳转,持久化、刷新仍在)。"
+            "审稿、查矛盾/重复/连贯/伏笔回收后调它汇总,而不是只在回复里散文罗列。每次调用=本剧本最新"
+            "审稿快照(会替换上一批)。每条 issue:chapter(可空,章号)/ severity(可空 高/中/低)/ "
+            "type(类别)/ detail(具体描述与建议)。"
         ),
         input_schema={
             "type": "object",
@@ -766,7 +798,7 @@ def register_misc_tools() -> None:
             "required": ["issues"],
         },
         executor=_t_report_writing_issues,
-        scope="user",
+        scope="script",
         origins=_CHOICE_ORIGINS,
         destructive=False,
     )

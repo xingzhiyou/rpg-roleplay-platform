@@ -4,6 +4,9 @@ on:
     paths: ['frontend/**', '.github/workflows/lighthouse-ci.yml']
 jobs:
   lhci:
+    # dependabot PR 的 GITHUB_TOKEN 是受限只读 → lhci autorun 的状态检查/上传步骤必失败(只在
+    # dependabot PR 挂、main/人工 PR 正常)。依赖升级 PR 跑 Lighthouse 性能审计本也无意义,直接跳过。
+    if: github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6

@@ -18,9 +18,12 @@ def _vector_column_exists(db, table: str) -> bool:
     if table in _VEC_COLUMN_CACHE:
         return _VEC_COLUMN_CACHE[table]
     try:
+        # 必须是**真 pgvector 类型**列(udt_name='vector')才算"有向量列"。无 pgvector 的部署
+        # (桌面捆绑版)migration 89 会建 jsonb 同名占位列让 `is not null` 计数不报错,但那种列
+        # 不能跑 <=> 相似度 → 这里按 udt_name 区分,jsonb 占位列返回 False,自动退化到关键词检索。
         row = db.execute(
             "select 1 from information_schema.columns "
-            "where table_name = %s and column_name = 'embedding_vec'",
+            "where table_name = %s and column_name = 'embedding_vec' and udt_name = 'vector'",
             (table,),
         ).fetchone()
         _VEC_COLUMN_CACHE[table] = bool(row)

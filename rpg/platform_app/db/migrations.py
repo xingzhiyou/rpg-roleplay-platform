@@ -2115,6 +2115,26 @@ MIGRATIONS: list[tuple[int, str, list[str]]] = [
         " created_at timestamptz not null default now())",
         "create index if not exists idx_swi_script on script_writing_issues(script_id, id)",
     ]),
+    (89, "no_pgvector_embedding_fallback_columns", [
+        # 桌面捆绑版 / 自部署无 pgvector 时:migration 10/60 跳过了 embedding_vec(vector)列,
+        # 但 embed_status / 重建估算等请求路径无条件跑 `embedding_vec is not null` 计数 →
+        # "column does not exist" → ASGI 500(客户实测桌面 win 版日志)。根因修复:无 vector 扩展时
+        # 建 jsonb 占位列,使所有「是否已嵌入」计数恒返 0(无 pgvector=没法嵌入,语义正确),不再每处散落拦截。
+        # **prod 无副作用**:有 pgvector 时整段 if 分支不执行(列已是 vector 类型)。
+        # 配套 _search._vector_column_exists 增加 udt_name='vector' 判定,jsonb 占位列不会被当向量列跑 <=>。
+        """
+        do $$
+        begin
+          if not exists (select 1 from pg_extension where extname = 'vector') then
+            execute 'alter table document_chunks    add column if not exists embedding_vec jsonb';
+            execute 'alter table memories            add column if not exists embedding_vec jsonb';
+            execute 'alter table character_cards     add column if not exists embedding_vec jsonb';
+            execute 'alter table worldbook_entries   add column if not exists embedding_vec jsonb';
+            execute 'alter table kb_canon_entities   add column if not exists embedding jsonb';
+          end if;
+        end $$;
+        """,
+    ]),
 ]
 
 

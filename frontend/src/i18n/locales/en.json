@@ -6979,6 +6979,7 @@
     },
     "md_editor_agent": {
       "title": "Assistant",
+      "empty_title": "Edit this script, straight to the database",
       "hint": "Ask the AI to edit this script — e.g. \"make this character more brooding\", \"polish the prose in this chapter\", \"add a new Worldbook entry: XX\". The AI writes directly to the database (destructive actions require your confirmation).",
       "error_generic": "Something went wrong",
       "tool_status": {

@@ -800,8 +800,10 @@ const MdEditorAgent = forwardRef(function MdEditorAgent({ scriptId, activeTab, o
       )}
       <div className="mde-agent-msgs" ref={scrollRef}>
         {messages.length === 0 && (
-          <div className="mde-agent-hint">
-            {t('components.md_editor_agent.hint')}
+          <div className="mde-agent-empty">
+            <span className="mde-agent-empty-glyph" aria-hidden="true">AI</span>
+            <div className="mde-agent-empty-title">{t('components.md_editor_agent.empty_title', { defaultValue: '改这个剧本,直接动库' })}</div>
+            <div className="mde-agent-empty-hint">{t('components.md_editor_agent.hint')}</div>
           </div>
         )}
         {messages.map((m, i) => (
@@ -848,55 +850,6 @@ const MdEditorAgent = forwardRef(function MdEditorAgent({ scriptId, activeTab, o
           )
         ))}
       </div>
-      {scriptId && activeTab && activeTab.kind === 'chapter' && (
-        <div className="mde-agent-skills" role="group" aria-label={t('components.md_editor_agent.skills.group', { defaultValue: '写作技能' })}>
-          <span className="mde-agent-skills-label">{t('components.md_editor_agent.skills.group', { defaultValue: '写作技能' })}</span>
-          {WRITING_SKILLS.map((s) => (
-            <button
-              key={s.key}
-              type="button"
-              className="mde-agent-skill"
-              disabled={busy}
-              onClick={() => send(s.prompt)}
-            >{t('components.md_editor_agent.skills.' + s.key, { defaultValue: s.label })}</button>
-          ))}
-        </div>
-      )}
-      {onContinue && activeTab && (
-        <div className="mde-agent-toolbar">
-          <button
-            className="mde-agent-continue"
-            title={t('components.md_editor_agent.continue_btn_title')}
-            onClick={() => { onContinue(input.trim()); setInput(''); }}
-          >{t('components.md_editor_agent.continue_btn')}</button>
-          <span className="mde-agent-toolbar-hint">{t('components.md_editor_agent.continue_hint')}</span>
-        </div>
-      )}
-      {(attached || uploading) && (
-        <div className="mde-agent-attachbar">
-          {uploading && <span className="mde-agent-attach-up">{t('components.md_editor_agent.doc.uploading', { defaultValue: '上传中…' })}</span>}
-          {attached && (
-            <span className="mde-agent-attach">
-              <span className="mde-agent-attach-icon" aria-hidden="true">⎘</span>
-              <span className="mde-agent-attach-name" title={attached.filename}>{attached.filename}</span>
-              <span className="mde-agent-attach-chars">{attached.chars}{t('components.md_editor_agent.doc.chars_suffix', { defaultValue: '字' })}</span>
-              <button type="button" className="mde-agent-attach-x" onClick={() => setAttached(null)}
-                title={t('common.remove', { defaultValue: '移除' })} aria-label={t('common.remove', { defaultValue: '移除' })}>×</button>
-            </span>
-          )}
-        </div>
-      )}
-      <div className="mde-agent-refbar">
-        <button type="button" className="mde-agent-refadd" onClick={openRefPicker} disabled={!scriptId}
-          title={t('components.md_editor_agent.ref.add_tip', { defaultValue: '引用章节/角色卡/世界书作为上下文' })}>{t('components.md_editor_agent.ref.add', { defaultValue: '@ 引用' })}</button>
-        {pinnedRefs.map((r) => (
-          <span key={r.kind + ':' + r.id} className="mde-agent-refchip">
-            <span className="mde-agent-refchip-k">{({ chapter: '章', card: '卡', worldbook: '书' })[r.kind] || ''}</span>
-            <span className="mde-agent-refchip-l" title={r.label}>{r.label}</span>
-            <button type="button" className="mde-agent-refchip-x" onClick={() => removeRef(r)} aria-label={t('common.remove', { defaultValue: '移除' })}>×</button>
-          </span>
-        ))}
-      </div>
       {refPicker && (
         <div className="mde-qopen-scrim" onMouseDown={() => setRefPicker(null)}>
           <div className="mde-refpick" onMouseDown={(e) => e.stopPropagation()}>
@@ -920,7 +873,55 @@ const MdEditorAgent = forwardRef(function MdEditorAgent({ scriptId, activeTab, o
           </div>
         </div>
       )}
-      <div className="mde-agent-composer">
+      {/* 统一输入坞:工具条(续写 / 引用 / 写作技能)→ 引用chips → 附件 → 输入,一个容器一条边线 */}
+      <div className="mde-agent-dock">
+        <div className="mde-agent-tools" role="group" aria-label={t('components.md_editor_agent.skills.group', { defaultValue: '写作技能' })}>
+          {onContinue && activeTab && (
+            <button type="button" className="mde-agent-tool primary"
+              title={t('components.md_editor_agent.continue_btn_title')}
+              onClick={() => { onContinue(input.trim()); setInput(''); }}
+            >{t('components.md_editor_agent.continue_btn')}<kbd className="mde-agent-kbd">⌘K</kbd></button>
+          )}
+          <button type="button" className="mde-agent-tool" onClick={openRefPicker} disabled={!scriptId}
+            title={t('components.md_editor_agent.ref.add_tip', { defaultValue: '引用章节/角色卡/世界书作为上下文' })}
+          >{t('components.md_editor_agent.ref.add', { defaultValue: '@ 引用' })}</button>
+          {scriptId && activeTab && activeTab.kind === 'chapter' && (
+            <>
+              <span className="mde-agent-tools-sep" aria-hidden="true" />
+              {WRITING_SKILLS.map((s) => (
+                <button key={s.key} type="button" className="mde-agent-tool skill" disabled={busy}
+                  onClick={() => send(s.prompt)}
+                >{t('components.md_editor_agent.skills.' + s.key, { defaultValue: s.label })}</button>
+              ))}
+            </>
+          )}
+        </div>
+        {(attached || uploading) && (
+          <div className="mde-agent-attachbar">
+            {uploading && <span className="mde-agent-attach-up">{t('components.md_editor_agent.doc.uploading', { defaultValue: '上传中…' })}</span>}
+            {attached && (
+              <span className="mde-agent-attach">
+                <span className="mde-agent-attach-icon" aria-hidden="true">⎘</span>
+                <span className="mde-agent-attach-name" title={attached.filename}>{attached.filename}</span>
+                <span className="mde-agent-attach-chars">{attached.chars}{t('components.md_editor_agent.doc.chars_suffix', { defaultValue: '字' })}</span>
+                <button type="button" className="mde-agent-attach-x" onClick={() => setAttached(null)}
+                  title={t('common.remove', { defaultValue: '移除' })} aria-label={t('common.remove', { defaultValue: '移除' })}>×</button>
+              </span>
+            )}
+          </div>
+        )}
+        {pinnedRefs.length > 0 && (
+          <div className="mde-agent-refbar">
+            {pinnedRefs.map((r) => (
+              <span key={r.kind + ':' + r.id} className="mde-agent-refchip">
+                <span className="mde-agent-refchip-k">{({ chapter: '章', card: '卡', worldbook: '书' })[r.kind] || ''}</span>
+                <span className="mde-agent-refchip-l" title={r.label}>{r.label}</span>
+                <button type="button" className="mde-agent-refchip-x" onClick={() => removeRef(r)} aria-label={t('common.remove', { defaultValue: '移除' })}>×</button>
+              </span>
+            ))}
+          </div>
+        )}
+        <div className="mde-agent-composer">
         <Composer
           text={input}
           setText={setInput}
@@ -946,6 +947,7 @@ const MdEditorAgent = forwardRef(function MdEditorAgent({ scriptId, activeTab, o
           hideContextUsage
           placeholder={scriptId ? t('components.md_editor_agent.placeholder_with_script') : t('components.md_editor_agent.placeholder_no_script')}
         />
+        </div>
       </div>
     </div>
   );

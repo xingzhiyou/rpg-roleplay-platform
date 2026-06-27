@@ -6976,6 +6976,7 @@
     },
     "md_editor_agent": {
       "title": "助手",
+      "empty_title": "改这个剧本,直接动库",
       "hint": "让 AI 帮你改这个剧本 —— 例如「把这个角色的性格改得更阴郁」「给这章正文润色」「新建一条世界书:XX」。AI 会直接改库(危险操作会先让你确认)。",
       "error_generic": "出错了",
       "tool_status": {

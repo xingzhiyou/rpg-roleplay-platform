@@ -300,7 +300,18 @@
 .mde-agent-skill:disabled { opacity: 0.45; cursor: default; }
 
 /* 右栏复用游戏聊天框 Composer:等比缩小适配窄栏 */
-.mde-agent-composer { flex: 0 0 auto; border-top: 1px solid var(--line-soft, #2a2724); padding: 6px; }
+/* 统一输入坞:工具条 + 引用chips + 附件 + 输入,一个容器一条边线 */
+.mde-agent-dock { flex: 0 0 auto; border-top: 1px solid var(--line-soft, #2a2724); background: var(--bg-deep, #161513); padding: 8px; display: flex; flex-direction: column; gap: 7px; }
+.mde-agent-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.mde-agent-tool { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; padding: 4px 10px; border-radius: 7px; border: 1px solid var(--line, #36322d); background: var(--panel, #1c1a18); color: var(--muted, #968f85); cursor: pointer; font-family: inherit; transition: border-color .15s, color .15s, background .15s, transform .1s; }
+.mde-agent-tool:hover:not(:disabled) { border-color: var(--accent, #b5654a); color: var(--accent, #b5654a); }
+.mde-agent-tool:active:not(:disabled) { transform: scale(.97); }
+.mde-agent-tool:disabled { opacity: .45; cursor: default; }
+.mde-agent-tool.primary { background: rgba(181,101,74,0.13); border-color: rgba(181,101,74,0.42); color: var(--accent, #b5654a); font-weight: 500; }
+.mde-agent-tool.primary:hover:not(:disabled) { background: rgba(181,101,74,0.2); border-color: var(--accent, #b5654a); }
+.mde-agent-kbd { font-size: 9.5px; padding: 1px 5px; border-radius: 4px; background: rgba(181,101,74,0.18); font-family: var(--font-mono, ui-monospace, monospace); line-height: 1.5; }
+.mde-agent-tools-sep { width: 1px; align-self: stretch; min-height: 16px; background: var(--line, #36322d); margin: 0 2px; }
+.mde-agent-composer { flex: 0 0 auto; padding: 0; }
 .mde-agent-composer .gc-composer-wrap { padding: 0; }
 .mde-agent-composer .gc-composer { font-size: 12.5px; }
 .mde-agent-composer .gc-composer-bottom { flex-wrap: wrap; gap: 4px 6px; }
@@ -308,7 +319,10 @@
 .mde-agent-wmode { flex: 0 0 auto; background: var(--panel-2, #282623); color: var(--text, #ebe7df); border: 1px solid var(--line, #36322d); border-radius: 5px; padding: 2px 6px; font-size: 11.5px; font-family: inherit; cursor: pointer; }
 .mde-agent { position: relative; }
 .mde-agent-msgs { flex: 1 1 auto; overflow-y: auto; padding: 12px 10px; display: flex; flex-direction: column; gap: 14px; scroll-behavior: smooth; }
-.mde-agent-hint { color: var(--muted-2, #6b655e); font-size: 12.5px; line-height: 1.7; padding: 10px 8px; }
+.mde-agent-empty { margin: auto; display: flex; flex-direction: column; align-items: center; text-align: center; padding: 20px 22px; max-width: 290px; }
+.mde-agent-empty-glyph { width: 40px; height: 40px; border-radius: 11px; background: rgba(181,101,74,0.14); color: var(--accent, #b5654a); font-size: 17px; font-weight: 700; letter-spacing: .3px; display: flex; align-items: center; justify-content: center; margin-bottom: 14px; }
+.mde-agent-empty-title { font-size: 15px; font-weight: 600; color: var(--text, #ebe7df); margin-bottom: 7px; }
+.mde-agent-empty-hint { font-size: 12px; line-height: 1.7; color: var(--muted-2, #6f685f); }
 
 /* ── Claude-Code 风线性流(去气泡/头像):文档式垂直流,逐条淡入 ── */
 .mde-msg { font-size: 13px; line-height: 1.66; animation: mdeMsgIn .2s cubic-bezier(.22,.61,.36,1); }
@@ -358,7 +372,7 @@
 .mde-agent-dropzone { position: absolute; inset: 0; z-index: 40; display: flex; align-items: center; justify-content: center; background: rgba(19,18,17,.82); backdrop-filter: blur(2px); pointer-events: none; }
 .mde-agent-dropzone-inner { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 22px 30px; border: 2px dashed var(--accent, #b5654a); border-radius: 14px; color: var(--accent, #b5654a); font-size: 13px; font-weight: 600; background: rgba(181,101,74,.08); }
 .mde-agent-dropzone-icon { font-size: 26px; line-height: 1; }
-.mde-agent-attachbar { flex: 0 0 auto; padding: 6px 8px 0; }
+.mde-agent-attachbar { flex: 0 0 auto; padding: 0; }
 .mde-agent-attach { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; padding: 4px 6px 4px 10px; border: 1px solid rgba(181,101,74,.4); border-radius: 999px; background: rgba(181,101,74,.1); font-size: 11.5px; color: var(--text, #ebe7df); }
 .mde-agent-attach-icon { color: var(--accent, #b5654a); }
 .mde-agent-attach-name { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -368,7 +382,7 @@
 .mde-agent-attach-up { font-size: 11.5px; color: var(--muted-2, #6b655e); }
 
 /* @引用栏:pin 章节/角色卡/世界书作为上下文 */
-.mde-agent-refbar { flex: 0 0 auto; display: flex; align-items: center; flex-wrap: wrap; gap: 5px; padding: 5px 8px 0; }
+.mde-agent-refbar { flex: 0 0 auto; display: flex; align-items: center; flex-wrap: wrap; gap: 5px; padding: 0; }
 .mde-agent-refadd { flex: 0 0 auto; font-size: 11px; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--line, #36322d); background: transparent; color: var(--muted, #968f85); cursor: pointer; font-family: inherit; }
 .mde-agent-refadd:hover:not(:disabled) { border-color: var(--accent, #b5654a); color: var(--accent, #b5654a); }
 .mde-agent-refadd:disabled { opacity: .5; cursor: default; }

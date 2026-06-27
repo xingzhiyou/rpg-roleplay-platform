@@ -418,11 +418,18 @@ async function init() {
   $('openExtBtn').addEventListener('click', () => sv.openAppExternal());
   $('sideOpenBrowser').addEventListener('click', () => sv.openAppExternal());
   $('rememberMode').addEventListener('change', async () => { cfg = await sv.setConfig({ rememberMode: $('rememberMode').checked }); });
-  $('copyLanBtn').addEventListener('click', async () => { const r = await sv.lanLoginUrl(); const ok = r && r.ok && await copy(r.url || ''); flash($('copyLanBtn'), ok ? (r.magic ? '已复制登录链接' : '已复制地址') : '复制失败'); });
+  // 局域网未开启时:不再静默失败,弹内联提示 + 一键「开启并重启」。
+  function showLanOff() { const h = $('lanOffPrompt'); if (!h) return; h.hidden = false; h.style.animation = 'none'; void h.offsetWidth; h.style.animation = ''; }
+  $('copyLanBtn').addEventListener('click', async () => {
+    if (!cfg || !cfg.lanEnabled) { showLanOff(); return; }
+    const r = await sv.lanLoginUrl(); const ok = r && r.ok && await copy(r.url || '');
+    flash($('copyLanBtn'), ok ? (r.magic ? '已复制登录链接' : '已复制地址') : '复制失败');
+  });
   // 二维码:hover 右侧 QR 区弹出供手机扫码(延时关闭跨越间隙)
   let _qrT;
   const _showQr = async () => {
     clearTimeout(_qrT);
+    if (!cfg || !cfg.lanEnabled) { showLanOff(); return; }
     // 每次打开都重新拉一张二维码:免登录 token 单次、10 分钟有效,缓存会过期 → 始终给最新的。
     if (!_qrLoaded) {
       try {
@@ -472,6 +479,18 @@ async function init() {
       flash($('revokeInviteBtn'), '已停止邀请');
     });
   }
+  // 一键开启局域网访问并重启(从提示里直接操作,免得用户去找「局域网访问」标签)。
+  if ($('lanEnableNowBtn')) $('lanEnableNowBtn').addEventListener('click', async () => {
+    const b = $('lanEnableNowBtn'); const o = b.textContent; b.disabled = true; b.textContent = '开启中…';
+    try {
+      cfg = await sv.setConfig({ lanEnabled: true });
+      if ($('lanEnabled')) $('lanEnabled').checked = true;
+      _qrLoaded = false;                          // 重启后端口/绑定变了,强制重生成二维码
+      await doRestart();                          // 绑 0.0.0.0 才生效
+      $('lanOffPrompt').hidden = true;
+    } catch (_) {}
+    b.disabled = false; b.textContent = o;
+  });
   $('startBtn').addEventListener('click', async () => { await sv.start().catch(() => {}); loadLocalAccount(); });
   $('stopBtn').addEventListener('click', () => sv.stop().catch(() => {}));
   $('restartBtn').addEventListener('click', doRestart);
@@ -577,6 +596,8 @@ async function init() {
   $('lanEnabled').addEventListener('change', async () => {
     cfg = await sv.setConfig({ lanEnabled: $('lanEnabled').checked });
     loadLan();
+    _qrLoaded = false;                                                   // 开关变了 → 二维码重生成
+    if (cfg.lanEnabled && $('lanOffPrompt')) $('lanOffPrompt').hidden = true;   // 已开 → 收起概览页引导
     if (cfg && cfg.mode === 'local' && last.state === 'running' && window.confirm(t('restart.settings_changed'))) await doRestart();
   });
   $('copyLanUrlBtn').addEventListener('click', async () => { await copy($('lanUrl').value); flash($('copyLanUrlBtn'), '已复制'); });

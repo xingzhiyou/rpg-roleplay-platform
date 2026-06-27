@@ -85,6 +85,10 @@
                 <div class="qrpop" id="qrPop" hidden><img id="qrImg" alt="局域网二维码" /><div class="muted-2 qrcap" id="qrCap" data-i18n="overview.qr_cap">手机扫码访问</div></div>
               </div>
               <span class="muted-2 openhint" data-i18n="overview.lan_hint">同网手机/平板扫码或访问</span>
+              <div class="lan-off-prompt" id="lanOffPrompt" hidden>
+                <span class="lan-off-msg">局域网访问未开启 —— 同网手机/平板无法扫码或访问。开启后后端会绑定 0.0.0.0(数据库仍只绑本机),需重启服务。</span>
+                <button class="btn lan-off-btn" id="lanEnableNowBtn">开启并重启服务</button>
+              </div>
             </div>
             <div class="openrow" id="lanInviteRow" hidden>
               <div class="splitbtn">
@@ -94,6 +98,13 @@
               </div>
               <a href="#" id="revokeInviteBtn" class="muted-2 openhint" data-i18n="overview.invite_revoke">停止邀请</a>
             </div>
+            <style>
+              .lan-off-prompt { display:flex; align-items:center; gap:12px; margin-top:10px; padding:9px 12px; border-radius:9px;
+                background:rgba(201,100,66,0.10); border:1px solid rgba(201,100,66,0.34); animation:lanOffIn .22s ease both; }
+              .lan-off-msg { font-size:12px; line-height:1.45; color:var(--text-2,#c9c1b6); flex:1; }
+              .lan-off-btn { white-space:nowrap; }
+              @keyframes lanOffIn { from { opacity:0; transform:translateY(-5px); } to { opacity:1; transform:none; } }
+            </style>
 
             <!-- 云端账户(在线模式)-->
             <div id="cloudAccount" class="acctblock" hidden>

@@ -95,3 +95,21 @@ def test_remove_then_readd_same_text_works():
     assert s.add_memory("notes", "可重添的笔记") is True
     assert s.data["memory"]["notes"] == ["可重添的笔记"]
     assert _active_item_texts(s) == ["可重添的笔记"]
+
+
+def test_remove_pinned_purges_items_and_gm_context():
+    """固定记忆(pinned)同样的「假删除」—— 行者无疆二次反馈。
+
+    pin_memory 走 add_memory('pinned',…)(legacy_bucket=pinned)同样 dual-write,
+    旧 remove_memory 同样只 pop bucket → 删了的固定记忆仍 active 留 items →
+    复活。本根因修复对 bucket 通用,这里显式钉死 pinned 也被覆盖。"""
+    s = GameState({"turn": 1, "memory": {}})
+    s.add_memory("pinned", "主角是穿越者")
+    s.add_memory("pinned", "守人房间有暗格")
+    assert "主角是穿越者" in _gm_memory_context(s)
+
+    s.remove_memory("pinned", 0)
+    assert s.data["memory"]["pinned"] == ["守人房间有暗格"]
+    assert "主角是穿越者" not in _active_item_texts(s, "pinned"), "被删固定记忆仍滞留 items(复活源)"
+    assert "主角是穿越者" not in _gm_memory_context(s), "被删固定记忆仍在 GM 上下文"
+    assert "守人房间有暗格" in _gm_memory_context(s)

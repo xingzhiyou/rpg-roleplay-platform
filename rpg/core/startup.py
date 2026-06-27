@@ -15,7 +15,7 @@ import os
 import uuid
 from contextlib import asynccontextmanager
 from contextvars import ContextVar
-from ipaddress import ip_address
+from ipaddress import ip_address, ip_network
 from json import JSONDecodeError
 from typing import TYPE_CHECKING
 from urllib.parse import urlsplit
@@ -59,6 +59,24 @@ API_VERSION = "1"
 MUTATING_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 
 _LOOPBACK_ORIGIN_REGEX = r"^https?://(?:localhost|127(?:\.\d{1,3}){3}|\[::1\])(?::\d{1,5})?$"
+# 本地/桌面自托管放行的来源:loopback + 私网 LAN(RFC1918)。让用户从手机 / 同网
+# 设备经 LAN IP(如 http://192.168.1.4:7860)访问桌面端服务器——邀请链接 / 登录 /
+# 打开存档。⚠️ 仅在本地模式(is_local_mode)启用;server/production 永不放宽。
+# 安全:Origin 由浏览器按页面真实来源填写,外部站点(evil.com)的 Origin 是其域名、
+# 非私网 IP,仍被拒;DNS rebinding 的 Origin 也是攻击者域名而非 IP,同样被拒。
+_PRIVATE_LAN_NETS = (
+    ip_network("10.0.0.0/8"),
+    ip_network("172.16.0.0/12"),
+    ip_network("192.168.0.0/16"),
+)
+_LOCAL_LAN_ORIGIN_REGEX = (
+    r"^https?://(?:"
+    r"localhost|127(?:\.\d{1,3}){3}|\[::1\]"          # loopback
+    r"|10(?:\.\d{1,3}){3}"                             # 10.0.0.0/8
+    r"|172\.(?:1[6-9]|2\d|3[01])(?:\.\d{1,3}){2}"      # 172.16–31.x.x
+    r"|192\.168(?:\.\d{1,3}){2}"                       # 192.168.x.x
+    r")(?::\d{1,5})?$"
+)
 
 # ── CORS origins 计算 ────────────────────────────────────────────────────
 
@@ -85,7 +103,9 @@ def _origin_allowed(origin: str | None) -> bool:
         return True
     if "*" in _origins or origin in _origins:
         return True
-    return _local_loopback_origins_allowed() and _is_loopback_origin(origin)
+    # 本地/桌面自托管放宽到 loopback + 私网 LAN(见 _is_local_origin);
+    # server/production 仍只认显式白名单 _origins。
+    return _local_loopback_origins_allowed() and _is_local_origin(origin)
 
 
 def _local_loopback_origins_allowed() -> bool:
@@ -93,8 +113,9 @@ def _local_loopback_origins_allowed() -> bool:
     return _is_local_mode()
 
 
-def _is_loopback_origin(origin: str) -> bool:
-    """本地开发/自托管允许 Vite 等前端服务使用任意 loopback 端口。"""
+def _is_local_origin(origin: str) -> bool:
+    """本地开发/自托管允许的来源:loopback + 私网 LAN(RFC1918)。
+    覆盖 Vite 等任意 loopback 端口,以及手机/同网设备经 LAN IP 访问桌面端服务器。"""
     try:
         parsed = urlsplit(origin)
     except ValueError:
@@ -107,9 +128,10 @@ def _is_loopback_origin(origin: str) -> bool:
     if host == "localhost" or host.endswith(".localhost"):
         return True
     try:
-        return ip_address(host).is_loopback
+        addr = ip_address(host)
     except ValueError:
         return False
+    return addr.is_loopback or any(addr in net for net in _PRIVATE_LAN_NETS)
 
 
 # ── lifespan (startup / shutdown) ────────────────────────────────────────
@@ -553,7 +575,7 @@ def configure_app(app: FastAPI) -> None:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=_origins,
-        allow_origin_regex=(_LOOPBACK_ORIGIN_REGEX if _local_loopback_origins_allowed() else None),
+        allow_origin_regex=(_LOCAL_LAN_ORIGIN_REGEX if _local_loopback_origins_allowed() else None),
         allow_credentials=_allow_credentials,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=(["*"] if not _allow_credentials else _allowed_request_headers),

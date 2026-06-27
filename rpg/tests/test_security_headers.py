@@ -117,18 +117,35 @@ class TestOriginAllowed:
             assert startup._origin_allowed("http://127.0.0.1:5175") is True
             assert startup._origin_allowed("http://[::1]:5176") is True
 
-    def test_local_mode_still_rejects_non_loopback_origins(self):
+    def test_local_mode_allows_private_lan_origins(self):
+        """桌面/自托管:手机/同网设备经 LAN IP(192.168/10/172.16-31)访问应放行——
+        修复「LAN 邀请链接/登录报 Origin 不在允许列表」。"""
+        from core import startup
+        with patch("core.startup._local_loopback_origins_allowed", return_value=True), \
+                patch.object(startup, "_origins", ["http://127.0.0.1:7860"]):
+            assert startup._origin_allowed("http://192.168.1.4:7860") is True
+            assert startup._origin_allowed("http://10.0.0.5:7860") is True
+            assert startup._origin_allowed("http://172.16.3.9:7860") is True
+            # 边界:172.15/172.32 不在私网段,应拒
+            assert startup._origin_allowed("http://172.15.0.1:7860") is False
+            assert startup._origin_allowed("http://172.32.0.1:7860") is False
+
+    def test_local_mode_still_rejects_non_loopback_non_lan_origins(self):
         from core import startup
         with patch("core.startup._local_loopback_origins_allowed", return_value=True), \
                 patch.object(startup, "_origins", ["http://127.0.0.1:7860"]):
             assert startup._origin_allowed("http://evil.example:5174") is False
+            # 公网 IP 不是私网段,即便本地模式也拒(防 DNS rebinding 到公网回指)
+            assert startup._origin_allowed("http://8.8.8.8:7860") is False
 
-    def test_server_mode_keeps_exact_origin_allowlist(self):
+    def test_server_mode_rejects_lan_origins(self):
+        """server/production 永不放宽:LAN IP 也必须被拒。"""
         from core import startup
         with patch("core.startup._local_loopback_origins_allowed", return_value=False), \
                 patch.object(startup, "_origins", ["https://rpg-roleplay.stellatrix.icu"]):
             assert startup._origin_allowed("https://rpg-roleplay.stellatrix.icu") is True
             assert startup._origin_allowed("http://localhost:5174") is False
+            assert startup._origin_allowed("http://192.168.1.4:7860") is False
 
 
 class TestHardenSetCookie:

@@ -428,13 +428,23 @@ def tavern_to_user_card(card_v2: dict[str, Any]) -> dict[str, Any]:
     d = card_v2["data"]
     raw_description = d.get("description", "")
     structured = _extract_structured_description(raw_description)
-    # mes_example 切第一条对话作为 sample_dialogue
+    # 无损 round-trip:本平台导出的卡带 extensions.stellatrix 全量结构化字段,直接采用、
+    # 免再从 description 解析(规避解析歧义)。非本平台卡则该键缺失,走 description 解析。
+    _ext = d.get("extensions") if isinstance(d.get("extensions"), dict) else {}
+    _stx = _ext.get("stellatrix") if isinstance(_ext.get("stellatrix"), dict) else None
+
+    def _sx(field: str, fallback: str) -> str:
+        if _stx and _stx.get(field):
+            return str(_stx[field])
+        return fallback
+
+    # mes_example → sample_dialogue:遍历**所有** <START> 块(旧实现首块后即 break,
+    # 多组示例对话只留第一条,round-trip 丢样例)。累计到 4 条为止。
     samples: list[str] = []
     for chunk in re.split(r"<START>|---", d.get("mes_example", "")):
         chunk = chunk.strip()
         if not chunk:
             continue
-        # 提取 {{char}}: 后的内容
         for line in chunk.splitlines():
             line = line.strip()
             if not line:
@@ -444,18 +454,18 @@ def tavern_to_user_card(card_v2: dict[str, Any]) -> dict[str, Any]:
                 samples.append(m.group(1).strip())
                 if len(samples) >= 4:
                     break
-        if samples:
+        if len(samples) >= 4:
             break
 
     return {
         "name": d["name"],
-        "identity": (structured.get("identity") if structured else raw_description)[:2000],
-        "background": structured.get("background", "")[:2000],
-        "appearance": structured.get("appearance", "")[:2000],
-        "personality": _join_text(d.get("personality", ""), structured.get("personality", ""), limit=1500),
-        "speech_style": structured.get("speech_style", "")[:1500],
-        "current_status": structured.get("current_status", "")[:1500],
-        "secrets": structured.get("secrets", "")[:1500],
+        "identity": _sx("identity", (structured.get("identity") if structured else raw_description))[:2000],
+        "background": _sx("background", structured.get("background", ""))[:2000],
+        "appearance": _sx("appearance", structured.get("appearance", ""))[:2000],
+        "personality": _sx("personality", _join_text(d.get("personality", ""), structured.get("personality", ""), limit=1500))[:1500],
+        "speech_style": _sx("speech_style", structured.get("speech_style", ""))[:1500],
+        "current_status": _sx("current_status", structured.get("current_status", ""))[:1500],
+        "secrets": _sx("secrets", structured.get("secrets", ""))[:1500],
         "sample_dialogue": samples,
         "tags": d.get("tags") or [],
         "metadata": {
@@ -645,28 +655,68 @@ def _minimal_png() -> bytes:
     return sig + ihdr + idat + iend
 
 
+# 平台结构化字段 → 带规范中文标签的 description(AI 可见)。标签取自 _LABEL_ALIASES 规范名,
+# 保证导出的酒馆卡再 import 回平台时,_extract_outline 能按标签原样拆回各字段(无损 round-trip)。
+# secrets 不进 description —— 它是「玩家知道但 GM/NPC 不应知道」的硬隔离字段,绝不泄漏到任何
+# 酒馆客户端的 AI 可见字段;只随 extensions.stellatrix 保存。
+_EXPORT_DESC_SECTIONS = (
+    ("身份", "identity"),
+    ("背景", "background"),
+    ("外貌", "appearance"),
+    ("语气", "speech_style"),
+    ("当前状态", "current_status"),
+)
+
+
 def user_card_to_tavern_v2(card: dict[str, Any]) -> dict[str, Any]:
-    """反向：本人卡 → V2 JSON 标准格式，可下载给酒馆用。"""
+    """反向:本人卡 → V2 JSON 标准格式,可下载给酒馆用。
+
+    根因修复(导出丢内容):旧实现 description 只取 identity,把 background(概述/身世)、
+    appearance(外貌)、speech_style(语气)、current_status(当前状态)全丢了 —— 平台 UI
+    里写的一大堆内容导出后几乎全空。现按规范标签拼全量 description;personality 单列;
+    并把结构化字段全量塞 extensions.stellatrix 供无损 round-trip(SillyTavern 忽略未知 extensions)。
+    """
     md = card.get("metadata") or {}
+
+    # description:按标签拼接所有非空结构化段(身份/背景/外貌/语气/当前状态)。
+    sections = []
+    for label, field in _EXPORT_DESC_SECTIONS:
+        val = str(card.get(field) or "").strip()
+        if val:
+            sections.append(f"{label}:\n{val}")
+    description = "\n\n".join(sections) or str(card.get("identity") or card.get("appearance") or "")
+
+    # first_mes:平台原生卡无此字段时退回首条 sample_dialogue,避免酒馆里角色开场白全空。
     samples = card.get("sample_dialogue") or []
-    # 合成 mes_example（SillyTavern 习惯）
-    mes_example = ""
-    if samples:
-        sample_blocks = []
-        for s in samples[:4]:
-            sample_blocks.append(f"<START>\n{{{{user}}}}: \n{{{{char}}}}: {s}")
-        mes_example = "\n".join(sample_blocks)
+    first_mes = md.get("first_mes") or (samples[0] if samples else "")
+
+    # mes_example:优先原文,否则从 sample_dialogue 合成(SillyTavern 习惯)。
+    mes_example = md.get("mes_example") or ""
+    if not mes_example and samples:
+        mes_example = "\n".join(
+            f"<START>\n{{{{user}}}}: \n{{{{char}}}}: {s}" for s in samples[:4]
+        )
+
+    # extensions.stellatrix:平台结构化字段全量无损保存,供再 import 精确还原(含 secrets,
+    # 不进 AI 可见 description)。SillyTavern 忽略未知 extensions,互不干扰。
+    ext = dict(md.get("extensions") or {})
+    ext["stellatrix"] = {
+        k: card.get(k)
+        for k in ("identity", "background", "appearance", "personality",
+                  "speech_style", "current_status", "secrets", "full_name", "aliases")
+        if card.get(k)
+    }
 
     return {
         "spec": "chara_card_v2",
         "spec_version": "2.0",
         "data": {
             "name": card.get("name", ""),
-            "description": card.get("identity", "") or card.get("appearance", ""),
+            "description": description,
             "personality": card.get("personality", ""),
             "scenario": md.get("scenario", ""),
-            "first_mes": md.get("first_mes", ""),
-            "mes_example": md.get("mes_example") or mes_example,
+            "first_mes": first_mes,
+            "mes_example": mes_example,
             "creator_notes": md.get("creator_notes", ""),
             "system_prompt": md.get("system_prompt", ""),
             "post_history_instructions": md.get("post_history_instructions", ""),
@@ -674,7 +724,7 @@ def user_card_to_tavern_v2(card: dict[str, Any]) -> dict[str, Any]:
             "tags": card.get("tags") or [],
             "creator": md.get("creator", ""),
             "character_version": md.get("character_version", "1.0"),
-            "extensions": md.get("extensions") or {},
+            "extensions": ext,
             "character_book": md.get("character_book"),
         },
     }

@@ -323,3 +323,70 @@ def test_export_produces_valid_parseable_card():
     # Must be parseable again
     re_parsed = parse_card(exported)
     assert re_parsed["data"]["name"] == "BackAndForth"
+
+
+# ── 平台原生卡导出:全量富文本不丢(行者反馈根因修复)──────────────────
+
+def _native_card() -> dict:
+    """模拟平台 UI 创建的原生卡(无 metadata.* 酒馆字段),富内容散在结构化列。"""
+    return {
+        "name": "莉穆雷",
+        "identity": "第十六代魔王的余女",
+        "background": "父亲是魔王,72岁前登基成为十七代魔王",
+        "appearance": "银色长发,血红色瞳孔",
+        "personality": "对外冷漠,标杆涟漪的国家领导者",
+        "speech_style": "温柔,轻佻,偶尔的腹黑与幽默",
+        "current_status": "魔界现任领袖",
+        "secrets": "其实暗恋主角",
+        "sample_dialogue": ["你来了。", "随我来。"],
+        "tags": ["魔王", "二次元"],
+        "metadata": {},
+    }
+
+
+def test_export_native_card_includes_all_rich_sections():
+    """根因:旧实现 description 只取 identity,把 background/appearance/speech_style/
+    current_status 全丢了。现在全量带标签拼进 description。"""
+    desc = user_card_to_tavern_v2(_native_card())["data"]["description"]
+    assert "第十六代魔王的余女" in desc   # identity
+    assert "72岁前登基" in desc          # background
+    assert "银色长发" in desc            # appearance
+    assert "偶尔的腹黑" in desc          # speech_style
+    assert "魔界现任领袖" in desc        # current_status
+    # personality 走酒馆独立字段,不混进 description
+    exported = user_card_to_tavern_v2(_native_card())
+    assert exported["data"]["personality"] == "对外冷漠,标杆涟漪的国家领导者"
+    # secrets 硬隔离:绝不进 AI 可见 description
+    assert "其实暗恋主角" not in desc
+
+
+def test_export_lossless_round_trip_via_stellatrix():
+    """extensions.stellatrix 全量保存结构化字段(含 secrets),再 import 精确还原。"""
+    card = _native_card()
+    exported = user_card_to_tavern_v2(card)
+    stx = exported["data"]["extensions"]["stellatrix"]
+    assert stx["secrets"] == "其实暗恋主角"          # 仅在 extensions,不在 description
+    assert stx["appearance"] == "银色长发,血红色瞳孔"
+
+    reimported = tavern_to_user_card(parse_card(exported))
+    for f in ("identity", "background", "appearance", "personality",
+              "speech_style", "current_status", "secrets"):
+        assert reimported[f] == card[f], f"{f} round-trip 丢失/变形"
+
+
+def test_export_first_mes_falls_back_to_first_sample():
+    """原生卡无 metadata.first_mes → 退回首条 sample_dialogue,避免酒馆开场白全空。"""
+    exported = user_card_to_tavern_v2(_native_card())
+    assert exported["data"]["first_mes"] == "你来了。"
+
+
+def test_import_mes_example_reads_all_start_blocks():
+    """旧实现首个 <START> 块后即 break,多组示例对话只留第一条。现读全部(≤4)。"""
+    v2 = minimal_v2()
+    v2["data"]["mes_example"] = (
+        "<START>\n{{user}}: A\n{{char}}: 回答一\n"
+        "<START>\n{{user}}: B\n{{char}}: 回答二\n"
+        "<START>\n{{user}}: C\n{{char}}: 回答三"
+    )
+    joined = " ".join(tavern_to_user_card(parse_card(v2))["sample_dialogue"])
+    assert "回答一" in joined and "回答二" in joined and "回答三" in joined

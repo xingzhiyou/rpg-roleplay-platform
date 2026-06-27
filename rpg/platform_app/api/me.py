@@ -825,7 +825,23 @@ async def api_export_tavern_png(card_id: int, user=Depends(require_user)):
     if not card:
         return json_response({"ok": False, "error": "card 不存在"}, status_code=404)
     v2 = tavern_cards.user_card_to_tavern_v2(card)
-    png = tavern_cards.write_png_card(v2)
+    # 用角色头像作 PNG 底图(旧实现总输出 1x1 透明像素,酒馆里看不到立绘)。
+    # 仅当头像是本地已存的 PNG 时嵌入(无 PIL 不转码);非 PNG / 取不到 → 退回最小 PNG,不报错。
+    template_png = None
+    avatar_path = card.get("avatar_path")
+    if isinstance(avatar_path, str) and avatar_path:
+        try:
+            from .. import storage as _storage
+            key = avatar_path.split("/api/storage/", 1)[-1]
+            if key and not key.startswith(("http://", "https://", "data:", "/")):
+                p = _storage.resolve_path(key)
+                if p.exists():
+                    raw = p.read_bytes()
+                    if raw[:8] == tavern_cards.PNG_SIGNATURE:
+                        template_png = raw
+        except Exception:
+            template_png = None
+    png = tavern_cards.write_png_card(v2, template_png=template_png)
     name = (card.get("name") or f"card_{card_id}").replace(" ", "_")
     return Response(
         content=png, media_type="image/png",

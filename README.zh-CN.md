@@ -34,12 +34,16 @@ RPG Roleplay 把一本长篇小说扔进一个自托管的 LLM 驱动的 RPG 运
 |---|---|
 | **Python 核心游戏循环**(state, op, scene, 骰子, 5E 核心, 遭遇, 物品栏, 检索, agents) | ✅ 稳定 |
 | **LLM 路由**(Anthropic 原生 / OpenAI Responses / Vertex Gemini / OpenAI 兼容) | ✅ 稳定 — 流式 + 工具调用 + 多模态 |
-| **Postgres + pgvector** 存储, v39+ 版本化迁移, 启动时自动加咨询锁顺序执行 | ✅ 稳定 |
+| **Postgres + pgvector** 存储, 90+ 版本化迁移, 启动时自动加咨询锁顺序执行 | ✅ 稳定 |
 | **Vite + React 19**, JSDoc 类型注解, 多页面入口 | ✅ 稳定 |
 | **可分支存档** — commit / ref / checkout 像 Git 一样工作 + 硬删 30 天宽限队列 | ✅ 稳定 |
 | **剧本导入** — TXT / ZIP 上传, 7 种章节切分, 自动抽角色卡 + 世界书 + 时间线 + 向量索引 | ✅ 稳定 |
 | **SillyTavern V2/V3 导入** — 角色卡(PNG tEXt / JSON) + 聊天记录(JSONL → 新存档) | ✅ 稳定 |
 | **酒馆模式** — SillyTavern 风 1:1 角色对话:拖卡即用、agent 工具(建/换角色、弹出选择、导入/导出卡)、本对话系统提示编辑、JSONL 往返 | ✅ 稳定 |
+| **剧本/小说编辑器**(`/md-editor`)— 三栏 IDE(文件树 · CodeMirror 6 · AI 侧栏)编辑章节 / 角色卡 / 世界书 / 人设,Markdown 无损往返;AI 写作搭档:正文内联 ghost-text 续写、逐块 diff 接受/拒绝、持久化 Problems 面板、可委派 BYOK 子模型 | ✅ 稳定 |
+| **原生 iOS / iPadOS 客户端**(SwiftUI,自带服务器地址)— 镜像网页游戏台;扫码登录、邀请链接加入、注册 / 验证码 / 找回密码 | 🟡 Beta |
+| **成就系统** — 声明式目录、解锁 toast、公开主页墙 | ✅ 稳定 |
+| **图像生成** — 封面 / 头像 / 聊天场景图 / 角色 + 人设立绘,统一模型层,BYOK | ✅ 稳定 |
 | **Provider 目录** — 10 家(Anthropic / OpenAI / Vertex / Google AI Studio / DeepSeek / DashScope / Hunyuan / MiMo / xAI / OpenRouter), BYOK 加密存储(AES-256-GCM HKDF per-user-per-api), 实时模型嗅探 | ✅ 稳定 |
 | **i18n** — 简体中文 + 英文, ~2000 keys, UI 全覆盖(设置 / 登录 / 平台 / 游戏 / 管理) | ✅ 稳定 |
 | **帮助系统** — 应用内 HelpDrawer, 27 个模块文档 | ✅ 稳定 |
@@ -71,9 +75,13 @@ RPG Roleplay 把一本长篇小说扔进一个自托管的 LLM 驱动的 RPG 运
 **[→ 下载 macOS / Windows(Releases)](https://github.com/felixchaos/rpg-roleplay-platform/releases)**
 
 - macOS(Apple 芯片)`.dmg` · Windows `.exe` —— 已签名/公证
-- 内置控制台:起停服务、日志、局域网共享(手机扫码访问)、备份恢复、应用内更新
+- 内置控制台:起停服务、日志、局域网共享(手机扫**登录二维码**免密码进自己的号,或扫**邀请二维码/链接**在你的实例上注册)、备份恢复、应用内更新
 - 自动创建本地账户;若要在局域网开放,可设用户名/密码
 - 更新渠道:优先 GitHub Releases,GitHub 慢时自动回退镜像
+
+### 原生 iOS / iPadOS 客户端
+
+一个 SwiftUI 配套客户端(自带服务器地址),镜像网页游戏台。可指向官方云端,也可指向你自部署的服务器;登录方式:手输账号密码,或**扫桌面端二维码** —— 扫自己的免密码登录码直接进号,或扫邀请链接在自部署局域网实例上注册。目前内测中。
 
 ### 从源码自部署 — 一条命令
 
@@ -163,7 +171,7 @@ open http://localhost:5173/Login.html
 ┌────────────────────────────┐   ┌────────────────────────────┐
 │  pgbouncer :6432           │   │  LLM providers (BYOK)      │
 │  Postgres 16 + pgvector    │   │  Anthropic · OpenAI ·      │
-│  v39+ migrations           │   │  Vertex (Gemini) ·         │
+│  90+ migrations            │   │  Vertex (Gemini) ·         │
 │                            │   │  DeepSeek · DashScope ·    │
 │  Redis :6379               │   │  Hunyuan · MiMo · xAI ·    │
 │  session · cache · ratelim │   │  OpenRouter                │
@@ -254,7 +262,7 @@ FastAPI 后端，~30+ 个路由模块 / agents / state mixin，~1k pytest 用例
 │   ├── chat_pipeline.py       # Phase 0-4 编排
 │   └── tests/                 # pytest 用例
 │
-├── frontend/                  # React 18 + Vite（多页 ESM）
+├── frontend/                  # React 19 + Vite（多页 ESM）
 │   ├── Login.html · Platform.html · Game Console.html
 │   └── src/
 │       ├── pages/             # settings/scripts/cards/saves/admin

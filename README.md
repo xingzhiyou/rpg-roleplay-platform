@@ -34,12 +34,16 @@ RPG Roleplay drops a long-form novel into a self-hosted, LLM-driven RPG runtime:
 |---|---|
 | **Python core game loop** (state, ops, scenes, dice, D&D 5E core, encounters, inventory, retrieval, agents) | ✅ Stable |
 | **LLM routing** (Anthropic native, OpenAI Responses, Vertex Gemini, OpenAI-compatible) | ✅ Stable, streaming + tool-use + multimodal |
-| **Postgres + pgvector storage**, v39+ versioned migrations, auto-apply on boot under advisory lock | ✅ Stable |
+| **Postgres + pgvector storage**, 90+ versioned migrations, auto-apply on boot under advisory lock | ✅ Stable |
 | **Vite + React 19**, JSDoc type annotations, multi-page entries | ✅ Stable |
 | **Branchable saves** — commit / ref / checkout work like Git, hard-delete with 30-day grace queue | ✅ Stable |
 | **Script ingestion** — TXT / ZIP upload, 7 chapter splitters, auto-extract character cards + worldbook + timeline, vector index | ✅ Stable |
 | **SillyTavern V2/V3 import** — character cards (PNG tEXt / JSON) + chat history (JSONL → new save) | ✅ Stable |
 | **Tavern Mode** — SillyTavern-style 1:1 character chat: drop-in cards, agent tools (create/swap character, popup choices, import/export card), per-conversation system-prompt editor, round-trip JSONL | ✅ Stable |
+| **Script & novel editor** (`/md-editor`) — three-pane IDE (file tree · CodeMirror 6 · AI side-panel) over chapters / cards / worldbook / personas with lossless Markdown round-trip; AI writing copilot: inline ghost-text continuation, per-hunk diff accept/reject, persistent Problems panel, delegated BYOK sub-models | ✅ Stable |
+| **Native iOS / iPadOS client** (SwiftUI, bring-your-own-server) — mirrors the web game console; QR scan-login, invite-link join, register / OTP / forgot-password | 🟡 Beta |
+| **Achievements** — declarative catalog, unlock toasts, public profile wall | ✅ Stable |
+| **Image generation** — covers / avatars / in-chat scene art / character + persona portraits, unified provider layer, BYOK | ✅ Stable |
 | **Provider catalog** — 10 providers (Anthropic / OpenAI / Vertex / Google AI Studio / DeepSeek / DashScope / Hunyuan / MiMo / xAI / OpenRouter), BYOK encrypted at-rest (AES-256-GCM HKDF per-user-per-api), live model sniffing | ✅ Stable |
 | **i18n** — zh-CN + en, ~2000 keys, full UI coverage (settings / login / platform / game / admin) | ✅ Stable |
 | **Help system** — in-app HelpDrawer with 27 module docs | ✅ Stable |
@@ -71,9 +75,13 @@ Don't want to touch a terminal? Download the desktop app — it bundles its own 
 **[→ Download for macOS / Windows (Releases)](https://github.com/felixchaos/rpg-roleplay-platform/releases)**
 
 - macOS (Apple Silicon) `.dmg` · Windows `.exe` — signed/notarized
-- Built-in console: start/stop the service, logs, LAN sharing (scan a QR from your phone), backup & restore, in-app updates
+- Built-in console: start/stop the service, logs, LAN sharing (a phone scans a **login QR** to sign in passwordlessly, or an **invite QR/link** to register on your instance), backup & restore, in-app updates
 - Auto-creates a local account; set a username/password if you expose it on your LAN
 - Update channel: pulls from GitHub Releases, falls back to a mirror if GitHub is slow
+
+### Native iOS / iPadOS app
+
+A SwiftUI companion client (bring-your-own-server) that mirrors the web game console. Point it at the official cloud or your own self-hosted server; sign in by typing your credentials or by **scanning a QR code** from the desktop app — either a passwordless login QR for your own account, or an invite link to register on a self-hosted LAN instance. Currently in private beta.
 
 ### Self-host from source — one command
 
@@ -163,7 +171,7 @@ You'll land on the Login page, create a user, then bounce to `Platform.html` (li
 ┌────────────────────────────┐   ┌────────────────────────────┐
 │  pgbouncer :6432           │   │  LLM providers (BYOK)      │
 │  Postgres 16 + pgvector    │   │  Anthropic · OpenAI ·      │
-│  v39+ migrations           │   │  Vertex (Gemini) ·         │
+│  90+ migrations            │   │  Vertex (Gemini) ·         │
 │                            │   │  DeepSeek · DashScope ·    │
 │  Redis :6379               │   │  Hunyuan · MiMo · xAI ·    │
 │  session · cache · ratelim │   │  OpenRouter                │
@@ -254,7 +262,7 @@ A full annotated example lives in `deploy/.env.example`.
 │   ├── chat_pipeline.py       # Phase 0-4 orchestration
 │   └── tests/                 # pytest cases
 │
-├── frontend/                  # React 18 + Vite (multi-page ESM)
+├── frontend/                  # React 19 + Vite (multi-page ESM)
 │   ├── Login.html · Platform.html · Game Console.html
 │   └── src/
 │       ├── pages/             # settings/scripts/cards/saves/admin

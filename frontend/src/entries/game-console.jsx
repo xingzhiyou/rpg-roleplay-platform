@@ -853,6 +853,10 @@ function App() {
     const restoreFailedDraft = () => {
       if (!isCurrentRun()) return;
       if (openedAssistant) return;
+      // 「保留未响应轮」(设置开关 gc.keepFailedTurn,默认关):失败/未响应/中断时不回退本轮玩家
+      // 气泡,保留在对话里,由错误条的「重试」按钮重发。开=直接 no-op(气泡即本轮记录,
+      // 输入框已在发送时清空;失败轮不落库,推进/重试时会被后端真值自然替换)。
+      if (lsGet('gc.keepFailedTurn') === 'on') return;
       setText((cur) => (String(cur || '').trim() ? cur : playerText));
       setAttachments((cur) => (Array.isArray(cur) && cur.length ? cur : sentAttachments));
       setHistory((h) => {

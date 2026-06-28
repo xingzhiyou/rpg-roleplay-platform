@@ -3317,6 +3317,8 @@
         "off": "Off",
         "show_usage_label": "Show Token Usage",
         "show_usage_desc": "Display input/output tokens, cost, and context usage below the input box each turn",
+        "keep_failed_label": "Keep Unanswered Turns",
+        "keep_failed_desc": "When a turn gets no reply or generation fails, keep your message and show Retry instead of auto-reverting it",
         "steering_label": "Steering Strength",
         "steering_desc": "Rail = strong anchors; Guided = gentle default; Free = no injection",
         "steer_rail": "Rail",

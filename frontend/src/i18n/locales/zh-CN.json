@@ -3408,6 +3408,8 @@
         "off": "关闭",
         "show_usage_label": "显示 token 用量",
         "show_usage_desc": "每轮在输入框下方显示输入/输出 tokens、费用与上下文占用",
+        "keep_failed_label": "保留未响应的对话",
+        "keep_failed_desc": "当本轮无回复或生成失败时,保留你的发言并显示「重试」,而不是自动撤回",
         "steering_label": "剧情引导强度",
         "steering_desc": "贴原著=强力锚点;软引导=默认温和;自由=不注入",
         "steer_rail": "贴原著",

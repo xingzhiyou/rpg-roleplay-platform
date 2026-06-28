@@ -1333,6 +1333,10 @@ function _readAutosave() {
 function _readShowUsage() {
   return lsGet("rpg.showTokenUsage") === "on";
 }
+// A#2:未响应/失败时保留本轮对话(可重试),不回退玩家气泡 — 默认关闭(=== "on")
+function _readKeepFailedTurn() {
+  return lsGet("gc.keepFailedTurn") === "on";
+}
 
 function GameSettingsModal({ open, onClose, saveTitle, permission, saveId }) {
   const { t } = useTranslation();
@@ -1340,6 +1344,7 @@ function GameSettingsModal({ open, onClose, saveTitle, permission, saveId }) {
   const [narrativeFont, setNarrativeFontState] = useStateA(_readNarrativeFont);
   const [autosave, setAutosaveState] = useStateA(_readAutosave);
   const [showUsage, setShowUsageState] = useStateA(_readShowUsage);
+  const [keepFailedTurn, setKeepFailedTurnState] = useStateA(_readKeepFailedTurn);
   // null = 尚未从后端拉到本档真实值;加载期不高亮任何档,避免先闪默认「软引导」再跳真值(被误读成"自己回跳")
   const [steerStrength, setSteerStrength] = useStateA(null);
 
@@ -1388,6 +1393,12 @@ function GameSettingsModal({ open, onClose, saveTitle, permission, saveId }) {
     lsSet("rpg.showTokenUsage", v ? "on" : "off");
     // App(game-console)监听此事件即时显隐 footer,无需刷新
     window.dispatchEvent(new CustomEvent("rpg-show-usage-change", { detail: v }));
+  };
+
+  const handleKeepFailedTurn = (v) => {
+    setKeepFailedTurnState(v);
+    // 纯前端:game-console 的 restoreFailedDraft 在失败时即时读 localStorage,无需事件/刷新
+    lsSet("gc.keepFailedTurn", v ? "on" : "off");
   };
 
   const handleSteerStrength = (v) => {
@@ -1517,6 +1528,20 @@ function GameSettingsModal({ open, onClose, saveTitle, permission, saveId }) {
                      onChange={(e) => handleShowUsage(e.target.checked)}
                      style={{width: 15, height: 15, cursor: "pointer"}} />
               <span style={{fontSize: 12.5, color: "var(--text-quiet)"}}>{showUsage ? t('game.app.settings.on') : t('game.app.settings.off')}</span>
+            </label>
+          </div>
+
+          {/* ── 保留未响应轮(可重试) ── */}
+          <div style={rowStyle}>
+            <div style={labelStyle}>
+              <div>{t('game.app.settings.keep_failed_label')}</div>
+              <div style={sublabelStyle}>{t('game.app.settings.keep_failed_desc')}</div>
+            </div>
+            <label style={{display: "flex", alignItems: "center", gap: 8, cursor: "pointer", flexShrink: 0}}>
+              <input type="checkbox" checked={keepFailedTurn}
+                     onChange={(e) => handleKeepFailedTurn(e.target.checked)}
+                     style={{width: 15, height: 15, cursor: "pointer"}} />
+              <span style={{fontSize: 12.5, color: "var(--text-quiet)"}}>{keepFailedTurn ? t('game.app.settings.on') : t('game.app.settings.off')}</span>
             </label>
           </div>
 

@@ -9,6 +9,11 @@ Version scheme: **SemVer** `MAJOR.MINOR.PATCH[-channel.N][+build]` since `v0.5.0
 
 ## [Unreleased]
 
+## [1.28.4] - 2026-06-28 (@ 9d9412e43)
+
+### Added
+- **RP harness 基准框架扩展(`rpg/bench/`,离线工具零运行时):** replay A/B 引擎——真实存档上下文喂【线上记录基线】vs【候选 OpenAI 兼容模型/提示词】,同 metrics 并排打分;确定性核心指标 `unknown_speaker`+`prior_echo`;写小说续写基准——真实章节前半→续写→比真实后半(style_overlap/canon_drift/prefix_copy/gen_repeat/length_ratio)。`bench/README.md` 三模式用法。本地真实数据(deepseek-v4-flash)验证通过。
+
 ## [1.28.3] - 2026-06-28 (@ e09cbbee0)
 
 ### Fixed

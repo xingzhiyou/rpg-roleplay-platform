@@ -122,3 +122,42 @@ def m_canon(resp: str, ctx: dict) -> dict:
         if any(nm and len(nm) >= 2 and nm in s for nm in names):
             hits += 1
     return {"canon_hits": hits, "engaged": bool(hits)}
+
+
+# ── 脱离 canon 的"开口说话者"(确定性核心检查·grounding)──────────────────────
+# 抽"名字+(语气)+说话动词"的说话者,凡不在 canon 角色表、且非代词 → 计为脱离 canon 的
+# 临场角色。不是非黑即白(新 NPC 合法),作 info 信号:某 harness 凭空造越多说话者 = 越脱离设定。
+_SPEAKER_RE = re.compile(
+    r"([一-鿿]{2,4})(?:[一-鿿]{0,3}地|[一-鿿]{0,2})?"
+    r"(?:说道|说|道|问道|问|答道|答|喊道|喊|叫道|低声|沉声|冷笑|轻声)[:：\"「]"
+)
+_PRONOUNS = {"你", "我", "他", "她", "它", "我们", "你们", "他们", "她们", "对方", "众人", "有人", "那人"}
+
+
+@metric("unknown_speaker", {"off_canon_speakers": "info"})
+def m_unknown_speaker(resp: str, ctx: dict) -> dict:
+    s = resp or ""
+    aliases: dict[str, list[str]] = ctx.get("canon_aliases") or {}
+    canon_names = {nm for names in aliases.values() for nm in names if nm}
+    speakers = {m.group(1) for m in _SPEAKER_RE.finditer(s)}
+    off = {sp for sp in speakers
+           if sp not in _PRONOUNS and not any(sp in cn or cn in sp for cn in canon_names)}
+    return {"off_canon_speakers": len(off)}
+
+
+# ── 复述上一轮(确定性核心检查·degeneration):GM 把前一轮的句子原样回炒 = 卡住/失忆 ──
+@metric("prior_echo", {"echo_ratio": "lower"})
+def m_prior_echo(resp: str, ctx: dict) -> dict:
+    prior = ctx.get("prior_assistant") or []
+    prev = prior[-1] if prior else ""
+    if not prev or not resp:
+        return {"echo_ratio": 0.0}
+    n = 10
+    prev_grams = {prev[i:i + n] for i in range(max(0, len(prev) - n))}
+    if not prev_grams:
+        return {"echo_ratio": 0.0}
+    resp_grams = [resp[i:i + n] for i in range(max(0, len(resp) - n))]
+    if not resp_grams:
+        return {"echo_ratio": 0.0}
+    echoed = sum(1 for g in resp_grams if g in prev_grams)
+    return {"echo_ratio": round(echoed / len(resp_grams), 4)}

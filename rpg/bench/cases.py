@@ -47,7 +47,8 @@ def load_save_cases(db, save_id: int) -> list[dict[str, Any]]:
     canon = _load_canon_aliases(db, script_id)
 
     cases: list[dict[str, Any]] = []
-    prior_assistant: list[str] = []
+    prior_full: list[dict[str, str]] = []     # 完整前文(user+assistant 交替),供 replay 重建
+    prior_assistant: list[str] = []           # 仅 assistant,供 prior_echo 等指标
     pending_user = ""
     turn = 0
     for h in history:
@@ -56,14 +57,18 @@ def load_save_cases(db, save_id: int) -> list[dict[str, Any]]:
         role, content = h.get("role"), (h.get("content") or "")
         if role == "user":
             pending_user = content
+            prior_full.append({"role": "user", "content": content})
         elif role == "assistant":
             if not content.strip():
                 continue
             cases.append({
                 "save_id": save_id, "script_id": script_id, "turn_idx": turn,
                 "player_input": pending_user, "gm_response": content,
-                "prior_assistant": list(prior_assistant), "canon_aliases": canon,
+                "prior": list(prior_full[-8:]),          # 末 8 条,控提示长度
+                "prior_assistant": list(prior_assistant),
+                "canon_aliases": canon,
             })
+            prior_full.append({"role": "assistant", "content": content})
             prior_assistant.append(content)
             pending_user = ""
             turn += 1

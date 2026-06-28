@@ -9,6 +9,11 @@ Version scheme: **SemVer** `MAJOR.MINOR.PATCH[-channel.N][+build]` since `v0.5.0
 
 ## [Unreleased]
 
+## [1.28.5] - 2026-06-28 (@ 6ea0ad03e)
+
+### Fixed
+- **固定记忆删改「可以删但一推进剧情就回归原样」(行者无疆,第四层根因,真库复现+回归测试)**:根因在 `persist_runtime_state` 的指针发散守卫。回合后 `game_saves.active_commit_id` 领先、`user_runtime` 由 `update_active_node` 异步同步**滞后**,旧逻辑一看 `db_active != commit_id` 就**无条件** `state_data = db_snapshot`,把刚做的 out-of-turn 编辑(固定记忆/笔记增删)连同 incoming state 一起丢掉 → 删除在缓存里生效(面板显示删了),但持久层是旧值,**一推进剧情(回合加载真值)就回退**。修:指针滞后 ≠ state 过时(异步窗口里 loaded state 往往是最新的);仅当 incoming 质量确实更低(基于更早回合、history 更短)才采用 db_snapshot,否则保留 incoming。真库复现发散场景 + 验证(发散删除保留 / 真过时仍防丢回合)。这是该反复 bug 的第四层(前三层:dual-write 同步 / 豁免归档 / 跨 worker 缓存 hash 漂移)。
+
 ## [1.28.4] - 2026-06-28 (@ 9d9412e43)
 
 ### Added

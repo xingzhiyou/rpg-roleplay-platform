@@ -184,12 +184,20 @@ def persist_runtime_state(
         # 的 state_data 基于过时 commit:此时不回退指针、也不用过时 state 覆盖 state_snapshot,
         # 改用 DB 当前真相(指针与快照保持不变),dirty 态留待下次 checkpoint 重存。
         db_active = int(save.get("active_commit_id") or save.get("active_branch_node_id") or 0)
+        # 指针发散(回合后 game_saves 领先、user_runtime 由 update_active_node 异步同步滞后)时:
+        # 把 commit_id 校正到 DB 当前真相,但**不再无条件丢弃 incoming state**。
+        # 指针滞后 ≠ state 过时 —— 异步同步窗口里 loaded state 往往就是最新的(玩家在最新回合上做了
+        # out-of-turn 编辑)。只在 incoming 确实更旧(基于更早回合、质量更低)时才采用 db_snapshot。
+        # 根因:旧逻辑按"指针滞后"丢 incoming,把"刚推进过剧情时的固定记忆/笔记增删"一并丢掉 →
+        # 用户报「固定记忆删了又回来 / 可以删但一推进剧情就回归原样」。真库已复现 + 验证。
+        _incoming_stale = _snapshot_quality(state_data) + 5 < _snapshot_quality(db_snapshot)
         if db_active and commit_id and db_active != commit_id:
             commit_id = db_active
             ref_id = int(save.get("active_branch_ref_id") or 0) or ref_id
-            state_data = db_snapshot
             state_path = Path(save.get("state_path") or state_path)
-        elif _snapshot_quality(state_data) + 5 < _snapshot_quality(db_snapshot):
+            if _incoming_stale:
+                state_data = db_snapshot
+        elif _incoming_stale:
             state_data = db_snapshot
             state_path = Path(save.get("state_path") or state_path)
         # 同步酒馆角色/persona 卡列与 state JSON 对齐(LLM 工具只 mutate JSON,不写列;

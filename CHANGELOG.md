@@ -9,6 +9,11 @@ Version scheme: **SemVer** `MAJOR.MINOR.PATCH[-channel.N][+build]` since `v0.5.0
 
 ## [Unreleased]
 
+## [1.31.1] - 2026-06-29
+
+### Fixed
+- **txt 导出残留代码围栏**:`export_transcript_txt` 的清洗只过开场三件套(按合法 op 模式匹配),漏掉**畸形 / 未闭合**的 ```json 围栏(如 GM 偶发吐出 ```json\n[, 截断块)。真库 save 268 导出实测仍含 1 处。修:清洗末尾再整块去代码围栏——先去成对 ```...```,再去单条未闭合 ``` 到本条消息结尾。对「当小说」更干净。
+
 ## [1.31.0] - 2026-06-29
 
 ### Added

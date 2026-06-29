@@ -117,13 +117,20 @@ def export_save(user_id: int, save_id: int) -> dict[str, Any]:
 
 
 def _clean_gm_text(text: str) -> str:
-    """剥掉给玩家不该看的 ops JSON / 工具脚手架 → 人类可读正文(同开场清洗三件套)。"""
+    """剥掉给玩家不该看的 ops JSON / 工具脚手架 / 代码围栏 → 人类可读正文(当小说)。"""
+    import re
     from state.json_ops import (
         strip_json_state_ops,
         strip_leaked_scaffold,
         strip_meta_tool_preamble,
     )
-    return strip_leaked_scaffold(strip_meta_tool_preamble(strip_json_state_ops(text or ""))).strip()
+    s = strip_leaked_scaffold(strip_meta_tool_preamble(strip_json_state_ops(text or "")))
+    # 残留代码围栏对「当小说」是噪声(含畸形/未闭合的 ops,如 ```json\n[, —— 三件套按合法 op 模式
+    # 匹配会漏掉)→ 整块去掉:先去成对 ```...```,再去单条未闭合 ``` 到本条消息结尾(逐条独立清洗)。
+    s = re.sub(r"```[\s\S]*?```", "", s)
+    s = re.sub(r"```[\s\S]*$", "", s)
+    s = re.sub(r"\n{3,}", "\n\n", s)
+    return s.strip()
 
 
 def _clean_player_text(text: str) -> str:

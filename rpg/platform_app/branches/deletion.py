@@ -18,7 +18,7 @@ from platform_app.branches.refs import (
     _upsert_ref,
     _write_checkout,
 )
-from platform_app.branches.tree_ops import collect_ids, message_row_by_index, round_start_node, tree
+from platform_app.branches.tree_ops import collect_ids, round_start_node, tree
 from platform_app.db import connect, expose, init_db
 
 
@@ -88,7 +88,7 @@ def rollback_to_message(
     save_id: int,
     message_index: int,
 ) -> dict[str, Any]:
-    """task 116c — 删除消息 N 及之后所有 → 软回滚到 turn (N//2 - 1) 的 round commit。"""
+    """task 116c — 删除消息 N 及之后所有 → 软回滚到 turn (N//2) 的 round commit(与 fork 同口径)。"""
     init_db()
     msg_index = int(message_index)
     if msg_index < 0:
@@ -106,40 +106,49 @@ def rollback_to_message(
         if not save:
             raise ValueError("无权访问该存档,或存档不存在")
 
-        target_msg = message_row_by_index(db, save_id, msg_index)
-        if target_msg:
-            deleted_turn = int(target_msg["turn"])
-            target_message_id = int(target_msg["id"])
-            target_message_role = str(target_msg["role"] or "")
-        else:
-            deleted_turn = msg_index // 2
-            target_message_id = None
-            target_message_role = "user" if msg_index % 2 == 0 else "assistant"
-        target_turn = deleted_turn - 1
+        current_commit_id = save.get("active_commit_id") or save.get("active_branch_node_id")
 
+        # 「删除消息 N 及之后」→ 软回滚到 frontend history 约定下应保留的 round commit。
+        # 前端 history index 约定(与 resolve_commit_id_by_message=fork 同口径):history[0]=GM 开场白
+        # (不落 messages 表),其后 [玩家,GM] 交替 → index N 落在 round 边界 turn = N//2:保留到 turn
+        # N//2、删除 turn N//2+1 起。**绝不**用 message_row_by_index(读 flat messages 表:含开场空
+        # user 行 + 非分支隔离 → 与 blob history 错位 ≥1 位),那正是群反馈「删除会多回退一个回合、要去
+        # 分支树手动切回来」的根因——fork 路径早改成 N//2,delete 路径漏同步(v1.28.1 分支隔离后错位更大)。
+        target_turn = msg_index // 2
+        deleted_turn = target_turn + 1
+        target_message_role = "user" if msg_index % 2 == 1 else "assistant"
+
+        # 沿**活跃 commit 血缘**定位 turn=target_turn 的 commit(多分支隔离,内联 resolve_commit_id_by_message
+        # 同款递归查询——不可直接调用它:会在本 advisory 锁内嵌套开连接致连接池死锁,见 5f0319a73)。
+        # 血缘里缺该 turn(缺口)则取 ≤target_turn 的最近一个;再不行回退 root。
         target_commit = None
-        if target_turn >= 0:
-            target_commit = db.execute(
+        active_cid = int(current_commit_id or 0)
+        if active_cid and target_turn >= 0:
+            row = db.execute(
                 """
-                select * from branch_commits
-                where save_id = %s and turn_index = %s and kind in ('round', 'gm', 'player')
-                order by id desc limit 1
+                with recursive lineage(id, parent_id, turn_index) as (
+                    select id, parent_id, turn_index from branch_commits
+                    where id = %s and save_id = %s
+                    union all
+                    select bc.id, bc.parent_id, bc.turn_index from branch_commits bc
+                    join lineage l on bc.id = l.parent_id
+                )
+                select id from lineage where turn_index <= %s order by turn_index desc, id desc limit 1
                 """,
-                (save_id, target_turn),
+                (active_cid, save_id, target_turn),
             ).fetchone()
-        if not target_commit and target_turn <= 0:
+            if row:
+                target_commit = db.execute(
+                    "select * from branch_commits where id = %s", (row["id"],)
+                ).fetchone()
+        if not target_commit:
             target_commit = db.execute(
-                """
-                select * from branch_commits
-                where save_id = %s and kind = 'root'
-                order by id asc limit 1
-                """,
+                "select * from branch_commits where save_id = %s and kind = 'root' order by id asc limit 1",
                 (save_id,),
             ).fetchone()
         if not target_commit:
             raise ValueError(f"找不到 turn {target_turn} 的 commit,无法回滚")
 
-        current_commit_id = save.get("active_commit_id") or save.get("active_branch_node_id")
         trash_ref = None
         if current_commit_id and current_commit_id != target_commit["id"]:
             ts = time.strftime("%Y%m%d-%H%M%S")
@@ -153,21 +162,12 @@ def rollback_to_message(
         _set_save_active(db, save_id, target_commit["id"], new_ref["id"])
         _write_checkout(db, user_id, save_id, new_ref["id"], target_commit["id"])
 
-        if target_message_id is not None:
-            deleted_messages = db.execute(
-                """
-                delete from messages
-                where save_id = %s
-                  and (turn > %s or (turn = %s and id >= %s))
-                returning id
-                """,
-                (save_id, deleted_turn, deleted_turn, target_message_id),
-            ).fetchall()
-        else:
-            deleted_messages = db.execute(
-                "delete from messages where save_id = %s and turn >= %s returning id",
-                (save_id, deleted_turn),
-            ).fetchall()
+        # messages 表为 kb_native 的衍生展示表(真相在目标 commit 的 state_snapshot blob),按 turn
+        # 清理 ≥deleted_turn 即可;指针/状态已回到 target_commit,前端 materialize 读 blob 得到正确截断。
+        deleted_messages = db.execute(
+            "delete from messages where save_id = %s and turn >= %s returning id",
+            (save_id, deleted_turn),
+        ).fetchall()
         n_msgs = len(deleted_messages or [])
 
         deleted_anchors = db.execute(

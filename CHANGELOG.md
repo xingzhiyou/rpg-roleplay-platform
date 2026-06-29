@@ -9,6 +9,11 @@ Version scheme: **SemVer** `MAJOR.MINOR.PATCH[-channel.N][+build]` since `v0.5.0
 
 ## [Unreleased]
 
+## [1.30.1] - 2026-06-29
+
+### Fixed
+- **「删除此消息及以后」多回退一个回合(群反馈,行者无疆/晓卡/星之游「修了一个出来两个」)**:`rollback_to_message`(delete 路径)用 `message_row_by_index` 读 flat `messages` 表定位回退点,但该表含开场空 user 行、且非分支隔离 → 与前端 blob history index 错位 ≥1 位,导致软回滚的目标 commit 系统性偏早一回合(要手动去分支树切回来)。fork 路径(`resolve_commit_id_by_message`)早已改用 `msg_index//2` + 活跃血缘,delete 路径漏同步;v1.28.1 分支隔离 materialize 让 messages 表与 blob 进一步背离、放大错位。修:delete 与 fork 同口径——`target_turn = msg_index//2`,内联活跃 commit 血缘递归定位(不调用 fork 版以免在 advisory 锁内嵌套开连接致池死锁),不再用 `message_row_by_index`。真库 save 268 跨 index 1..7 验证NEW 恒为 OLD+1 且落在真实 turn;加源码不变量回归守卫。
+
 ## [1.30.0] - 2026-06-29
 
 ### Added

@@ -79,24 +79,35 @@ def import_state(db, save_id: int, commit_id: int, state_data: dict) -> dict[str
     # 2) 事实/事件 → kb_events(分别标 source 以便无损还原 memory.facts vs world.known_events)
     mem = dict(sd.get("memory") or {})
     world = dict(sd.get("world") or {})
-    for i, f in enumerate(mem.get("facts") or []):
+    # 去重保序(同一文本绝不占多个 fact:{i})。index-keyed:桶收缩/重排后高 index 的旧 fact:{i} 会变孤儿,
+    # 不退役就被 materialize 重复读出 → 「事实库重复条目」累积根因。故写完按当前长度退役高 index 孤儿。
+    _facts = list(dict.fromkeys(str(f) for f in (mem.get("facts") or []) if f is not None and str(f).strip()))
+    for i, summ in enumerate(_facts):
         lk = f"fact:{i}"
-        summ = f if isinstance(f, str) else str(f)
         if cur_evt.get(lk) == summ:
             n_skip += 1
             continue
         live_repo.record_event(db, save_id, commit_id, lk, summary=summ,
                                story_time=str(world.get("time") or ""), metadata={"source": "memory.facts"})
         n_evt += 1
-    for i, ev in enumerate(world.get("known_events") or []):
+    _kevts = list(dict.fromkeys(str(e) for e in (world.get("known_events") or []) if e is not None and str(e).strip()))
+    for i, summ in enumerate(_kevts):
         lk = f"kevt:{i}"
-        summ = ev if isinstance(ev, str) else str(ev)
         if cur_evt.get(lk) == summ:
             n_skip += 1
             continue
         live_repo.record_event(db, save_id, commit_id, lk, summary=summ,
                                story_time=str(world.get("time") or ""), metadata={"source": "world.known_events"})
         n_evt += 1
+    # 退役孤儿 index(桶变短/去重后 index 超界的旧 fact:/kevt: 行):只退当前可见且确属孤儿的,根治累积。
+    for lk in list(cur_evt):
+        prefix, _, idx_s = lk.partition(":")
+        if not idx_s.isdigit():
+            continue
+        idx = int(idx_s)
+        if (prefix == "fact" and idx >= len(_facts)) or (prefix == "kevt" and idx >= len(_kevts)):
+            live_repo.retire_event(db, save_id, commit_id, lk)
+            n_evt += 1
 
     # 3) 玩家自身 → kb_entities(_player)
     player = dict(sd.get("player") or {})
@@ -133,10 +144,23 @@ def materialize(db, save_id: int, commit_id: int) -> dict[str, Any]:
 
     # 事件层 → 还原 memory.facts / world.known_events(按 source)
     evts = live_repo._newest_visible(db, "kb_events", save_id, commit_id, ("logical_key", "summary", "metadata"))
+    # ⚠️ 按文本去重(保序):事实/事件用 index-keyed logical_key(fact:{i}/kevt:{i}),桶收缩/重排后
+    # 高 index 的旧行未退役会残留 → 同一文本落在多个 logical_key 上,_newest_visible 各取一行 →
+    # materialize 重复读(群反馈「事实库大量重复条目」,真库 save 268 实测 149 条仅 41 唯一)。这里按
+    # summary 去重,让所有存档下次加载即干净;import_state 侧再退役孤儿根治累积(见下)。
     facts, kevts = [], []
+    _seen_f: set[str] = set()
+    _seen_k: set[str] = set()
     for e in sorted(evts, key=lambda x: x["logical_key"]):
         src = (e.get("metadata") or {}).get("source")
-        (facts if src == "memory.facts" or e["logical_key"].startswith("fact:") else kevts).append(e["summary"])
+        summ = e["summary"]
+        if src == "memory.facts" or e["logical_key"].startswith("fact:"):
+            if summ not in _seen_f:
+                _seen_f.add(summ)
+                facts.append(summ)
+        elif summ not in _seen_k:
+            _seen_k.add(summ)
+            kevts.append(summ)
     state.setdefault("memory", {})
     if facts or "memory" in state:
         state["memory"]["facts"] = facts

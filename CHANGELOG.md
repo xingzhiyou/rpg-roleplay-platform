@@ -9,6 +9,11 @@ Version scheme: **SemVer** `MAJOR.MINOR.PATCH[-channel.N][+build]` since `v0.5.0
 
 ## [Unreleased]
 
+## [1.31.3] - 2026-06-29
+
+### Fixed
+- **事实库大量重复条目(群反馈,行者无疆「这一条就有9条」)**:kb_native 档的 `memory.facts`/`world.known_events` 用 index-keyed logical_key(`fact:{i}`/`kevt:{i}`)存进 kb_events。桶收缩 / 重排后,高 index 的旧 `fact:{i}` 行**不退役**,同一文本残留在多个 logical_key 上,`_newest_visible` 各取一行 → `materialize` 重复读出(真库 save 268 实测 memory.facts 149 条仅 41 唯一,某条 ×15),且自我累积(materialize 重复→import 写更多 index)。修两层:① `save_kb.materialize` 按 summary 去重(保序)→ 所有存档**下次加载即干净**(显示 + GM 上下文);② `save_kb.import_state` 写前桶去重 + 写后按当前长度**退役高 index 孤儿** → 根治累积,存档下回合自愈、不再增长。真库 save 268 materialize 验证 + 回归测试 test_kb_facts_dedup。
+
 ## [1.31.2] - 2026-06-29
 
 ### Fixed

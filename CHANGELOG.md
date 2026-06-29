@@ -9,6 +9,11 @@ Version scheme: **SemVer** `MAJOR.MINOR.PATCH[-channel.N][+build]` since `v0.5.0
 
 ## [Unreleased]
 
+## [1.31.2] - 2026-06-29
+
+### Fixed
+- **游戏内切换模型不生效 / 永远跑旧模型(群反馈,白玖,反复出现)**:真根因=`persist_session_model` 的 SELECT `join user_runtime ur on ur.checkout_id=rc.id` 引用了 **user_runtime 不存在的列 checkout_id** → 每次抛 UndefinedColumn 被外层 except 静默吞掉 → session_model 从不落 runtime_checkouts → 跨 worker 模型漂移检测(读 DB session_model)永远拿不到新值,逻辑对但数据源被静默掐断。workers=4 下切换只在处理该请求的 worker 内存生效,绝大多数 GM 请求落到没切过的 worker → 旧模型(日志 [GM] zhipu …)。修:persist 改按 (user_id,save_id) 取 runtime_checkouts(与 read_runtime/_attach_db_state 同一行,该组合唯一)。第二层(kb_native):materialize 从 kb_worldline_vars 拿到的是上回合旧 session_model 会 clobber 刚切的值 → `_kb_backed_state` 保留 working-tree (runtime_checkouts)的 session_model。真库往返复现 + 回归测试。
+
 ## [1.31.1] - 2026-06-29
 
 ### Fixed

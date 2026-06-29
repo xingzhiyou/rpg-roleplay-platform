@@ -814,6 +814,13 @@ def _kb_backed_state(state: "GameState", save_id: int, commit_id: int) -> "GameS
             _wl[_tk] = _blob_wl[_tk]
     if _wl:
         data["worldline"] = _wl
+    # session_model 是「游戏内手动切模型」的瞬态:out-of-turn 编辑,只落 runtime_checkouts working-tree,
+    # **不随回合 import 进 KB**。materialize 从 kb_worldline_vars 拿到的是上次回合的旧值 → 会把刚切的新
+    # 模型打回旧的(kb_native 档「切了不生效」的第二层:即便 persist 修好、漂移触发重载,materialize 仍
+    # clobber)。working-tree(传入的 blob state,来自 runtime_checkouts 优先级1)更新 → 以它为准。
+    _blob_sm = (getattr(state, "data", {}) or {}).get("session_model") or {}
+    if isinstance(_blob_sm, dict) and _blob_sm.get("model_id"):
+        data["session_model"] = _blob_sm
     data["_active_save_id"] = save_id  # materialize 丢瞬态指针,这里补回
     return GameState(data)
 

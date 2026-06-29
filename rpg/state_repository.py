@@ -320,14 +320,19 @@ def persist_session_model(
     try:
         init_db()
         with connect() as db:
-            # 找到当前 save 的 runtime_checkout
+            # 找到当前 save 的 runtime_checkout —— 必须命中 read_runtime/_attach_db_state 取的同一行
+            # (它按 user_id+save_id 取;runtime_checkouts 上 (user_id,save_id) 唯一)。
+            # ⚠️ 旧实现 `join user_runtime ur on ur.checkout_id = rc.id` —— **user_runtime 根本没有
+            # checkout_id 列**,SELECT 每次抛 UndefinedColumn 被外层 except 静默吞掉 → session_model
+            # 从不落 runtime_checkouts → 跨 worker 模型漂移检测(读 DB session_model)永远拿不到新值
+            # → 用户「切了不生效、永远跑旧模型」真根因:切换只在处理该请求的 worker 内存里生效,落不到
+            # DB、传不到其它 worker(workers=4 下绝大多数 GM 请求落到没切过的 worker)。
             row = db.execute(
                 """
-                select rc.id, rc.state_snapshot
-                from runtime_checkouts rc
-                join user_runtime ur on ur.checkout_id = rc.id
-                where rc.save_id = %s
-                  and (%s is null or ur.user_id = %s)
+                select id, state_snapshot
+                from runtime_checkouts
+                where save_id = %s and (%s::bigint is null or user_id = %s)
+                order by updated_at desc
                 limit 1
                 """,
                 (int(save_id), user_id, user_id),

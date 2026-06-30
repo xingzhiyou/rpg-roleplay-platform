@@ -9,6 +9,11 @@ Version scheme: **SemVer** `MAJOR.MINOR.PATCH[-channel.N][+build]` since `v0.5.0
 
 ## [Unreleased]
 
+## [1.32.3] - 2026-06-30
+
+### Fixed
+- **后期角色出现在 GM 每轮思考里(反馈 #84.1)**:`novel.py` 注入待发生锚点用 `limit=20` + 50 章窗口 → 把远未来锚点(尚未登场的后期角色,如无限流「楚轩」)成批灌进 GM 上下文 → 思考被未来角色污染、徒增 token(真库 save 268:20 条全是原著郑吒剧情线、楚轩在第 8 条)。按章近优排序后**只取最近 6 拍**(`limit=20→6`):楚轩等远锚点不再进 GM视野;不影响进度计算 / pending NPC 强制注入 → 无 stall 风险。真库验证 limit=6 后楚轩已被砍。
+
 ## [1.32.2] - 2026-06-30
 
 ### Fixed

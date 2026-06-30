@@ -191,8 +191,13 @@ def _extract_anchor_npc_names(state, save_id: int | None) -> list[str]:
         world = data.get("world", {}) or {}
         _wt = (world.get("time") or "").strip()
         prog = get_progress_window(int(save_id), world_time_label=_wt, window_size=50)
+        # 群反馈 #84:原 limit=20 把 50 章窗口里的远未来锚点(尚未登场的后期角色,如无限流的「楚轩」)成批
+        # 灌进 GM 每轮上下文 → GM 思考被未来角色污染(真库 save 268:20 条全是原著郑吒的剧情线,楚轩在第 8 条)、
+        # 徒增 token、还把"原著主角的剧情"压给本不在这条线上的穿越者玩家(同 #87)。按章节近优排序后只取最近 6 拍
+        # 足够引导,远未来锚点不进 GM 视野。不影响进度计算(那走 get_progress_window/marking)、不影响 pending
+        # NPC 强制注入(_extract_anchor_npc_names 另算)→ 无 stall 风险。
         anchors = list_pending_for_phase(
-            int(save_id), None, limit=20,
+            int(save_id), None, limit=6,
             chapter_min=prog["chapter_min"], chapter_max=prog["chapter_max"],
             order_by_chapter=True,
         ) or []

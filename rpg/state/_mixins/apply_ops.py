@@ -385,6 +385,11 @@ class ApplyOpsMixin:
             _new_name = str(value or "").strip()
             if _new_name != _cur_name:  # 含 空→郑吒;仅同值 no-op 放行(不刷拒绝噪音)
                 return f"状态写入拒绝:玩家姓名只由玩家本人设定,GM/史官 不可写(拦截「{_cur_name or '(空)'}」→「{_new_name}」)"
+        # 1-c fork 收编:/set story_intent=X 之前写到顶层 data["story_intent"](没人读),而
+        # WorldlineProvider 读的是 player_private.story_intent(建档 dual-write 的字段)→ 游戏中
+        # 改 story_intent 对 GM 导演层无效。统一路由到 player_private.story_intent(与建档+读取同源)。
+        if path == "story_intent":
+            path = "player_private.story_intent"
         # task 87 Phase 6: dispatcher 路由
         if str(source or "").startswith("gm") and not force:
             try:

@@ -126,6 +126,8 @@ def _write_path_allowed(path: str, mode: str) -> bool:
         "player.background",
         "player.current_location",
         "world.time",
+        "world.weather",   # P3 fork 收编:recorder/extractor 提示词声明 weather 可写,但白名单漏它
+                           # → default 模式每回合静默入 pending。天气是低风险叙事态,纳入白名单。
         "world.timeline.current_phase",
         "world.timeline.anchor_state",
         "world.known_events",
@@ -144,6 +146,7 @@ def _write_path_allowed(path: str, mode: str) -> bool:
         return path in {
             "player.current_location",
             "world.time",
+            "world.weather",   # P3:recorder/extractor 声明 weather 可写,default 白名单漏它 → 静默入 pending
             "memory.main_quest",
             "memory.current_objective",
             "memory.resources",

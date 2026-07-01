@@ -9,6 +9,17 @@ Version scheme: **SemVer** `MAJOR.MINOR.PATCH[-channel.N][+build]` since `v0.5.0
 
 ## [Unreleased]
 
+## [1.32.11] - 2026-07-01
+
+流水线去 fork · 批次6(真机 e2e 复查 + 审计遗漏补修)。
+
+### Added
+- **async acceptance retry 真机 e2e**(`test_acceptance_retry_fires_e2e.py`):真实 chat 端点 + async 生产路径 + 真实 rule 验收器,只 stub curator/GM(第一稿不满足→触发 retry→第二稿满足)。验证回合 200 无 error、GM 被调 2 次(retry 真 fire)、`acceptance_retry` 事件、最终落库第二稿。补上批次4 之前缺的真回合验证。
+
+### Fixed
+- **reveal_clause_v2 v2 前沿门控漏传 progress_chapter**(P1,休眠于 `RPG_TKB_FRONTIER` off):3 处 `_rc_v2` 调用(主/parent/shadow)漏传 → `save_visible_anchors` 空(新档)时带 `reveal_anchor_key` 的实体全被过滤、层级树空。补齐。
+- **harness 时间跳跃路径漏 recall/time-value 双门**(P2):harness(所有 BYOK 主路径)缺了 `llm_curator` 分支已有的 `is_recall_framing` + `looks_like_time_value` 两道门 → 玩家「回想起…」触发假时间跳跃(v1.26.4 只修了另一分支)。对齐。
+
 ## [1.32.10] - 2026-07-01
 
 流水线去 fork · 批次5(收尾)。

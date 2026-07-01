@@ -9,6 +9,14 @@ Version scheme: **SemVer** `MAJOR.MINOR.PATCH[-channel.N][+build]` since `v0.5.0
 
 ## [Unreleased]
 
+## [1.32.10] - 2026-07-01
+
+流水线去 fork · 批次5(收尾)。
+
+### Fixed
+- **`/set story_intent=X` 对 GM 导演层无效**:之前写到没人读的顶层 `data["story_intent"]`,而 WorldlineProvider 读的是 `player_private.story_intent`(建档 dual-write 字段)→ 游戏中改 story_intent 白改。`apply_state_write_typed` 统一路由 `story_intent → player_private.story_intent`(与建档+读取同源)。
+- **`world.weather` 被权限白名单漏掉**:recorder/extractor 提示词声明天气可写,但 `default`/`auto_review` 白名单不含它 → 每回合静默入 pending 审批。天气是低风险叙事态,纳入白名单(`read_only` 仍拦)。
+
 ## [1.32.9] - 2026-07-01
 
 流水线去 fork · 批次4(async acceptance retry 真正生效)。

@@ -276,7 +276,15 @@ def _build_tool_schema(tasks: frozenset[str], acceptance_clauses: list[str] | No
             "type": ["integer", "null"],
             "description": "本回合最接近原著第几章（无法定位或不确定 → null）",
         }
-        required.extend(["reached", "current_chapter"])
+        # fork 收编:progress_motion 之前只声明在 system prompt 文本里(_build_system_prompt:139),
+        # 没进 tool schema → Anthropic 原生 tool-use / Vertex function-call 下 LLM 不吐它 →
+        # _safe_progress_motion(None) → anchor_reconcile.do_pace=False → pace fallback 在主力
+        # provider 上永不触发(发散局进度冻死的真根因)。tool-schema 与 prompt 必须同源。
+        properties["progress_motion"] = {
+            "type": ["integer", "null"],
+            "description": "本回合叙事推进度(必答):0=原地/回忆无推进,1=正常推进一拍,2=重大跨越。发散局脱离原著也要答,与 current_chapter 无关。",
+        }
+        required.extend(["reached", "current_chapter", "progress_motion"])
 
     if "acceptance" in tasks:
         # enum 锁定到传入条款原文（与 acceptance_verifier 完全一致）

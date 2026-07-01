@@ -753,7 +753,10 @@ def _parse_curator_json(text: str) -> dict[str, Any]:
         "candidate_actions": _string_list(data.get("candidate_actions")),
         # 5E-compatible 规则动作候选。LLM 返回 dict 列表；解析时只接受 dict（容错过滤）。
         "rule_candidate_actions": _rule_actions_list(data.get("rule_candidate_actions")),
-        "acceptance": _string_list(data.get("acceptance")),
+        # 与 GM prompt 渲染上限对齐(rules_text.py:65 只渲染 acceptance[:6])。存 8 渲 6 →
+        # 第 7/8 条 GM 从没见过却被 verify_acceptance 检查 → 必然假 unmet + 白烧一次 retry。
+        # 收敛到 6:GM 所见 == verifier 所查,单一真相。
+        "acceptance": _string_list(data.get("acceptance"))[:6],
         "risk_flags": _string_list(data.get("risk_flags")),
         "confidence": conf,
         "clarifying_question": str(data.get("clarifying_question") or "").strip(),

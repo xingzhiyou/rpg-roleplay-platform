@@ -9,6 +9,15 @@ Version scheme: **SemVer** `MAJOR.MINOR.PATCH[-channel.N][+build]` since `v0.5.0
 
 ## [Unreleased]
 
+## [1.32.6] - 2026-07-01
+
+GM 每回合流水线系统性审计(43 原始发现 → 30 对抗验证确认)后的分批去 fork 收尾 · 批次1(全确定性根修)。
+
+### Fixed
+- **发散局进度冻死在 Anthropic/Vertex(主力 provider)**(审计 P1):`progress_motion` 只声明在 recorder system prompt 文本里,没进 `_build_tool_schema` 的 anchors 块 → 原生 tool-use / Vertex function-call 下 LLM 不吐它 → `_safe_progress_motion(None)` → `do_pace=False` → pace fallback 永不触发(此前只对 OpenAI-compat 有效)。补进 tool-schema(收 provider fork)+ 加 parity 守卫测试(tool-schema 与 system prompt 必须同源声明该字段)。
+- **acceptance 跳过元信息污染活事实库(污染回路 B)**:`master.py` 曾指示 GM 把「acceptance 'X' 跳过因为 Y」写进 `memory.facts`,被 MemoryProvider/short_summary 每回合回读 → 自强化污染剧情记忆。双保险:`apply_ops` 落库层确定性拦截该类字符串 + `master.py` 改指示直接跳过、不写任何状态字段(审计的事)。
+- **acceptance 存 8 渲 6 → 必然假 unmet retry**:curator 存 `acceptance[:8]` 但 GM prompt 只渲染 `[:6]`,第 7/8 条 GM 从没见过却被 verifier 检查 → 必然判 unmet + 白烧一次 GM 调用。存储上限收敛到 6,GM 所见 == verifier 所查。
+
 ## [1.32.5] - 2026-06-30
 
 ### Fixed

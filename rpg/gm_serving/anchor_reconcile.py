@@ -313,8 +313,9 @@ drift_score(偏离度 0.0-1.0):0.0=完全按原著;0.3=核心保留但过程/场
 
 【输出格式(严格)】
 仅输出一个 JSON 对象,以 `{` 开头、以 `}` 结尾。不要 markdown 围栏、不要解释:
-  {"reached": [{"anchor_key":"<来自列表>","drift_score":<0.0-1.0>}], "current_chapter": <章号整数 或 null>}
+  {"reached": [{"anchor_key":"<来自列表>","drift_score":<0.0-1.0>}], "current_chapter": <章号整数 或 null>, "progress_motion": <0|1|2>}
 没有锚点到达 → reached 为 []。无法定位章节 → current_chapter 为 null。
+progress_motion(必答,本回合叙事推进度):0=原地/回忆无推进,1=正常推进一拍,2=重大跨越。发散局脱离原著也要答,与 current_chapter 无关(供进度节奏兜底 pace fallback 用)。
 """
 
 
@@ -439,7 +440,18 @@ def _default_judge(
     except (TypeError, ValueError):
         estimated_chapter = None
 
-    return {"reached": reached, "estimated_chapter": estimated_chapter}
+    # 遗漏补(同 recorder tool-schema 的 progress_motion 修复):_default_judge(recorder_unified 关时走)
+    # 之前不产 progress_motion → 该路径 pace fallback 也失效。补上,与史官三合一路径同信号。
+    _pm_raw = parsed.get("progress_motion")
+    progress_motion: int | None = None
+    try:
+        if _pm_raw is not None:
+            _pm = int(_pm_raw)
+            progress_motion = 0 if _pm <= 0 else (2 if _pm >= 2 else 1)
+    except (TypeError, ValueError):
+        progress_motion = None
+
+    return {"reached": reached, "estimated_chapter": estimated_chapter, "progress_motion": progress_motion}
 
 
 def reconcile_anchors_for_turn(

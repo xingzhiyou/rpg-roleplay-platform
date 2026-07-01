@@ -508,6 +508,23 @@ def retrieve_context(user_input: str, verbose: bool = False, state=None, user_id
                                 pass
             except Exception as _prog_err:
                 log.warning(f"[retrieval] progress_chapter 同步跳过(非致命): {_prog_err}")
+            # C 修(反馈「主线不更新」):main_quest 从当前 phase 派生(锚点系统已知阶段),不再靠 GM
+            # 记得发【主线】→ 主线永不 stale。非破坏:仅当 main_quest 为空、或仍是上次自动派生值
+            # (=没被玩家 set_main_quest / GM【主线】手改)时刷新,保护手写主线。
+            try:
+                _mqp = _resolve_active_phase_range(_save_id_prog, script_id)
+                if _mqp and (_mqp.get("phase_label") or _mqp.get("summary")):
+                    _pl = (_mqp.get("phase_label") or "").strip()
+                    _ps = (_mqp.get("summary") or "").strip()
+                    _derived_mq = (f"{_pl} — {_ps}" if _pl and _ps else (_pl or _ps))[:200]
+                    _mem = state.data.setdefault("memory", {})
+                    _cur_mq = str(_mem.get("main_quest") or "").strip()
+                    _last_mq = str((state.data.get("player_private") or {}).get("_derived_main_quest") or "")
+                    if _derived_mq and (not _cur_mq or _cur_mq == _last_mq):
+                        _mem["main_quest"] = _derived_mq
+                        state.data.setdefault("player_private", {})["_derived_main_quest"] = _derived_mq
+            except Exception:
+                pass
         if not timeline_filter.get("anchor_chapter"):
             previous = (timeline.get("last_transition") or {}).get("from")
             if previous:

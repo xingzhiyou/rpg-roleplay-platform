@@ -25,7 +25,6 @@ from context_engine.layers import (
     _safe_timeline_filter,
     _state_schema_layer,
     _timeline_layer,
-    _worldline_layer,
     _write_results_layer,
 )
 from context_engine.loaders import (
@@ -59,7 +58,6 @@ __all__ = [
     "_write_results_layer",
     "_timeline_layer",
     "_safe_timeline_filter",
-    "_worldline_layer",
     # loaders
     "_safe_load_chars",
     "_load_characters",

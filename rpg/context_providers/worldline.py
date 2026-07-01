@@ -73,6 +73,19 @@ class WorldlineProvider(ContextProvider):
         if player.get("current_location"):
             lines.append(f"\n【玩家当前位置】{player['current_location']}")
 
+        # 移植自已废弃的 _worldline_layer(task 53):把当前权限模式的具体行为讲清楚,让 GM 在
+        # read_only/default 下少写无意义的【状态写入】(反正入 pending)、改用【询问玩家】。
+        # provider 化迁移时漏移这段 → GM 只看到「只读模式」标签、不知其语义。
+        _perm_mode = str(((data.get("permissions") or {}).get("mode")) or "full_access").strip()
+        _mode_behavior = {
+            "read_only": "【只读模式】你的任何状态写入都不会立即生效、全进玩家审批队列;本轮专注叙事 + 用【询问玩家】把要变更处做成选项,别写多余结构化标签。",
+            "default": "【默认权限】白名单字段(current_location/time/main_quest/current_objective/resources/abilities/facts/known_events/relationships.*)自动生效,其它进审批;尽量只写白名单内字段。",
+            "auto_review": "【自动审查】白名单字段 + worldline.user_variables.* + relationships.* 自动生效,其它需审批。",
+            "full_access": "【完全访问】除硬黑名单(permissions.*/history.*/schema_version)外全部立即生效;仍不可写 permissions.*(用户权限边界,由 UI 切)。",
+        }.get(_perm_mode)
+        if _mode_behavior:
+            lines.append(f"\n【本轮写入权限行为】{_mode_behavior}")
+
         text = "\n".join(lines)
         layers.append(self.make_layer(
             "worldline", "世界线 / 用户变量", text,

@@ -103,7 +103,7 @@ AGENT_PROMPT = """\
 confidence 阈值：
 - >= 0.7：清晰意图，正常调主 GM
 - 0.5-0.7：有歧义但可推进，把歧义写进 risk_flags
-- < 0.5：意图模糊，填 clarifying_question 让系统先问玩家，主 GM 本轮不出场
+- < 0.5：意图模糊，填 clarifying_question 记录你的疑问；但主 GM 本轮仍会做最合理解读推进（管线已不再短路等待，仅在真正互斥抉择时由主 GM 用 question op 弹窗）
 
 clarifying_question 写法：直接的封闭式问题 + 2-3 个候选答案。
 例：「你想让阿衡先在塔下观察，还是直接推门进去？(A) 观察 (B) 推门进入 (C) 退后撤离」
